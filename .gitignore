@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual envs
+.venv/
+venv/
+ENV/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# SQLite runtime files
+data/*.db
+data/*.db-shm
+data/*.db-wal
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Node placeholder
+node_modules/
+dist/
