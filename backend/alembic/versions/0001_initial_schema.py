@@ -1,14 +1,25 @@
-"""initial schema
+"""
+初始数据库模式迁移脚本。
 
 Revision ID: 0001_initial_schema
 Revises: None
 Create Date: 2026-05-12
+
+本迁移脚本创建系统的初始数据库表结构，包括：
+- 静态规则表：精灵、性格、技能、状态定义、属性克制规则
+- 玩家配置表：己方精灵配置
+- 战斗运行时表：战斗主表、精灵状态、技能槽
+- 候选配置表：敌方候选配置、计算缓存
+- 状态效果表：状态实例、状态快照
+- 事件日志表：通用事件、伤害事件、状态变化事件、资源变化事件
 """
+
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
 
+# 迁移标识
 revision: str = "0001_initial_schema"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
@@ -16,6 +27,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def timestamp_columns() -> list[sa.Column]:
+    """
+    返回标准的时间戳列定义。
+
+    Returns:
+        list[sa.Column]: 包含 created_at、updated_at、deleted_at 的列定义列表
+    """
     return [
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
@@ -24,6 +41,14 @@ def timestamp_columns() -> list[sa.Column]:
 
 
 def upgrade() -> None:
+    """
+    执行数据库升级。
+
+    创建所有初始表结构和索引。
+    """
+    # ==================== 静态规则表 ====================
+
+    # 精灵定义表
     op.create_table(
         "elf_definition",
         sa.Column("elf_id", sa.String(), primary_key=True),
@@ -47,6 +72,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_elf_definition_name", "elf_definition", ["elf_name"])
 
+    # 性格定义表
     op.create_table(
         "nature_definition",
         sa.Column("nature_id", sa.String(), primary_key=True),
@@ -60,6 +86,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_nature_definition_name", "nature_definition", ["nature_name"])
 
+    # 技能定义表
     op.create_table(
         "skill_definition",
         sa.Column("skill_id", sa.String(), primary_key=True),
@@ -82,6 +109,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_skill_definition_name", "skill_definition", ["skill_name"])
 
+    # 状态效果定义表
     op.create_table(
         "effect_definition",
         sa.Column("effect_id", sa.String(), primary_key=True),
@@ -132,6 +160,9 @@ def upgrade() -> None:
     op.create_index("idx_effect_definition_category", "effect_definition", ["category"])
     op.create_index("idx_effect_definition_owner_scope", "effect_definition", ["owner_scope"])
 
+    # ==================== 关联表 ====================
+
+    # 精灵可学习技能关联表
     op.create_table(
         "elf_learnable_skill",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
@@ -143,6 +174,7 @@ def upgrade() -> None:
     op.create_index("idx_elf_learnable_skill_elf", "elf_learnable_skill", ["elf_id"])
     op.create_index("idx_elf_learnable_skill_skill", "elf_learnable_skill", ["skill_id"])
 
+    # 属性克制规则表
     op.create_table(
         "type_effectiveness_rule",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
@@ -155,6 +187,9 @@ def upgrade() -> None:
     )
     op.create_index("idx_type_effectiveness_attack", "type_effectiveness_rule", ["attack_element_type"])
 
+    # ==================== 玩家配置表 ====================
+
+    # 玩家精灵配置表
     op.create_table(
         "player_elf_build",
         sa.Column("build_id", sa.String(), primary_key=True),
@@ -169,6 +204,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_player_elf_build_elf", "player_elf_build", ["elf_id"])
 
+    # 玩家配置技能槽表
     op.create_table(
         "player_elf_build_skill",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
@@ -179,6 +215,9 @@ def upgrade() -> None:
     )
     op.create_index("idx_player_elf_build_skill_build", "player_elf_build_skill", ["build_id"])
 
+    # ==================== 战斗运行时表 ====================
+
+    # 战斗主表
     op.create_table(
         "battle",
         sa.Column("battle_id", sa.String(), primary_key=True),
@@ -193,6 +232,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_battle_phase", "battle", ["phase"])
 
+    # 战斗精灵状态表
     op.create_table(
         "battle_elf_state",
         sa.Column("state_id", sa.String(), primary_key=True),
@@ -217,6 +257,7 @@ def upgrade() -> None:
     op.create_index("idx_battle_elf_state_battle_side_elf", "battle_elf_state", ["battle_id", "side", "elf_id"])
     op.create_index("idx_battle_elf_state_active", "battle_elf_state", ["battle_id", "side", "is_active_elf"])
 
+    # 战斗技能槽表
     op.create_table(
         "battle_skill_slot",
         sa.Column("slot_id", sa.String(), primary_key=True),
@@ -235,6 +276,9 @@ def upgrade() -> None:
     op.create_index("idx_battle_skill_slot_battle_elf", "battle_skill_slot", ["battle_id", "side", "elf_id"])
     op.create_index("idx_battle_skill_slot_skill", "battle_skill_slot", ["skill_id"])
 
+    # ==================== 候选配置表 ====================
+
+    # 敌方候选配置表
     op.create_table(
         "build_candidate",
         sa.Column("candidate_id", sa.String(), primary_key=True),
@@ -264,6 +308,9 @@ def upgrade() -> None:
     op.create_index("idx_build_candidate_battle_elf_excluded", "build_candidate", ["battle_id", "elf_id", "is_excluded"])
     op.create_index("idx_build_candidate_confidence", "build_candidate", ["battle_id", "elf_id", "confidence"])
 
+    # ==================== 状态效果表 ====================
+
+    # 战斗状态实例表
     op.create_table(
         "battle_effect_instance",
         sa.Column("instance_id", sa.String(), primary_key=True),
@@ -296,6 +343,7 @@ def upgrade() -> None:
     op.create_index("idx_effect_instance_battle_category", "battle_effect_instance", ["battle_id", "category"])
     op.create_index("idx_effect_instance_active", "battle_effect_instance", ["battle_id", "is_active"])
 
+    # 状态快照表
     op.create_table(
         "battle_effect_snapshot",
         sa.Column("snapshot_id", sa.String(), primary_key=True),
@@ -318,6 +366,9 @@ def upgrade() -> None:
     op.create_index("idx_effect_snapshot_battle_turn", "battle_effect_snapshot", ["battle_id", "turn_number", "created_at"])
     op.create_index("idx_effect_snapshot_source_event", "battle_effect_snapshot", ["source_event_id"])
 
+    # ==================== 事件日志表 ====================
+
+    # 通用战斗事件表
     op.create_table(
         "battle_event",
         sa.Column("event_id", sa.String(), primary_key=True),
@@ -341,6 +392,7 @@ def upgrade() -> None:
     op.create_index("idx_battle_event_battle_turn", "battle_event", ["battle_id", "turn_number", "created_at"])
     op.create_index("idx_battle_event_type", "battle_event", ["battle_id", "event_type"])
 
+    # 伤害事件详情表
     op.create_table(
         "damage_event",
         sa.Column("event_id", sa.String(), primary_key=True),
@@ -374,6 +426,7 @@ def upgrade() -> None:
     op.create_index("idx_damage_event_battle_event", "damage_event", ["battle_event_id"], unique=True)
     op.create_index("idx_damage_event_battle_pair", "damage_event", ["battle_id", "attacker_elf_id", "defender_elf_id"])
 
+    # 状态变化事件详情表
     op.create_table(
         "effect_change_event",
         sa.Column("event_id", sa.String(), primary_key=True),
@@ -405,6 +458,7 @@ def upgrade() -> None:
     op.create_index("idx_effect_change_battle_event", "effect_change_event", ["battle_event_id"])
     op.create_index("idx_effect_change_target", "effect_change_event", ["battle_id", "target_side", "target_elf_id"])
 
+    # 资源变化事件详情表
     op.create_table(
         "resource_change_event",
         sa.Column("event_id", sa.String(), primary_key=True),
@@ -426,6 +480,9 @@ def upgrade() -> None:
     )
     op.create_index("idx_resource_change_battle_event", "resource_change_event", ["battle_event_id"])
 
+    # ==================== 计算缓存表 ====================
+
+    # 计算缓存表
     op.create_table(
         "calculation_cache",
         sa.Column("cache_id", sa.String(), primary_key=True),
@@ -441,6 +498,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """
+    执行数据库降级。
+
+    删除所有创建的表，按依赖关系的逆序删除。
+    """
+    # 按依赖关系的逆序删除表
     for table in [
         "calculation_cache",
         "resource_change_event",

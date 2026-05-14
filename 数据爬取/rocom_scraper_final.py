@@ -1,11 +1,13 @@
 """
 洛克王国 BWIKI 精灵数据爬虫
+
 目标: https://wiki.biligame.com/rocom/精灵图鉴
-输出: data/sprites.json  (精灵基础数据 + 技能 + 克制关系)
-      data/sprites.csv   (同上，CSV 格式，技能列用分号拼接)
-      data/skills.csv    (全技能去重列表)
-      data/urls.csv      (图片URL列表，边爬边更新)
-      data/images/       (下载的图片，按类型分子目录)
+输出:
+  - data/sprites.json  (精灵基础数据 + 技能 + 克制关系)
+  - data/sprites.csv   (同上，CSV 格式，技能列用分号拼接)
+  - data/skills.csv    (全技能去重列表)
+  - data/urls.csv      (图片URL列表，边爬边更新)
+  - data/images/       (下载的图片，按类型分子目录)
 
 使用方法:
     pip install requests beautifulsoup4
@@ -20,6 +22,7 @@
     --repair-images    不重爬已有数据，只重新进入详情页补下载缺失图片
 """
 
+# ==================== 标准库导入 ====================
 import re
 import csv
 import json
@@ -32,12 +35,17 @@ import hashlib
 from pathlib import Path
 from urllib.parse import urljoin, unquote
 
+# ==================== 第三方库导入 ====================
 import requests
 from bs4 import BeautifulSoup
 
+# ==================== 全局配置 ====================
+
+# 基础URL配置
 BASE_URL = "https://wiki.biligame.com"
 LIST_URL = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4"
 
+# HTTP请求头，模拟浏览器访问
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -49,16 +57,17 @@ HEADERS = {
     "Referer": "https://wiki.biligame.com/rocom/",
 }
 
-# 请求间隔：每次随机 1.5~3 秒（--delay 参数覆盖下限）
+# 请求间隔配置：随机 1.5~3 秒（可通过 --delay 参数覆盖下限）
 _DELAY_MIN = 1.5
 _DELAY_MAX = 3.0
 
+# 创建全局 Session 对象，复用连接和 Cookie
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
-# ── URL 收集 & 图片下载 ────────────────────────────────────────────────────────
+# ==================== 图片下载相关全局变量 ====================
 
-# 图片类型 -> 子目录名
+# 图片类型到子目录的映射
 IMAGE_DIRS = {
     "sprite":    "images/sprites",    # 精灵立绘
     "attribute": "images/attributes", # 属性图标
@@ -67,35 +76,74 @@ IMAGE_DIRS = {
     "matchup":   "images/matchup",    # 克制表属性图标
 }
 
-_urls_cache: dict[str, dict] = {}   # url -> row, 去重用
+# URL 缓存，用于图片去重和断点续传
+_urls_cache: dict[str, dict] = {}   # url -> row
 _urls_path: Path | None = None
 _IMAGE_DEBUG = False
 
+# urls.csv 的列定义
 URL_COLUMNS = ["name", "type", "url", "local_path", "status", "bytes", "content_type", "error"]
 
 
-def _debug_image(msg: str):
-    """图片下载调试日志。用 --debug-images 开启。"""
+# ==================== 图片下载工具函数 ====================
+
+def _debug_image(msg: str) -> None:
+    """
+    图片下载调试日志。
+
+    使用 --debug-images 参数开启调试输出。
+
+    Args:
+        msg: 调试消息
+    """
     if _IMAGE_DEBUG:
         print(f"\n  [IMG-DEBUG] {msg}", flush=True)
 
 
 def _normalize_img_url(url: str) -> str:
-    """把图片地址统一转成绝对 URL，避免 requests 直接请求相对路径失败。"""
+    """
+    规范化图片URL。
+
+    把图片地址统一转成绝对 URL，避免 requests 直接请求相对路径失败。
+
+    Args:
+        url: 原始图片URL（可能是相对路径）
+
+    Returns:
+        str: 绝对 URL
+    """
     return urljoin(BASE_URL, url.strip()) if url else ""
 
 
-def _ensure_image_dirs(data_dir: Path):
-    """启动时就创建图片目录，让用户即使还没下载图片也能看到目录位置。"""
+def _ensure_image_dirs(data_dir: Path) -> None:
+    """
+    确保图片目录存在。
+
+    启动时创建所有图片子目录，让用户即使还没下载图片也能看到目录位置。
+
+    Args:
+        data_dir: 数据根目录
+    """
     for sub in IMAGE_DIRS.values():
         (data_dir / sub).mkdir(parents=True, exist_ok=True)
 
 
 def _best_img_src(img) -> str:
-    """从 img 标签里优先取 srcset/data-srcset 中分辨率最高的地址，否则退回 data-src/src。"""
+    """
+    从 img 标签提取最佳图片来源。
+
+    优先取 srcset/data-srcset 中分辨率最高的地址，否则退回 data-src/src。
+
+    Args:
+        img: BeautifulSoup img 标签对象
+
+    Returns:
+        str: 最佳图片URL
+    """
     if not img:
         return ""
 
+    # 尝试从 srcset 获取最高分辨率图片
     srcset = img.get("srcset") or img.get("data-srcset") or ""
     candidates: list[tuple[float, str]] = []
     if srcset:
@@ -118,11 +166,24 @@ def _best_img_src(img) -> str:
     if candidates:
         return max(candidates, key=lambda item: item[0])[1]
 
+    # 回退到普通 src 属性
     return img.get("data-src") or img.get("src") or ""
 
 
 def _guess_image_extension(url: str, content_type: str = "") -> str:
-    """从 Content-Type 或 URL 中推断图片扩展名。"""
+    """
+    推断图片扩展名。
+
+    从 Content-Type 或 URL 中推断图片扩展名。
+
+    Args:
+        url: 图片URL
+        content_type: HTTP Content-Type 头
+
+    Returns:
+        str: 扩展名（不含点）
+    """
+    # 首先尝试从 Content-Type 推断
     ctype = (content_type or "").split(";")[0].strip().lower()
     content_type_map = {
         "image/png": "png",
@@ -135,6 +196,7 @@ def _guess_image_extension(url: str, content_type: str = "") -> str:
     if ctype in content_type_map:
         return content_type_map[ctype]
 
+    # 从 URL 推断
     cleaned = url.split("?")[0].split("#")[0]
     filename = cleaned.rsplit("/", 1)[-1]
     m = re.search(r"\.([A-Za-z0-9]{2,5})$", filename)
@@ -146,15 +208,35 @@ def _guess_image_extension(url: str, content_type: str = "") -> str:
 
 
 def _make_image_local_path(name: str, img_type: str, url: str, ext: str) -> str:
-    """生成稳定且不容易重名的本地图片相对路径。"""
+    """
+    生成图片本地保存路径。
+
+    生成稳定且不容易重名的本地图片相对路径。
+
+    Args:
+        name: 图片名称（用于文件名）
+        img_type: 图片类型
+        url: 原始URL（用于生成唯一hash）
+        ext: 扩展名
+
+    Returns:
+        str: 相对路径
+    """
     safe_name = re.sub(r'[\\/:*?"<>|]', "_", name).strip() or "unnamed"
-    # 避免文件名过长；URL hash 用来防止同名图片互相覆盖。
-    safe_name = safe_name[:80]
+    safe_name = safe_name[:80]  # 避免文件名过长
     url_hash = hashlib.sha1(url.encode("utf-8")).hexdigest()[:10]
     return f"{IMAGE_DIRS[img_type]}/{safe_name}_{url_hash}.{ext}"
 
 
-def _init_urls(out_path: Path):
+def _init_urls(out_path: Path) -> None:
+    """
+    初始化 URL 缓存。
+
+    加载已有的 urls.csv 到内存缓存，支持断点续传和去重。
+
+    Args:
+        out_path: 输出文件路径
+    """
     global _urls_path, _urls_cache
     _urls_path = out_path.parent / "urls.csv"
     _urls_cache = {}
@@ -162,7 +244,7 @@ def _init_urls(out_path: Path):
     if _urls_path.exists():
         with open(_urls_path, encoding="utf-8-sig", newline="") as f:
             for row in csv.DictReader(f):
-                # 兼容旧 urls.csv 里可能保存过相对 URL 的情况。
+                # 兼容旧 urls.csv 里可能保存过相对 URL 的情况
                 normalized_url = _normalize_img_url(row.get("url", ""))
                 if normalized_url:
                     row["url"] = normalized_url
@@ -171,7 +253,21 @@ def _init_urls(out_path: Path):
 
 
 def _add_url(name: str, img_type: str, url: str, data_dir: Path, force: bool = False) -> str:
-    """记录一条图片 URL；本地文件不存在时下载，返回 data_dir 下的相对路径。"""
+    """
+    添加并下载图片。
+
+    记录一条图片 URL；本地文件不存在时下载，返回 data_dir 下的相对路径。
+
+    Args:
+        name: 图片名称
+        img_type: 图片类型
+        url: 图片URL
+        data_dir: 数据目录
+        force: 是否强制重新下载
+
+    Returns:
+        str: 本地相对路径
+    """
     if not url:
         _debug_image(f"跳过空图片URL: name={name!r}, type={img_type!r}")
         return ""
@@ -188,6 +284,7 @@ def _add_url(name: str, img_type: str, url: str, data_dir: Path, force: bool = F
     subdir = data_dir / IMAGE_DIRS[img_type]
     subdir.mkdir(parents=True, exist_ok=True)
 
+    # 检查缓存
     cached = _urls_cache.get(url)
     if cached and not force:
         cached_local = cached.get("local_path", "")
@@ -197,7 +294,7 @@ def _add_url(name: str, img_type: str, url: str, data_dir: Path, force: bool = F
             return cached_local
         _debug_image(f"缓存存在但本地文件缺失/为空，重新下载: {url}, cached_local={cached_local!r}")
 
-    # 先根据 URL 猜一个扩展名。若响应头给出更准确的 Content-Type，会在下载后修正路径。
+    # 准备下载
     guessed_ext = _guess_image_extension(url)
     local_path = cached.get("local_path") if cached and cached.get("local_path") else _make_image_local_path(name, img_type, url, guessed_ext)
     abs_path = data_dir / local_path
@@ -213,6 +310,7 @@ def _add_url(name: str, img_type: str, url: str, data_dir: Path, force: bool = F
     content_type = ""
     error = ""
 
+    # 下载图片
     if abs_path.exists() and abs_path.stat().st_size > 0 and not force:
         size = str(abs_path.stat().st_size)
         _debug_image(f"目标文件已存在，跳过下载: {abs_path.resolve()} ({size} bytes)")
@@ -232,11 +330,12 @@ def _add_url(name: str, img_type: str, url: str, data_dir: Path, force: bool = F
             if not r.content:
                 raise RuntimeError("响应内容为空")
 
+            # 验证响应类型
             ctype_simple = content_type.split(";")[0].strip().lower()
             if ctype_simple and not ctype_simple.startswith("image/"):
                 raise RuntimeError(f"响应不是图片，Content-Type={content_type!r}")
 
-            # 如果 Content-Type 显示的扩展名和 URL 猜测不同，改成更准确的文件后缀。
+            # 如果 Content-Type 显示的扩展名和 URL 猜测不同，修正文件后缀
             real_ext = _guess_image_extension(url, content_type)
             if real_ext != guessed_ext and not (cached and cached.get("local_path")):
                 local_path = _make_image_local_path(name, img_type, url, real_ext)
@@ -253,6 +352,7 @@ def _add_url(name: str, img_type: str, url: str, data_dir: Path, force: bool = F
             _debug_image(f"失败保存路径本应为: {abs_path.resolve()}")
             local_path = ""
 
+    # 更新缓存
     row = {
         "name": name,
         "type": img_type,
@@ -268,7 +368,12 @@ def _add_url(name: str, img_type: str, url: str, data_dir: Path, force: bool = F
     return local_path
 
 
-def _flush_urls():
+def _flush_urls() -> None:
+    """
+    刷新 URL 缓存到文件。
+
+    将内存中的 URL 缓存写入 urls.csv 文件。
+    """
     if _urls_path is None:
         return
     with open(_urls_path, "w", encoding="utf-8-sig", newline="") as f:
@@ -277,10 +382,20 @@ def _flush_urls():
         writer.writerows(_urls_cache.values())
 
 
-# ── 进度条 ────────────────────────────────────────────────────────────────────
+# ==================== 工具函数 ====================
 
-def print_progress(current: int, total: int, label: str = "", width: int = 28):
-    """用 \\r 在同一行覆写进度条"""
+def print_progress(current: int, total: int, label: str = "", width: int = 28) -> None:
+    """
+    打印进度条。
+
+    使用 \r 在同一行覆写，显示当前进度。
+
+    Args:
+        current: 当前进度
+        total: 总数量
+        label: 进度标签
+        width: 进度条宽度
+    """
     filled = int(width * current / total) if total > 0 else 0
     bar = "#" * filled + "-" * (width - filled)
     pct = current / total * 100 if total > 0 else 0
@@ -290,15 +405,23 @@ def print_progress(current: int, total: int, label: str = "", width: int = 28):
         print()
 
 
-# ── 工具函数 ──────────────────────────────────────────────────────────────────
-
 def fetch(url: str, retries: int = 3) -> BeautifulSoup:
     """
-    抓取页面并返回 BeautifulSoup 对象。
+    抓取页面并解析。
+
     失败时采用递增等待：第1次10s，第2次20s，第3次30s。
     567（反爬限制）单独提示。
+
+    Args:
+        url: 要抓取的 URL
+        retries: 重试次数
+
+    Returns:
+        BeautifulSoup: 解析后的页面
+
+    Raises:
+        RuntimeError: 重试次数用尽后仍失败
     """
-    # 每次重试前等待时间（秒）
     retry_waits = [10, 20, 30]
 
     for attempt in range(retries):
@@ -325,15 +448,32 @@ def fetch(url: str, retries: int = 3) -> BeautifulSoup:
 
 
 def img_alt_to_attr(alt: str) -> str:
-    """从图片 alt 文本提取属性名, 如 '图标 宠物 属性 光.png' -> '光'"""
+    """
+    从图片 alt 文本提取属性名。
+
+    例如 '图标 宠物 属性 光.png' -> '光'
+
+    Args:
+        alt: 图片 alt 文本
+
+    Returns:
+        str: 提取的属性名
+    """
     m = re.search(r'属性\s+(\S+?)(?:\.png)?$', alt)
     return m.group(1) if m else alt.strip()
 
 
-# ── 列表页解析 ────────────────────────────────────────────────────────────────
+# ==================== 列表页解析 ====================
 
 def parse_list_page() -> list[dict]:
-    """解析精灵图鉴列表页, 返回 [{no, name, form, url, has_shiny}, ...]"""
+    """
+    解析精灵图鉴列表页。
+
+    返回精灵基本信息列表，包含编号、名称、形态、URL等。
+
+    Returns:
+        list[dict]: 精灵信息列表
+    """
     print(f"[*] 抓取列表页: {LIST_URL}")
     soup = fetch(LIST_URL)
 
@@ -353,6 +493,7 @@ def parse_list_page() -> list[dict]:
         url = urljoin(BASE_URL, href)
         name_raw = unquote(href.split("/rocom/")[-1])
 
+        # 解析形态（如 "精灵名（形态名）"）
         form_m = re.match(r'^(.+?)（(.+)）$', name_raw)
         if form_m:
             name = form_m.group(1)
@@ -375,16 +516,25 @@ def parse_list_page() -> list[dict]:
     return entries
 
 
-# ── 详情页解析 ────────────────────────────────────────────────────────────────
+# ==================== 详情页解析 ====================
 
 def parse_stat_block(soup: BeautifulSoup) -> dict:
-    """解析种族值"""
+    """
+    解析种族值。
+
+    从详情页提取精灵的六维种族资质。
+
+    Args:
+        soup: 解析后的页面
+
+    Returns:
+        dict: 六维种族资质
+    """
     stats = {}
     stat_map = {
         "生命": "hp", "物攻": "atk", "魔攻": "sp_atk",
         "物防": "def", "魔防": "sp_def", "速度": "spd",
     }
-    # 每个种族值在 <li> 里，包含 <p class="rocom_sprite_info_qualification_name">名称</p> 和数字
     seen = set()
     for li in soup.find_all("li"):
         name_p = li.find("p", attrs={"class": "rocom_sprite_info_qualification_name"})
@@ -402,14 +552,23 @@ def parse_stat_block(soup: BeautifulSoup) -> dict:
 
 
 def parse_ability(soup: BeautifulSoup) -> dict | None:
-    """解析特性"""
+    """
+    解析特性。
+
+    从详情页提取精灵的特性名称和描述。
+
+    Args:
+        soup: 解析后的页面
+
+    Returns:
+        dict | None: 特性信息，不存在则返回 None
+    """
     ability_header = soup.find(string=re.compile(r'^特性$'))
     if not ability_header:
         return None
     container = ability_header.find_parent()
     if not container:
         return None
-    # 特性名在下一个有内容的节点
     texts = [t.strip() for t in container.find_next_siblings(string=True) if t.strip()][:2]
     imgs = container.find_next_sibling()
     if not imgs:
@@ -417,7 +576,6 @@ def parse_ability(soup: BeautifulSoup) -> dict | None:
     ability_name = imgs.get_text(strip=True) if imgs else ""
     ability_desc_node = imgs.find_next_sibling() if imgs else None
     ability_desc = ability_desc_node.get_text(strip=True) if ability_desc_node else ""
-    # 备选: 直接从图片 alt
     img = container.find_next("img", alt=re.compile(r'^(?!图标|界面|页面)'))
     if img:
         ability_name = img.get("alt", ability_name).replace(".png", "")
@@ -425,9 +583,19 @@ def parse_ability(soup: BeautifulSoup) -> dict | None:
 
 
 def parse_type_matchup(soup: BeautifulSoup) -> dict:
-    """解析克制关系"""
+    """
+    解析克制关系。
+
+    从详情页提取精灵的属性克制关系（克制、被克制、抵抗、被抵抗）。
+
+    Args:
+        soup: 解析后的页面
+
+    Returns:
+        dict: 克制关系
+    """
     matchup = {
-        "strong_against": [],   # 克制 (我的属性技能对这些属性有效果)
+        "strong_against": [],   # 克制
         "weak_to": [],          # 被克制
         "resists": [],          # 抵抗
         "resisted_by": [],      # 被抵抗
@@ -445,7 +613,6 @@ def parse_type_matchup(soup: BeautifulSoup) -> dict:
         p = node.find_parent()
         if not p:
             continue
-        # 属性图片是 <p> 的兄弟节点，同在一个 <div> 内
         container = p.find_parent()
         if not container:
             continue
@@ -457,13 +624,25 @@ def parse_type_matchup(soup: BeautifulSoup) -> dict:
 
 
 def parse_skills(soup: BeautifulSoup, data_dir: Path | None = None, force: bool = False) -> list[dict]:
-    """解析技能列表，含等级要求和图标URL"""
+    """
+    解析技能列表。
+
+    从详情页提取精灵的技能信息，包括等级要求、威力、能耗等。
+
+    Args:
+        soup: 解析后的页面
+        data_dir: 数据目录（用于下载图标）
+        force: 是否强制重新下载
+
+    Returns:
+        list[dict]: 技能列表
+    """
     skills = []
     skill_cost_imgs = soup.find_all("img", alt=re.compile(r'图标 技能 星星背景'))
 
     for cost_img in skill_cost_imgs:
         try:
-            # 向上找技能容器块 (rocom_sprite_skill_box)
+            # 向上找技能容器块
             container = cost_img.find_parent()
             for _ in range(6):
                 if container and container.get("class") and "rocom_sprite_skill_box" in container.get("class", []):
@@ -474,7 +653,7 @@ def parse_skills(soup: BeautifulSoup, data_dir: Path | None = None, force: bool 
             if not container:
                 continue
 
-            # 等级要求: rocom_sprite_skill_level div
+            # 等级要求
             level = 0
             level_div = container.find(class_="rocom_sprite_skill_level")
             if level_div:
@@ -497,7 +676,7 @@ def parse_skills(soup: BeautifulSoup, data_dir: Path | None = None, force: bool 
                 skill_name = ""
                 skill_icon_url = ""
 
-            # 属性图标URL (优先取 srcset 里分辨率最高的图)
+            # 属性图标URL
             attr_icon_url = _best_img_src(attr_img) if attr_img else ""
 
             # 能量消耗
@@ -528,7 +707,7 @@ def parse_skills(soup: BeautifulSoup, data_dir: Path | None = None, force: bool 
             if not skill_name:
                 continue
 
-            # 下载图标，并把本地相对路径写入结果，方便后续定位
+            # 下载图标
             skill_icon_path = ""
             attr_icon_path = ""
             if data_dir and skill_icon_url:
@@ -550,6 +729,7 @@ def parse_skills(soup: BeautifulSoup, data_dir: Path | None = None, force: bool 
         except Exception:
             continue
 
+    # 去重
     seen = set()
     deduped = []
     for sk in skills:
@@ -560,16 +740,22 @@ def parse_skills(soup: BeautifulSoup, data_dir: Path | None = None, force: bool 
 
 
 def parse_attributes_from_detail(soup: BeautifulSoup) -> list[str]:
-    """从详情页解析精灵属性 (可能有双属性)"""
-    # 详情页顶部有属性图标
+    """
+    从详情页解析精灵属性。
+
+    提取精灵的系别属性（可能有双属性）。
+
+    Args:
+        soup: 解析后的页面
+
+    Returns:
+        list[str]: 属性列表
+    """
     header_area = soup.find("div", id="mw-content-text") or soup
     attrs = []
-    # 找标题附近的属性图标 (排除克制表里的)
-    # 策略: 找第一组属性图标 (在种族值之前)
     stat_node = soup.find(string=re.compile(r'种族值'))
     if stat_node:
         before_stats = stat_node.find_parent()
-        # 找在这之前出现的属性图标
         for img in soup.find_all("img", alt=re.compile(r'^图标 宠物 属性')):
             if before_stats and img in before_stats.find_all_previous("img"):
                 continue
@@ -582,7 +768,17 @@ def parse_attributes_from_detail(soup: BeautifulSoup) -> list[str]:
 
 
 def parse_evolution_chain(soup: BeautifulSoup) -> list[dict] | None:
-    """解析进化链，返回 [{name, id, condition}, ...] 或 None"""
+    """
+    解析进化链。
+
+    提取精灵的进化链信息。
+
+    Args:
+        soup: 解析后的页面
+
+    Returns:
+        list[dict] | None: 进化链信息
+    """
     box = soup.find("div", class_="rocom_spirit_evolution_box")
     if not box:
         return None
@@ -626,14 +822,26 @@ def parse_evolution_chain(soup: BeautifulSoup) -> list[dict] | None:
 
 
 def parse_sprite_detail(entry: dict, data_dir: Path | None = None, force: bool = False) -> dict:
-    """爬取并解析单个精灵的详情页"""
+    """
+    爬取并解析单个精灵的详情页。
+
+    提取精灵的完整信息，包括种族值、技能、特性、克制关系等。
+
+    Args:
+        entry: 精灵基本信息
+        data_dir: 数据目录
+        force: 是否强制重新下载
+
+    Returns:
+        dict: 精灵完整信息
+    """
     soup = fetch(entry["url"])
     content = soup.find("div", id="mw-content-text") or soup
 
     stats = parse_stat_block(content)
     sprite_image_path = ""
 
-    # 属性图标 (h1 之后前几个)
+    # 属性图标
     attrs = []
     h1 = soup.find("h1")
     if h1:
@@ -663,7 +871,7 @@ def parse_sprite_detail(entry: dict, data_dir: Path | None = None, force: bool =
                     ability_icon_path = _add_url(ability_name, "ability", ability_icon_url, data_dir, force)
                 ability = {"name": ability_name, "description": ability_desc, "icon": ability_icon_path}
 
-    # 精灵立绘 (rocom_sprite_grament_img 内第一个可见 img)
+    # 精灵立绘
     if data_dir:
         grament_div = content.find("div", class_="rocom_sprite_grament_img")
         if grament_div:
@@ -707,9 +915,14 @@ def parse_sprite_detail(entry: dict, data_dir: Path | None = None, force: bool =
     }
 
 
-# ── 主流程 ────────────────────────────────────────────────────────────────────
+# ==================== 主流程 ====================
 
 def main():
+    """
+    爬虫主函数。
+
+    解析命令行参数，执行爬取流程，保存结果。
+    """
     parser = argparse.ArgumentParser(description="洛克王国精灵数据爬虫")
     parser.add_argument("--limit", type=int, default=0, help="只爬前N只 (0=全部)")
     parser.add_argument("--delay", type=float, default=1.5,
@@ -744,7 +957,7 @@ def main():
                 p.unlink()
         _urls_cache.clear()
 
-    # 加载已有数据，按 (no, name, form) 建索引
+    # 加载已有数据
     existing: dict[tuple, dict] = {}
     if out_path.exists() and not args.force:
         with open(out_path, encoding="utf-8") as f:
@@ -772,7 +985,7 @@ def main():
         print_progress(i, len(entries), f"NO.{entry['no']:03d} {name_display}")
 
         if key in existing and not args.repair_images:
-            _debug_image(f"跳过已有精灵，不会重新解析详情页/下载图片: NO.{entry['no']:03d} {name_display}。如需补下载图片，请加 --repair-images 或 --force。")
+            _debug_image(f"跳过已有精灵: NO.{entry['no']:03d} {name_display}")
             results.append(existing[key])
             skipped += 1
             continue
@@ -781,7 +994,6 @@ def main():
             _debug_image(f"补下载已有精灵图片: NO.{entry['no']:03d} {name_display}")
             try:
                 repaired_data = parse_sprite_detail(entry, data_dir, False)
-                # 保留已有数据为主，同时合并最新解析到的图片路径字段。
                 merged = dict(existing[key])
                 merged["sprite_image"] = repaired_data.get("sprite_image", merged.get("sprite_image", ""))
                 if repaired_data.get("ability"):
@@ -827,8 +1039,15 @@ def main():
         print(f"[完成] 失败URL已记录至: {fail_path}")
 
 
-def _backfill_evolution_ids(results: list):
-    """用名字→no映射回填进化链中的no字段，支持有form的精灵"""
+def _backfill_evolution_ids(results: list) -> None:
+    """
+    回填进化链中的编号。
+
+    用名字到编号的映射回填进化链中的 no 字段。
+
+    Args:
+        results: 精灵数据列表
+    """
     name_to_no = {}
     for s in results:
         if not s.get("name"):
@@ -841,17 +1060,34 @@ def _backfill_evolution_ids(results: list):
             stage["no"] = name_to_no.get(stage["name"])
 
 
-def _save(data: list, path: Path):
+def _save(data: list, path: Path) -> None:
+    """
+    保存数据到 JSON 文件。
+
+    Args:
+        data: 数据列表
+        path: 输出路径
+    """
     if path.exists():
         shutil.copy2(path, path.with_suffix(".backup.json"))
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+# 技能 CSV 列定义
 SKILLS_CSV_COLUMNS = ["技能名", "属性", "类型", "威力", "耗能", "效果描述"]
 
 
-def _save_skills_csv(data: list, path: Path):
+def _save_skills_csv(data: list, path: Path) -> None:
+    """
+    保存技能数据到 CSV 文件。
+
+    提取所有精灵的技能，去重后保存。
+
+    Args:
+        data: 精灵数据列表
+        path: 输出路径
+    """
     seen = set()
     rows = []
     for sprite in data:
@@ -873,7 +1109,7 @@ def _save_skills_csv(data: list, path: Path):
         writer.writerows(rows)
 
 
-
+# 精灵 CSV 列定义
 CSV_COLUMNS = [
     "no", "name", "form", "url", "has_shiny",
     "attributes", "total_stats",
@@ -886,6 +1122,15 @@ CSV_COLUMNS = [
 
 
 def _sprite_to_csv_row(d: dict) -> dict:
+    """
+    转换精灵数据为 CSV 行。
+
+    Args:
+        d: 精灵数据字典
+
+    Returns:
+        dict: CSV 行数据
+    """
     stats = d.get("stats") or {}
     ability = d.get("ability") or {}
     matchup = d.get("type_matchup") or {}
@@ -929,7 +1174,14 @@ def _sprite_to_csv_row(d: dict) -> dict:
     }
 
 
-def _save_csv(data: list, path: Path):
+def _save_csv(data: list, path: Path) -> None:
+    """
+    保存精灵数据到 CSV 文件。
+
+    Args:
+        data: 精灵数据列表
+        path: 输出路径
+    """
     if path.exists():
         shutil.copy2(path, path.with_suffix(".backup.csv"))
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
