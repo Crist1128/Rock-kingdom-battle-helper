@@ -104,3 +104,44 @@ class LineupInput(BaseModel):
         elves: 精灵列表，包含双方六只精灵
     """
     elves: list[LineupElfInput] = Field(..., description="精灵列表")
+
+
+class StartBattleInput(BaseModel):
+    """
+    进入战斗阶段请求。
+
+    准备阶段阵容录入后，调用此请求确认双方首发并切换到 battle 阶段。
+    如果阵容录入时已经设置首发，也可以不传 active_elf_id。
+    """
+
+    self_active_elf_id: str | None = Field(default=None, description="己方首发精灵 ID")
+    enemy_active_elf_id: str | None = Field(default=None, description="敌方首发精灵 ID")
+
+
+class SwitchElfInput(BaseModel):
+    """
+    切换当前上场精灵请求。
+
+    切换时会触发 clear_on_switch 规则：可切换清除的状态会失效，不能
+    切换清除的状态会保留，并记录状态变化事件。
+    """
+
+    side: str = Field(..., description="切换阵营：self 或 enemy")
+    elf_id: str = Field(..., description="新上场精灵 ID")
+    turn_number: int | None = Field(default=None, description="发生回合，默认使用战斗当前回合")
+    notes: str | None = Field(default=None, description="备注")
+
+
+class LineupOut(BaseModel):
+    """
+    阵容录入响应。
+
+    返回本次生成的战斗精灵状态数量和敌方候选数量，便于前端确认准备
+    阶段是否完成。
+    """
+
+    battle_id: str
+    created_elf_state_count: int
+    generated_candidate_count: int
+    self_active_elf_id: str | None = None
+    enemy_active_elf_id: str | None = None

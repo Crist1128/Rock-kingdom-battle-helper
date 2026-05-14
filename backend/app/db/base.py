@@ -7,7 +7,7 @@
 - UTC 时间辅助函数
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -18,7 +18,8 @@ naming_convention = {
     "ix": "ix_%(column_0_label)s",  # 索引命名：ix_列名
     "uq": "uq_%(table_name)s_%(column_0_name)s",  # 唯一约束：uq_表名_列名
     "ck": "ck_%(table_name)s_%(constraint_name)s",  # 检查约束：ck_表名_约束名
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",  # 外键：fk_表名_列名_引用表名
+    # 外键：fk_表名_列名_引用表名
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",  # 主键：pk_表名
 }
 
@@ -30,7 +31,7 @@ def utc_now() -> datetime:
     Returns:
         datetime: 带 UTC 时区信息的当前时间
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Base(DeclarativeBase):

@@ -66,7 +66,10 @@ class BuildCandidate(TimestampMixin, Base):
     battle_id: Mapped[str] = mapped_column(ForeignKey("battle.battle_id"), nullable=False)
     side: Mapped[str] = mapped_column(String, nullable=False, default="enemy")
     elf_id: Mapped[str] = mapped_column(ForeignKey("elf_definition.elf_id"), nullable=False)
-    nature_id: Mapped[str] = mapped_column(ForeignKey("nature_definition.nature_id"), nullable=False)
+    nature_id: Mapped[str] = mapped_column(
+        ForeignKey("nature_definition.nature_id"),
+        nullable=False,
+    )
     individual_talent_distribution_json: Mapped[str] = mapped_column(Text, nullable=False)
 
     # 最终面板属性六维

@@ -67,7 +67,10 @@ class BattleEffectInstance(TimestampMixin, Base):
 
     instance_id: Mapped[str] = mapped_column(String, primary_key=True)
     battle_id: Mapped[str] = mapped_column(ForeignKey("battle.battle_id"), nullable=False)
-    effect_id: Mapped[str] = mapped_column(ForeignKey("effect_definition.effect_id"), nullable=False)
+    effect_id: Mapped[str] = mapped_column(
+        ForeignKey("effect_definition.effect_id"),
+        nullable=False,
+    )
     category: Mapped[str] = mapped_column(String, nullable=False)
 
     # 归属信息（状态跟随的目标）

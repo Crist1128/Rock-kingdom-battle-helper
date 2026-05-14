@@ -13,7 +13,7 @@
 """
 
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
 from pydantic import BaseModel
 
@@ -161,7 +161,11 @@ class StatCalculator:
             PanelStats: 计算后的六维面板属性
         """
         return PanelStats(
-            hp=StatCalculator.calculate_hp(base.hp, individual.hp, nature.multiplier_for(StatKey.HP)),
+            hp=StatCalculator.calculate_hp(
+                base.hp,
+                individual.hp,
+                nature.multiplier_for(StatKey.HP),
+            ),
             physical_attack=StatCalculator.calculate_non_hp(
                 base.physical_attack,
                 individual.physical_attack,
@@ -209,7 +213,11 @@ class StatCalculator:
         return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
     @staticmethod
-    def calculate_non_hp(base_talent: int, individual_talent: int, nature_multiplier: Decimal) -> int:
+    def calculate_non_hp(
+        base_talent: int,
+        individual_talent: int,
+        nature_multiplier: Decimal,
+    ) -> int:
         """
         计算非生命属性（物攻、物防、魔攻、魔防、速度）。
 

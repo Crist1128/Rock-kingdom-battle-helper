@@ -131,7 +131,10 @@ class DamageEvent(TimestampMixin, Base):
 
     event_id: Mapped[str] = mapped_column(String, primary_key=True)
     battle_id: Mapped[str] = mapped_column(ForeignKey("battle.battle_id"), nullable=False)
-    battle_event_id: Mapped[str] = mapped_column(ForeignKey("battle_event.event_id"), nullable=False)
+    battle_event_id: Mapped[str] = mapped_column(
+        ForeignKey("battle_event.event_id"),
+        nullable=False,
+    )
 
     # 攻击方和防御方
     attacker_side: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -221,7 +224,10 @@ class EffectChangeEvent(TimestampMixin, Base):
 
     event_id: Mapped[str] = mapped_column(String, primary_key=True)
     battle_id: Mapped[str] = mapped_column(ForeignKey("battle.battle_id"), nullable=False)
-    battle_event_id: Mapped[str] = mapped_column(ForeignKey("battle_event.event_id"), nullable=False)
+    battle_event_id: Mapped[str] = mapped_column(
+        ForeignKey("battle_event.event_id"),
+        nullable=False,
+    )
     turn_number: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # 变化类型和状态信息
@@ -288,7 +294,10 @@ class ResourceChangeEvent(TimestampMixin, Base):
 
     event_id: Mapped[str] = mapped_column(String, primary_key=True)
     battle_id: Mapped[str] = mapped_column(ForeignKey("battle.battle_id"), nullable=False)
-    battle_event_id: Mapped[str] = mapped_column(ForeignKey("battle_event.event_id"), nullable=False)
+    battle_event_id: Mapped[str] = mapped_column(
+        ForeignKey("battle_event.event_id"),
+        nullable=False,
+    )
 
     # 资源类型和变化类型
     resource_type: Mapped[str] = mapped_column(String, nullable=False)

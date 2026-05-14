@@ -344,7 +344,10 @@ class PlayerElfBuild(TimestampMixin, Base):
     build_id: Mapped[str] = mapped_column(String, primary_key=True)
     build_name: Mapped[str | None] = mapped_column(String, nullable=True)
     elf_id: Mapped[str] = mapped_column(ForeignKey("elf_definition.elf_id"), nullable=False)
-    nature_id: Mapped[str] = mapped_column(ForeignKey("nature_definition.nature_id"), nullable=False)
+    nature_id: Mapped[str] = mapped_column(
+        ForeignKey("nature_definition.nature_id"),
+        nullable=False,
+    )
     individual_talent_distribution_json: Mapped[str] = mapped_column(Text, nullable=False)
     final_stats_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
