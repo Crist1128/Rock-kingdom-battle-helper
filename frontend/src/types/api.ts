@@ -413,3 +413,69 @@ export interface BattlePurgeResultOut {
   rows: Record<string, number>;
   message: string;
 }
+
+
+export interface RocomCheckRequest {
+  /** 只检查前 N 条；0 表示全量。 */
+  limit?: number;
+  /** 响应中最多返回多少条新增精灵预览。 */
+  include_new_elves_limit?: number;
+}
+
+export interface RocomCheckResponse {
+  source: string;
+  status: "changed" | "unchanged";
+  checked_at: string;
+  remote_count: number;
+  local_rocom_count: number;
+  new_elf_count: number;
+  missing_local_count: number;
+  new_elves: Array<Record<string, unknown>>;
+  new_elves_truncated: boolean;
+  remote_fingerprint: string;
+  note: string;
+}
+
+export interface RocomDataUpdateRequest {
+  /** 是否实际提交数据库事务；false 为 dry-run。 */
+  commit?: boolean;
+  /** 是否强制重新爬取已缓存精灵。 */
+  force?: boolean;
+  /** 只更新前 N 条；0 表示全量。 */
+  limit?: number;
+  /** 爬虫请求间隔下限秒数。 */
+  delay?: number;
+  /** 是否下载图片；MVP 默认仅记录远程图片 URL。 */
+  with_images?: boolean;
+  /** 可选规则数据版本号，例如 rocom_bwiki_20260516。 */
+  data_version?: string | null;
+  /** 是否写 raw/cleaned JSON 文件便于审阅。 */
+  write_artifacts?: boolean;
+}
+
+export interface RocomLocalImportRequest {
+  /** cleaned JSON 目录；留空时使用后端 ROCOM_DATA_DIR/cleaned。 */
+  cleaned_dir?: string | null;
+  /** 是否实际提交数据库事务；false 为 dry-run。 */
+  commit?: boolean;
+  /** 可选：覆盖 cleaned 数据中的 data_version。 */
+  data_version?: string | null;
+}
+
+export interface RocomDataUpdateAccepted {
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  message: string;
+}
+
+export interface RocomDataUpdateJobStatus {
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  created_at: string;
+  job_type: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  params: Record<string, unknown>;
+  result?: Record<string, unknown> | null;
+  error?: string | null;
+}

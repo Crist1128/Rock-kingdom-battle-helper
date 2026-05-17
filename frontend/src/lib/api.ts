@@ -23,6 +23,12 @@ import type {
   PlayerElfBuildCreate,
   PlayerElfBuildOut,
   ResourceChangeEventCreate,
+  RocomCheckRequest,
+  RocomCheckResponse,
+  RocomDataUpdateAccepted,
+  RocomDataUpdateJobStatus,
+  RocomDataUpdateRequest,
+  RocomLocalImportRequest,
   SkillDefinitionOut,
   StartBattleInput,
   SwitchElfInput,
@@ -199,6 +205,35 @@ export const api = {
           headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
         },
       ),
+  },
+
+  adminDataUpdates: {
+    checkRocom: (payload: RocomCheckRequest = {}, adminToken?: string) =>
+      request<RocomCheckResponse>("/admin/data-updates/rocom/check", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        body: JSON.stringify(payload),
+      }),
+    syncRocom: (payload: RocomDataUpdateRequest, adminToken?: string) =>
+      request<RocomDataUpdateAccepted>("/admin/data-updates/rocom/sync", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        body: JSON.stringify(payload),
+      }),
+    importLocalRocom: (payload: RocomLocalImportRequest, adminToken?: string) =>
+      request<RocomDataUpdateAccepted>("/admin/data-updates/rocom/import-local", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        body: JSON.stringify(payload),
+      }),
+    getRocomJob: (jobId: string, adminToken?: string) =>
+      request<RocomDataUpdateJobStatus>(`/admin/data-updates/rocom/jobs/${jobId}`, {
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+      }),
+    listRocomJobs: (adminToken?: string) =>
+      request<RocomDataUpdateJobStatus[]>("/admin/data-updates/rocom/jobs", {
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+      }),
   },
 
 };

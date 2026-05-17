@@ -45,16 +45,25 @@ VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
 - `avatar`：按远程 URL 展示，并增加图片加载失败 fallback。
 - `data_version === "dev"`：规则库可切换显示；选择器默认优先隐藏 dev 示例数据。
 - `GET /api/v1/candidates/{battle_id}/{elf_id}/detail`
-- `GET /api/v1/candidates/{battle_id}/{elf_id}/evidence`：按最新 `speed_buckets`、`nature_distribution`、`pattern_distribution` 结构展示。
+- `GET /api/v1/candidates/{battle_id}/{elf_id}/evidence`
+- `POST /api/v1/admin/data-updates/rocom/check`
+- `POST /api/v1/admin/data-updates/rocom/import-local`
+- `POST /api/v1/admin/data-updates/rocom/sync`
+- `GET /api/v1/admin/data-updates/rocom/jobs`
+- `GET /api/v1/admin/data-updates/rocom/jobs/{job_id}`：按最新 `speed_buckets`、`nature_distribution`、`pattern_distribution` 结构展示。
 - Vite `/api` proxy：减少本地开发跨域和地址硬编码。
 
-普通用户页面没有接入：
+设置 / 数据管理页面已经接入主动数据更新入口：
 
 ```text
-/api/v1/admin/data-updates/*
+POST /api/v1/admin/data-updates/rocom/check
+POST /api/v1/admin/data-updates/rocom/import-local
+POST /api/v1/admin/data-updates/rocom/sync
+GET  /api/v1/admin/data-updates/rocom/jobs
+GET  /api/v1/admin/data-updates/rocom/jobs/{job_id}
 ```
 
-原因：该接口需要 `X-Admin-Token`，不应把 `ADMIN_UPDATE_TOKEN` 写入公开前端代码。
+这些接口仍由 `X-Admin-Token` 保护。前端只允许用户手动输入管理令牌并保存在浏览器 localStorage，不会把 `ADMIN_UPDATE_TOKEN` 写入公开代码。推荐流程是：先检查更新或 dry-run，再确认提交写库。
 
 ## 当前设计边界
 
@@ -98,6 +107,11 @@ VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
 - `GET /api/v1/candidates/{battle_id}/{elf_id}/summary`
 - `GET /api/v1/candidates/{battle_id}/{elf_id}/detail`
 - `GET /api/v1/candidates/{battle_id}/{elf_id}/evidence`
+- `POST /api/v1/admin/data-updates/rocom/check`
+- `POST /api/v1/admin/data-updates/rocom/import-local`
+- `POST /api/v1/admin/data-updates/rocom/sync`
+- `GET /api/v1/admin/data-updates/rocom/jobs`
+- `GET /api/v1/admin/data-updates/rocom/jobs/{job_id}`
 
 ## 已知后端边界与前端处理
 
