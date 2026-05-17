@@ -15,20 +15,43 @@ htmlcov/
 venv/
 ENV/
 
-# Env
+# Env / local secrets
 .env
 .env.*
 !.env.example
 
-# SQLite runtime files
-data/*.db
-data/*.db-shm
-data/*.db-wal
-backend/*.db
-backend/*.db-shm
-backend/*.db-wal
+# Runtime data and databases
+# 项目根 data/ 是本地运行数据目录，包含 SQLite 数据库、爬虫原始数据、清洗数据和图片；不要提交到 GitHub。
+/data/*
+!/data/.gitkeep
+!/data/README.md
 
-# IDE
+# 兼容旧路径：如果误把运行数据放到 backend/data/，也不要提交。
+/backend/data/*
+!/backend/data/.gitkeep
+!/backend/data/README.md
+
+# SQLite files and journals anywhere in the repo
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Rocom crawler/update artifacts
+**/data/rocom/raw/
+**/data/rocom/cleaned/
+**/data/rocom/images/
+**/sprites_raw.json
+**/image_urls.json
+**/failed_urls.txt
+
+# Logs
+*.log
+logs/
+
+# IDE / OS
 .vscode/
 .idea/
 .DS_Store
