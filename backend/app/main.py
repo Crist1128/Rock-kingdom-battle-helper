@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.seed.core_natures import ensure_core_natures_with_session
 
 
 def create_app() -> FastAPI:
@@ -41,6 +42,11 @@ def create_app() -> FastAPI:
     # 注册 API 路由，所有路由以 /api 为前缀
     app.include_router(api_router, prefix="/api")
 
+
+    @app.on_event("startup")
+    def ensure_core_rules_on_startup() -> None:
+        """服务启动时幂等补齐小型核心规则数据。"""
+        ensure_core_natures_with_session()
 
     @app.on_event("startup")
     def maybe_start_rocom_auto_update() -> None:
