@@ -1,6 +1,6 @@
-﻿# Frontend MVP 范围说明
+# Frontend MVP 范围说明
 
-更新日期：2026-05-19
+更新日期：2026-05-21
 
 ## 当前阶段
 
@@ -66,15 +66,16 @@
 
 ## 真实计算处理原则
 
-本项目当前真实计算部分尚未实现，因此前端遵循以下约束：
+本项目当前由后端负责规则计算与候选推断，前端遵循以下约束：
 
 - 不在前端计算真实伤害。
 - 不在前端计算真实速度先手概率。
 - 不展示伪伤害区间。
-- 不根据占位公式排除候选。
-- 候选面板保留 `formula_unavailable` 提示。
-- 技能伤害、击杀判断、速度概率只显示“未实现”或占位状态。
-- 前端只展示后端返回的事实和占位结果，不自行推断隐藏规则。
+- 不根据占位公式或前端猜测排除候选。
+- 伤害录入可同步提交 observation，由后端进行候选软评分。
+- 候选面板展示后端返回的摘要、Top 候选、unknown 或 `formula_unavailable` 等状态。
+- 技能伤害、击杀判断、速度概率只显示后端已提供的结果或明确的未实现状态。
+- 前端只展示后端返回的事实和推断结果，不自行推断隐藏规则。
 
 ## 当前依赖的主要后端接口
 
@@ -94,6 +95,7 @@
 - `POST /api/v1/battles/{battle_id}/archive`
 - `POST /api/v1/battles/{battle_id}/damage-events`
 - `POST /api/v1/battles/{battle_id}/resource-events`
+- `POST /api/v1/observations/{battle_id}`
 - `GET /api/v1/battles/{battle_id}/timeline`
 - `POST /api/v1/effects/instances`
 - `DELETE /api/v1/effects/instances/{instance_id}`
@@ -123,5 +125,5 @@
 1. 在规则库中增加状态定义维护/预览页面，用于配合 `effect_definition` 数据补充。
 2. 在事件日志中增加快照详情查看。
 3. 等后端提供真实速度上下文后，补速度区间/先手展示。
-4. 等后端提供真实候选证据链后，补候选排除原因展示。
+4. 基于后端 observation evidence，补候选匹配/冲突原因展示；硬排除原因等后端开启后再展示。
 5. 对当前大包构建进行路由级代码分割，降低 Vite chunk 体积警告。

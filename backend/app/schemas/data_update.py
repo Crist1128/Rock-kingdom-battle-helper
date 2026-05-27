@@ -15,7 +15,10 @@ class RocomDataUpdateRequest(BaseModel):
     limit: int = Field(default=0, ge=0, description="只更新前 N 条；0 表示全量")
     delay: float = Field(default=1.5, ge=0.5, description="请求间隔下限秒数")
     with_images: bool = Field(default=False, description="是否下载图片；MVP 默认仅记录图片 URL")
-    data_version: str | None = Field(default=None, description="写入数据版本号；为空则按 UTC 日期生成")
+    data_version: str | None = Field(
+        default=None,
+        description="写入数据版本号；为空则按 UTC 日期生成",
+    )
     write_artifacts: bool = Field(default=True, description="是否写 raw/cleaned JSON 文件便于审阅")
 
 

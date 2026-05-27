@@ -20,6 +20,8 @@ import type {
   LineupInput,
   LineupOut,
   NatureDefinitionOut,
+  ObservationCreate,
+  ObservationProcessResult,
   PlayerElfBuildCreate,
   PlayerElfBuildOut,
   ResourceChangeEventCreate,
@@ -165,6 +167,14 @@ export const api = {
       request<BattleEventOut>(`/battles/${battleId}/events/${eventId}/correct`, { method: "POST", body: JSON.stringify(payload) }),
     replayFrom: (battleId: string, eventId: string) =>
       request<BattleReplayResult>(`/battles/${battleId}/replay-from/${eventId}`, { method: "POST" }),
+  },
+
+  observations: {
+    process: (battleId: string, payload: ObservationCreate) =>
+      request<ObservationProcessResult>(`/observations/${battleId}`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
 
   candidates: {

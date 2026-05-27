@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Sheet } from "@/components/ui/sheet";
 import { EffectSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { useAppStore } from "@/store/useAppStore";
-import type { BattleElfStateDict, DamageDisplayType, Side } from "@/types/api";
+import type { BattleElfStateDict, DamageDisplayType, ObservationCreate, PanelStatsInput, Side } from "@/types/api";
 
 export function ManualEventDrawer({ battleId, state }: { battleId?: string | null; state?: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } } }) {
   const queryClient = useQueryClient();
@@ -19,6 +19,9 @@ export function ManualEventDrawer({ battleId, state }: { battleId?: string | nul
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] }),
       queryClient.invalidateQueries({ queryKey: ["timeline", battleId] }),
+      queryClient.invalidateQueries({ queryKey: ["candidate-summary"] }),
+      queryClient.invalidateQueries({ queryKey: ["candidate-detail"] }),
+      queryClient.invalidateQueries({ queryKey: ["candidate-list"] }),
     ]);
   };
 
@@ -56,26 +59,56 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
   const [hpBefore, setHpBefore] = useState<number | "">(100);
   const [hpAfter, setHpAfter] = useState<number | "">("");
   const [notes, setNotes] = useState("");
+  const [syncObservation, setSyncObservation] = useState(true);
+  const [resolveRules, setResolveRules] = useState(true);
+  const [damageTolerance, setDamageTolerance] = useState(0);
 
   const attackerElfId = attackerSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
   const defenderElfId = defenderSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
-  const mutation = useMutation({ mutationFn: () => api.battles.createDamageEvent(battleId, {
-    turn_number: state.battle.turn_number,
-    attacker_side: attackerSide,
-    attacker_elf_id: attackerElfId,
-    defender_side: defenderSide,
-    defender_elf_id: defenderElfId,
-    skill_id: skillId,
-    skill_confirmed: Boolean(skillId),
-    damage_display_type: damageDisplayType,
-    damage_value: damageDisplayType === "single_damage" ? damageValue : undefined,
-    final_total_damage_value: damageDisplayType === "visual_total_damage" ? damageValue : undefined,
-    per_hit_damage_value: damageDisplayType === "combo_repeated_damage" ? perHitDamage : undefined,
-    hit_count: damageDisplayType === "combo_repeated_damage" ? hitCount : undefined,
-    hp_percent_before: hpBefore === "" ? undefined : Number(hpBefore),
-    hp_percent_after: hpAfter === "" ? undefined : Number(hpAfter),
-    notes,
-  }), onSuccess: onDone });
+  const attackerElf = state.elves.find((elf) => elf.side === attackerSide && elf.elf_id === attackerElfId);
+  const defenderElf = state.elves.find((elf) => elf.side === defenderSide && elf.elf_id === defenderElfId);
+  const attackerPanelStats = toPanelStats(attackerElf?.panel_stats_json);
+  const defenderPanelStats = toPanelStats(defenderElf?.panel_stats_json);
+  const observedTotalDamage = damageDisplayType === "combo_repeated_damage" ? perHitDamage * hitCount : damageValue;
+  const observationPayload = buildDamageObservationPayload({
+    syncObservation,
+    resolveRules,
+    battleId,
+    attackerSide,
+    defenderSide,
+    attackerElfId,
+    defenderElfId,
+    attackerPanelStats,
+    defenderPanelStats,
+    skillId,
+    observedTotalDamage,
+    damageTolerance,
+    hitCount: damageDisplayType === "combo_repeated_damage" ? hitCount : 1,
+  });
+
+  const mutation = useMutation({ mutationFn: async () => {
+    const damageEvent = await api.battles.createDamageEvent(battleId, {
+      turn_number: state.battle.turn_number,
+      attacker_side: attackerSide,
+      attacker_elf_id: attackerElfId,
+      defender_side: defenderSide,
+      defender_elf_id: defenderElfId,
+      skill_id: skillId,
+      skill_confirmed: Boolean(skillId),
+      damage_display_type: damageDisplayType,
+      damage_value: damageDisplayType === "single_damage" ? damageValue : undefined,
+      final_total_damage_value: damageDisplayType === "visual_total_damage" ? damageValue : undefined,
+      per_hit_damage_value: damageDisplayType === "combo_repeated_damage" ? perHitDamage : undefined,
+      hit_count: damageDisplayType === "combo_repeated_damage" ? hitCount : undefined,
+      hp_percent_before: hpBefore === "" ? undefined : Number(hpBefore),
+      hp_percent_after: hpAfter === "" ? undefined : Number(hpAfter),
+      notes,
+    });
+    const observationResult = observationPayload
+      ? await api.observations.process(battleId, observationPayload)
+      : null;
+    return { damageEvent, observationResult };
+  }, onSuccess: onDone });
 
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
@@ -98,10 +131,94 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
         <NumberMaybeField label="受击前 HP%" value={hpBefore} onChange={setHpBefore} />
         <NumberMaybeField label="受击后 HP%" value={hpAfter} onChange={setHpAfter} />
       </div>
+      <div className="space-y-3 rounded-2xl border bg-slate-50 p-3 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={syncObservation} onChange={(e) => setSyncObservation(e.target.checked)} />
+          <span>同步写入候选反推观察</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={resolveRules} onChange={(e) => setResolveRules(e.target.checked)} disabled={!syncObservation} />
+          <span>启用后端规则解析（技能、本系、克制、应对）</span>
+        </label>
+        <NumberField label="伤害容差" value={damageTolerance} onChange={setDamageTolerance} />
+        {syncObservation && !observationPayload ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+            当前缺少可用于反推的敌方目标、伤害值或面板信息，本次只会记录事件。
+          </div>
+        ) : null}
+      </div>
+      {mutation.error ? <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">提交失败：{String((mutation.error as Error).message)}</div> : null}
       <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="备注" />
       <SubmitButton loading={mutation.isPending} />
     </form>
   );
+}
+
+interface DamageObservationBuildInput {
+  syncObservation: boolean;
+  resolveRules: boolean;
+  battleId: string;
+  attackerSide: Side;
+  defenderSide: Side;
+  attackerElfId?: string | null;
+  defenderElfId?: string | null;
+  attackerPanelStats: PanelStatsInput | null;
+  defenderPanelStats: PanelStatsInput | null;
+  skillId?: string | null;
+  observedTotalDamage: number;
+  damageTolerance: number;
+  hitCount: number;
+}
+
+function buildDamageObservationPayload(input: DamageObservationBuildInput): ObservationCreate | null {
+  if (!input.syncObservation || input.observedTotalDamage <= 0) return null;
+
+  const enemyElfId = input.attackerSide === "enemy" ? input.attackerElfId : input.defenderElfId;
+  if (!enemyElfId) return null;
+
+  const enemyIsAttacker = input.attackerSide === "enemy";
+  const payload: Record<string, unknown> = {
+    resolve_rules: input.resolveRules,
+    enemy_role: enemyIsAttacker ? "attacker" : "defender",
+    skill_id: input.skillId || undefined,
+    damage_tolerance: input.damageTolerance,
+    hit_count: input.hitCount,
+  };
+
+  if (enemyIsAttacker) {
+    if (!input.defenderPanelStats) return null;
+    payload.defender_panel_stats = input.defenderPanelStats;
+    payload.defender_elf_id = input.defenderElfId || undefined;
+  } else {
+    if (!input.attackerPanelStats) return null;
+    payload.attacker_panel_stats = input.attackerPanelStats;
+    payload.attacker_elf_id = input.attackerElfId || undefined;
+  }
+
+  return {
+    enemy_elf_id: enemyElfId,
+    observation_type: "damage_value",
+    observed_value: input.observedTotalDamage,
+    payload,
+  };
+}
+
+function toPanelStats(rawJson?: string | null): PanelStatsInput | null {
+  if (!rawJson) return null;
+  try {
+    const value = JSON.parse(rawJson) as Partial<Record<keyof PanelStatsInput, unknown>>;
+    const stats: PanelStatsInput = {
+      hp: Number(value.hp),
+      physical_attack: Number(value.physical_attack),
+      physical_defense: Number(value.physical_defense),
+      magic_attack: Number(value.magic_attack),
+      magic_defense: Number(value.magic_defense),
+      speed: Number(value.speed),
+    };
+    return Object.values(stats).every((item) => Number.isFinite(item)) ? stats : null;
+  } catch {
+    return null;
+  }
 }
 
 function ResourceForm({ battleId, state, defaultSide, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; onDone: () => void }) {

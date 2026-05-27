@@ -40,7 +40,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
 本版前端已适配：
 
 - `GET /api/v1/elves?q=&limit=&offset=`：精灵搜索、分页、远程头像展示。
-- `GET /api/v1/skills?q=&limit=&offset=`：技能搜索、分页、公式占位显示。
+- `GET /api/v1/skills?q=&limit=&offset=`：技能搜索、分页、规则字段展示。
 - `element_types_json`：前端统一 `JSON.parse()` 为属性数组。
 - `avatar`：按远程 URL 展示，并增加图片加载失败 fallback。
 - `data_version === "dev"`：规则库可切换显示；选择器默认优先隐藏 dev 示例数据。
@@ -50,7 +50,9 @@ VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
 - `POST /api/v1/admin/data-updates/rocom/import-local`
 - `POST /api/v1/admin/data-updates/rocom/sync`
 - `GET /api/v1/admin/data-updates/rocom/jobs`
-- `GET /api/v1/admin/data-updates/rocom/jobs/{job_id}`：按最新 `speed_buckets`、`nature_distribution`、`pattern_distribution` 结构展示。
+- `GET /api/v1/admin/data-updates/rocom/jobs/{job_id}`。
+- `POST /api/v1/observations/{battle_id}`：伤害录入后可同步提交候选反推观察。
+- 候选详情按最新 `speed_buckets`、`nature_distribution`、`pattern_distribution` 和 Top 候选结构展示。
 - Vite `/api` proxy：减少本地开发跨域和地址硬编码。
 
 设置 / 数据管理页面已经接入主动数据更新入口：
@@ -67,13 +69,13 @@ GET  /api/v1/admin/data-updates/rocom/jobs/{job_id}
 
 ## 当前设计边界
 
-本前端明确遵守“真实计算未实现”的项目边界：
+本前端明确遵守“计算由后端负责、前端不伪造规则”的项目边界：
 
-- 不实现真实伤害公式。
+- 不在前端实现伤害公式。
 - 不展示伪伤害区间。
-- 不实现真实速度先手概率。
-- 不基于占位公式排除候选。
-- 推算区固定展示 `formula_unavailable`、`manual only` 等状态。
+- 不在前端实现速度先手概率。
+- 不基于占位公式或前端猜测排除候选。
+- 伤害录入可把 observation 提交给后端，由后端进行软评分；存在未知因素时仍展示后端返回的 unknown / `formula_unavailable` / manual only 等状态。
 
 ## 后端接口依赖
 
@@ -118,6 +120,6 @@ GET  /api/v1/admin/data-updates/rocom/jobs/{job_id}
 1. 事件修正接口已提供通用入口，但复杂伤害/资源/状态子事件修正仍建议通过专用录入接口重新创建事实事件。
 2. 从修正点重放接口当前为占位返回，不会执行真实重算；后续需要 EventReplayService。
 3. `BattleStateOut.elves` 和 `active_effects` 仍返回 `dict`，前端用宽松类型接收，并在 UI 层容错。
-4. 真实伤害公式、速度先手概率、候选过滤仍未实现，前端继续显示 `formula_unavailable`。
+4. 完整真实伤害体系、速度先手概率和候选硬排除仍未完成；前端只展示后端 observation 软评分、Top 候选、unknown 或 `formula_unavailable` 等结果。
 
 详见 `BACKEND_NOTES.md`。

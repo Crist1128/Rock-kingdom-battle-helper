@@ -19,6 +19,11 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
     queryFn: () => api.candidates.detail(battleId!, elfId!),
     enabled,
   });
+  const topCandidatesQuery = useQuery({
+    queryKey: ["candidate-list", battleId, elfId, "top"],
+    queryFn: () => api.candidates.list(battleId!, elfId!, { limit: 5, offset: 0 }),
+    enabled,
+  });
   const natures = useQuery({ queryKey: ["natures", "candidate-panel"], queryFn: () => api.natures.list({ limit: 100 }) });
   const natureMap = useMemo(() => new Map((natures.data ?? []).map((nature) => [nature.nature_id, nature.nature_name])), [natures.data]);
 
@@ -42,6 +47,7 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
   const natureData = detailQuery.data?.nature_distribution ?? [];
   const talentData = detailQuery.data?.talent_distribution ?? [];
   const patternData = detailQuery.data?.pattern_distribution?.slice(0, 5) ?? [];
+  const topCandidates = topCandidatesQuery.data ?? [];
 
   return (
     <Card>
@@ -88,7 +94,30 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
         <DistributionList title="个体资质组合 Top" items={patternData.map((item) => ({ label: formatTalentPattern(item.pattern), value: `${item.count} · ${(item.ratio * 100).toFixed(1)}%` }))} />
         <DistributionList title="个体资质维度统计" items={talentData.map((item) => ({ label: statName(item.stat_key), value: `有资质 ${item.non_zero_count} · 无资质 ${item.zero_count}` }))} />
 
-        <Button className="w-full" variant="outline" onClick={() => { summaryQuery.refetch(); detailQuery.refetch(); }}>刷新候选摘要</Button>
+        <div className="rounded-2xl border bg-white p-3">
+          <div className="mb-2 text-sm font-semibold">候选 Top 5（按置信度）</div>
+          {topCandidates.length === 0 ? <div className="text-sm text-muted-foreground">暂无候选明细。</div> : null}
+          <div className="space-y-2">
+            {topCandidates.map((candidate, index) => (
+              <div key={candidate.candidate_id} className="rounded-xl border bg-slate-50 p-2 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">#{index + 1} {compactId(candidate.candidate_id)}</span>
+                  <span className="text-muted-foreground">{((candidate.confidence ?? 0) * 100).toFixed(1)}%</span>
+                </div>
+                <div className="mt-1 grid grid-cols-3 gap-1 text-muted-foreground">
+                  <span>评分 {candidate.match_score.toFixed(2)}</span>
+                  <span>HP {candidate.final_hp}</span>
+                  <span>速 {candidate.final_speed}</span>
+                  <span>物防 {candidate.final_physical_defense}</span>
+                  <span>魔防 {candidate.final_magic_defense}</span>
+                  <span>{candidate.is_excluded ? "已排除" : "有效"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Button className="w-full" variant="outline" onClick={() => { summaryQuery.refetch(); detailQuery.refetch(); topCandidatesQuery.refetch(); }}>刷新候选摘要</Button>
       </CardContent>
     </Card>
   );

@@ -255,6 +255,51 @@ export interface EffectApplyInput {
   notes?: string | null;
 }
 
+
+
+export type ObservationType =
+  | "damage_value"
+  | "hp_percent_delta"
+  | "speed_order"
+  | "skill_seen"
+  | "state_trigger"
+  | "survival";
+
+export interface PanelStatsInput {
+  hp: number;
+  physical_attack: number;
+  physical_defense: number;
+  magic_attack: number;
+  magic_defense: number;
+  speed: number;
+}
+
+export interface ObservationCreate {
+  enemy_elf_id: string;
+  event_id?: string | null;
+  observation_type: ObservationType;
+  observed_value?: number | string | null;
+  payload?: Record<string, unknown>;
+  event_weight?: number | null;
+  allow_hard_exclude?: boolean;
+}
+
+export interface ObservationProcessResult {
+  status: string;
+  battle_id: string;
+  enemy_elf_id: string;
+  event_id: string;
+  observation_type: string;
+  candidate_count: number;
+  matched_count: number;
+  mismatched_count: number;
+  unknown_count: number;
+  hard_excluded_count: number;
+  hard_filter_applied: boolean;
+  top_candidate_id?: string | null;
+  top_confidence?: number | null;
+}
+
 export interface CandidateSummaryOut {
   battle_id: string;
   elf_id: string;
