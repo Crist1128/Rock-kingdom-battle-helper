@@ -107,7 +107,9 @@ class AdminBattleService:
             battle_ids=battle_ids,
             rows=rows,
             message=(
-                "dry-run 预览完成，未删除任何数据。" if dry_run else "归档战斗及关联数据已物理删除。"
+                "dry-run 预览完成，未删除任何数据。"
+                if dry_run
+                else "归档战斗及关联数据已物理删除。"
             ),
         )
 
@@ -151,8 +153,7 @@ class AdminBattleService:
     def _count_related_rows(self, battle_id: str) -> dict[str, int]:
         """统计一场战斗将被删除的各表行数。"""
         return {
-            model.__tablename__: self._count_rows(model, battle_id)
-            for model in self._PURGE_ORDER
+            model.__tablename__: self._count_rows(model, battle_id) for model in self._PURGE_ORDER
         }
 
     def _count_rows(self, model: Any, battle_id: str) -> int:

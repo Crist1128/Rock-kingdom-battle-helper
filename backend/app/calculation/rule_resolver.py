@@ -198,16 +198,18 @@ class RuleResolver:
                 "value": str(context.type_multiplier),
             }
             return
-        if not context.skill_element_type or not context.defender_element_types:
+        attack_element_type = self._damage_element_type(context)
+        if not attack_element_type or not context.defender_element_types:
             return
 
         single_multipliers = [
-            self._single_type_multiplier(context.skill_element_type, defender_type)
+            self._single_type_multiplier(attack_element_type, defender_type)
             for defender_type in context.defender_element_types[:2]
         ]
         context.type_multiplier = self._combine_type_multipliers(single_multipliers)
         details["type_multiplier"] = {
             "source": "type_effectiveness_rule",
+            "attack_element_type": attack_element_type,
             "single_multipliers": [str(item) for item in single_multipliers],
             "value": str(context.type_multiplier),
         }
@@ -285,6 +287,13 @@ class RuleResolver:
         if elf is None or elf.deleted_at is not None:
             return []
         return self._normalize_element_types(loads_json(elf.element_types_json, []))
+
+    @staticmethod
+    def _damage_element_type(context: DamageFormulaContext) -> str | None:
+        """返回本次伤害实际用于属性克制的攻击属性。"""
+        if context.formula_type == "starfall":
+            return context.starfall_element_type
+        return context.skill_element_type
 
     @classmethod
     def _combine_type_multipliers(cls, values: list[Decimal]) -> Decimal:

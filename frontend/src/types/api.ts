@@ -52,12 +52,46 @@ export interface NatureDefinitionOut {
 export interface EffectDefinitionOut {
   effect_id: string;
   effect_name: string;
+  icon?: string | null;
   category: string;
   polarity: string;
   display_group: string;
+  display_priority: number;
   owner_scope: string;
+  target_scope: string;
+  attach_target_type: string;
+  is_visible_icon: boolean;
+  is_recognizable_by_icon: boolean;
+  recognition_alias_json?: string | null;
+  default_layers: number;
+  max_layers?: number | null;
+  stack_rule: string;
+  refresh_rule?: string | null;
+  duration_type: string;
+  default_duration_turns?: number | null;
+  default_duration_uses?: number | null;
   clear_on_switch: boolean;
+  clear_by_abnormal_cleanse: boolean;
+  clear_by_stat_clear: boolean;
+  clear_by_mark_clear: boolean;
+  clear_by_weather_replace: boolean;
+  clear_by_skill_specific: boolean;
+  can_be_transferred: boolean;
+  can_be_converted: boolean;
+  can_be_inherited: boolean;
+  can_be_stolen: boolean;
+  can_be_doubled: boolean;
+  conflict_group?: string | null;
+  conflict_policy?: string | null;
   formula_hooks_json?: string | null;
+  stat_modifier_json?: string | null;
+  damage_modifier_json?: string | null;
+  skill_modifier_json?: string | null;
+  action_modifier_json?: string | null;
+  resource_modifier_json?: string | null;
+  special_rule_id?: string | null;
+  developer_notes?: string | null;
+  data_version?: string | null;
 }
 
 export interface IndividualTalentInput {
@@ -199,6 +233,20 @@ export interface SwitchElfInput {
   notes?: string | null;
 }
 
+export interface EndTurnInput {
+  notes?: string | null;
+}
+
+export interface EndTurnResult {
+  battle: BattleOut;
+  battle_event: BattleEventOut;
+  ended_turn_number: number;
+  next_turn_number: number;
+  snapshot_id: string;
+  settlement_status: "not_implemented" | "settled" | "partial" | string;
+  settlement_events: Record<string, unknown>[];
+}
+
 export interface DamageEventCreate {
   turn_number?: number | null;
   attacker_side?: Side | null;
@@ -218,6 +266,38 @@ export interface DamageEventCreate {
   hp_percent_after?: number | null;
   enemy_hp_percent_damage?: number | null;
   notes?: string | null;
+}
+
+export interface DamageEventOut {
+  event_id: string;
+  battle_id: string;
+  battle_event_id: string;
+  attacker_side?: Side | null;
+  attacker_elf_id?: string | null;
+  defender_side?: Side | null;
+  defender_elf_id?: string | null;
+  skill_id?: string | null;
+  damage_display_type: string;
+  damage_value?: number | null;
+  final_total_damage_value?: number | null;
+  per_hit_damage_value?: number | null;
+  hit_count?: number | null;
+  computed_total_damage_value?: number | null;
+  hp_percent_before?: number | null;
+  hp_percent_after?: number | null;
+  hp_percent_delta?: number | null;
+  enemy_hp_percent_damage?: number | null;
+  formula_context_json?: string | null;
+  calculation_confidence?: number | null;
+  manual_override: boolean;
+}
+
+export interface DamageEventCreateResult {
+  battle_event: BattleEventOut;
+  damage_event: DamageEventOut;
+  snapshot_id: string;
+  inference_result: Record<string, unknown>;
+  post_settlement_events: Record<string, unknown>[];
 }
 
 export interface ResourceChangeEventCreate {

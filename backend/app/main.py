@@ -53,7 +53,10 @@ def create_app() -> FastAPI:
         """按配置在服务启动时被动触发一次洛克王国静态数据更新。"""
         if not settings.rocom_auto_update_on_startup:
             return
-        from app.services.rocom_data_update_service import RocomUpdateParams, start_rocom_update_thread
+        from app.services.rocom_data_update_service import (
+            RocomUpdateParams,
+            start_rocom_update_thread,
+        )
 
         start_rocom_update_thread(
             RocomUpdateParams(

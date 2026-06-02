@@ -180,6 +180,10 @@ class DamageEventCreateResult(BaseModel):
     damage_event: DamageEventOut
     snapshot_id: str
     inference_result: dict
+    post_settlement_events: list[dict] = Field(
+        default_factory=list,
+        description="本次伤害事件后自动触发的结算摘要，例如星陨",
+    )
 
 
 

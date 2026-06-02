@@ -107,26 +107,66 @@ class EffectDefinitionOut(ORMBase):
     """
     状态效果定义输出 Schema。
 
-    用于 API 响应中返回状态效果的基础信息。
+    用于 API 响应中返回状态效果定义。阶段 A 起该结构返回完整审阅字段，
+    让前端规则库可以直接检查状态挂载范围、叠层、清除规则、公式钩子和资源修正。
 
     Attributes:
         effect_id: 状态唯一标识
         effect_name: 状态显示名称
+        icon: 状态图标
         category: 状态分类
         polarity: 极性（正面/负面/中性）
         display_group: 显示分组
+        display_priority: 显示优先级
         owner_scope: 归属范围
+        target_scope: 目标范围
+        attach_target_type: 实际挂载目标类型
         clear_on_switch: 切换精灵时是否清除
         formula_hooks_json: 参与的公式钩子（JSON 字符串）
     """
+
     effect_id: str
     effect_name: str
+    icon: str | None = None
     category: str
     polarity: str
     display_group: str
+    display_priority: int
     owner_scope: str
+    target_scope: str
+    attach_target_type: str
+    is_visible_icon: bool
+    is_recognizable_by_icon: bool
+    recognition_alias_json: str | None = None
+    default_layers: int
+    max_layers: int | None = None
+    stack_rule: str
+    refresh_rule: str | None = None
+    duration_type: str
+    default_duration_turns: int | None = None
+    default_duration_uses: int | None = None
     clear_on_switch: bool
+    clear_by_abnormal_cleanse: bool
+    clear_by_stat_clear: bool
+    clear_by_mark_clear: bool
+    clear_by_weather_replace: bool
+    clear_by_skill_specific: bool
+    can_be_transferred: bool
+    can_be_converted: bool
+    can_be_inherited: bool
+    can_be_stolen: bool
+    can_be_doubled: bool
+    conflict_group: str | None = None
+    conflict_policy: str | None = None
     formula_hooks_json: str | None = None
+    stat_modifier_json: str | None = None
+    damage_modifier_json: str | None = None
+    skill_modifier_json: str | None = None
+    action_modifier_json: str | None = None
+    resource_modifier_json: str | None = None
+    special_rule_id: str | None = None
+    developer_notes: str | None = None
+    data_version: str | None = None
 
 
 class StatBlock(BaseModel):

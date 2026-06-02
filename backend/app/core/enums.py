@@ -92,11 +92,11 @@ class EffectCategory(StrEnum):
         SPECIAL_STATUS: 特殊状态（如萌化）
         MARK: 印记效果
         WEATHER: 天气/战场效果
-        DAMAGE_MODIFIER: 伤害修正（如增伤、减伤）
+        DAMAGE_MODIFIER: 伤害修正（如吸血、增伤）
         SKILL_MODIFIER: 技能修正（如威力变化、能耗变化）
         COMBO_MODIFIER: 连击修正
-        ACTION_RULE: 行动规则修正（如先手、迅捷、蓄力）
-        RESOURCE_RULE: 资源规则修正（如 PP 回复、能量获取）
+        ACTION_MODIFIER: 行动规则修正（如先手、迅捷、蓄力）
+        RESOURCE_MODIFIER: 资源规则修正（如生命、能量持续结算）
         SPECIAL_RULE: 特殊规则（如奉献）
     """
     STAT_MODIFIER = "stat_modifier"
@@ -107,9 +107,13 @@ class EffectCategory(StrEnum):
     DAMAGE_MODIFIER = "damage_modifier"
     SKILL_MODIFIER = "skill_modifier"
     COMBO_MODIFIER = "combo_modifier"
-    ACTION_RULE = "action_rule"
-    RESOURCE_RULE = "resource_rule"
+    ACTION_MODIFIER = "action_modifier"
+    RESOURCE_MODIFIER = "resource_modifier"
     SPECIAL_RULE = "special_rule"
+
+    # 兼容旧代码/旧数据中的命名。枚举序列化时仍使用新的 *_modifier 值。
+    ACTION_RULE = "action_modifier"
+    RESOURCE_RULE = "resource_modifier"
 
 
 class OwnerScope(StrEnum):
@@ -210,6 +214,8 @@ class BattleEventType(StrEnum):
         SWITCH_CLEAR: 切换清除状态
         WEATHER_CHANGE: 天气变化
         MARK_CHANGE: 印记变化
+        EFFECT_TRIGGER: 状态触发
+        TURN_END: 回合结束
     """
     SKILL_USE = "skill_use"
     DAMAGE = "damage"
@@ -226,3 +232,5 @@ class BattleEventType(StrEnum):
     SWITCH_CLEAR = "switch_clear"
     WEATHER_CHANGE = "weather_change"
     MARK_CHANGE = "mark_change"
+    EFFECT_TRIGGER = "effect_trigger"
+    TURN_END = "turn_end"

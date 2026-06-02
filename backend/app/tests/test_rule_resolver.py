@@ -88,6 +88,11 @@ def db_session() -> Iterator[Session]:
                 defense_element_type="water",
                 multiplier=0.5,
             ),
+            TypeEffectivenessRule(
+                attack_element_type="幻",
+                defense_element_type="grass",
+                multiplier=0.5,
+            ),
         ]
     )
     session.commit()
@@ -169,3 +174,19 @@ def test_rule_resolver_marks_unknown_when_response_branch_is_unknown(
 
     assert "response_success_unknown" in context.unknown_factors
     assert context.response_multiplier == Decimal("1")
+
+
+def test_rule_resolver_uses_starfall_element_for_type_multiplier(db_session: Session) -> None:
+    """星陨应按自身幻系结算克制，而不是按触发技能系别结算。"""
+    context = _context("grass_elf")
+    context.formula_type = "starfall"
+    context.trigger_skill_element_type = "fire"
+    context.trigger_skill_category = "physical"
+    context.effect_id = "effect_starfall_mark"
+    context.effect_layers = 1
+
+    resolved = RuleResolver(db_session).resolve_damage_context(context, {"resolve_rules": True})
+
+    assert resolved.skill_element_type == "fire"
+    assert resolved.rule_resolution_details["type_multiplier"]["attack_element_type"] == "幻"
+    assert resolved.type_multiplier == Decimal("0.5")

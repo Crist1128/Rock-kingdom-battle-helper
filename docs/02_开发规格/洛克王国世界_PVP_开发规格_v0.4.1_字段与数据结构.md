@@ -646,7 +646,7 @@ SpeedContext {
   enemy_panel_speed_candidates
 
   effect_snapshot_id
-  action_rule_effect_ids
+  action_modifier_effect_ids
   skill_priority_modifiers
 
   result_type
@@ -870,11 +870,11 @@ ResourceChangeEvent {
 | `special_status` | 特殊层数或特殊规则状态 |
 | `mark` | 印记 |
 | `weather` | 天气 / 战场环境 |
-| `damage_modifier` | 增伤 / 减伤 |
+| `damage_modifier` | 吸血 / 增伤等伤害修正 |
 | `skill_modifier` | 技能槽修正 |
 | `combo_modifier` | 连击数修正 |
-| `action_rule` | 行动规则 |
-| `resource_rule` | 生命 / 能量持续结算 |
+| `action_modifier` | 行动规则修正 |
+| `resource_modifier` | 生命 / 能量持续结算 |
 | `special_rule` | 复杂特殊机制 |
 
 ### 5.2 `owner_scope`

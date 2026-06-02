@@ -1,0 +1,161 @@
+[
+  {
+    "skill_name": "超维投射",
+    "source": "docs/04_附件/skills.csv:78",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers": 4,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方获得4层星陨印记。"
+      }
+    ]
+  },
+  {
+    "skill_name": "冥想",
+    "source": "docs/04_附件/skills.csv:137",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers": 2,
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "notes": "应对攻击成功时敌方获得2层星陨印记；条件未知时不自动执行。"
+      }
+    ]
+  },
+  {
+    "skill_name": "多维击打",
+    "source": "docs/04_附件/skills.csv:145",
+    "operations": [
+      {
+        "op_type": "modify_hit_count_from_effect_layers",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方每有1层星陨印记，本次技能连击数+1；阶段D先记录规则，不自动改连击。"
+      }
+    ]
+  },
+  {
+    "skill_name": "心灵洞悉",
+    "source": "docs/04_附件/skills.csv:370",
+    "operations": [
+      {
+        "op_type": "dynamic_apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers_from": "enemy_existing_starfall_layers",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方获得星陨印记，层数等于敌方印记层数；动态层数阶段D暂不自动执行。"
+      }
+    ]
+  },
+  {
+    "skill_name": "二律背反",
+    "source": "docs/04_附件/skills.csv:371",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers": 3,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方获得3层星陨印记。"
+      },
+      {
+        "op_type": "multiply_layers",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "multiplier": 2,
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "notes": "应对防御成功时额外使敌方星陨印记层数翻倍；条件未知时不自动执行。"
+      }
+    ]
+  },
+  {
+    "skill_name": "星轨裂变",
+    "source": "docs/04_附件/skills.csv:372",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers": 2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方获得2层星陨印记。"
+      }
+    ]
+  },
+  {
+    "skill_name": "超新星馈赠",
+    "source": "docs/04_附件/skills.csv:391",
+    "operations": [
+      {
+        "op_type": "dynamic_apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "base_layers": 2,
+        "layers_bonus_per_use": 1,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方获得2层星陨印记，每使用1次赋予层数+1；需要技能使用计数，阶段D暂不自动执行。"
+      }
+    ]
+  },
+  {
+    "skill_name": "空间压迫",
+    "source": "docs/04_附件/skills.csv:392",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers": 1,
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "notes": "造成物伤，敌方获得1层星陨印记。"
+      }
+    ]
+  },
+  {
+    "skill_name": "星链",
+    "source": "docs/04_附件/skills.csv:397",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers": 2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "2连击，每次连击使敌方获得1层星陨印记；P0 合并为确定增加2层。"
+      }
+    ]
+  },
+  {
+    "skill_name": "错乱",
+    "source": "docs/04_附件/skills.csv:398",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_starfall_mark",
+        "target": "enemy_side",
+        "layers": 3,
+        "condition": "response_status_success",
+        "timing": "on_skill_use",
+        "notes": "应对状态成功时敌方获得3层星陨印记；条件未知时不自动执行。"
+      }
+    ]
+  }
+]

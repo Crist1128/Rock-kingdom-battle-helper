@@ -170,7 +170,7 @@ class ObservationMatcher:
         context = DamageFormulaContext(
             battle_id=observation.battle_id,
             damage_event_id=observation.event_id,
-            formula_type="attack",
+            formula_type=str(payload.get("formula_type", "attack") or "attack"),
             attacker_side="enemy" if enemy_role == "attacker" else "self",
             defender_side="self" if enemy_role == "attacker" else "enemy",
             attacker_elf_id=attacker_elf_id,
@@ -180,6 +180,12 @@ class ObservationMatcher:
             defender_max_hp=defender_max_hp,
             skill_id=self._optional_str(payload.get("skill_id")),
             skill_element_type=self._optional_str(payload.get("skill_element_type")),
+            trigger_skill_id=self._optional_str(payload.get("trigger_skill_id")),
+            trigger_skill_element_type=self._optional_str(
+                payload.get("trigger_skill_element_type")
+            ),
+            trigger_skill_category=self._optional_str(payload.get("trigger_skill_category")),
+            starfall_element_type=str(payload.get("starfall_element_type", "幻") or "幻"),
             attacker_element_types=self._element_types_from_payload(payload.get("attacker_element_types")),
             defender_element_types=self._element_types_from_payload(payload.get("defender_element_types")),
             skill_category=self._optional_str(payload.get("skill_category")),
@@ -195,6 +201,8 @@ class ObservationMatcher:
             unstable_multiplier=payload.get("unstable_multiplier", 1),
             damage_reductions=payload.get("damage_reductions", []) or [],
             hit_count=int(payload.get("hit_count", 1) or 1),
+            effect_id=self._optional_str(payload.get("effect_id")),
+            effect_layers=int(payload.get("effect_layers", 1) or 1),
             observed_damage_value=self._optional_int(
                 payload.get("observed_damage_value", observation.observed_value)
             ),

@@ -2,6 +2,8 @@
 
 from app.calculation.attack_damage import AttackDamageCalculator
 from app.calculation.formula_context import CalculationPlaceholderResult, DamageFormulaContext
+from app.calculation.starfall_damage import StarfallDamageCalculator
+from app.calculation.status_damage import StatusDamageCalculator
 
 
 class DamageCalculator:
@@ -16,11 +18,17 @@ class DamageCalculator:
 
     def __init__(self) -> None:
         self.attack_damage_calculator = AttackDamageCalculator()
+        self.status_damage_calculator = StatusDamageCalculator()
+        self.starfall_damage_calculator = StarfallDamageCalculator()
 
     def calculate(self, context: DamageFormulaContext) -> CalculationPlaceholderResult:
         """计算伤害；上下文不足时返回 formula_unavailable。"""
         if context.formula_type == "attack":
             return self.attack_damage_calculator.calculate(context)
+        if context.formula_type == "status":
+            return self.status_damage_calculator.calculate(context)
+        if context.formula_type == "starfall":
+            return self.starfall_damage_calculator.calculate(context)
         return CalculationPlaceholderResult(
             status="formula_unavailable",
             formula_type=context.formula_type,

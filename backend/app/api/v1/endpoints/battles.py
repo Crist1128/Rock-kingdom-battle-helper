@@ -17,6 +17,8 @@ from app.schemas.battle import (
     BattleCreate,
     BattleOut,
     BattleStateOut,
+    EndTurnInput,
+    EndTurnResult,
     LineupInput,
     LineupOut,
     StartBattleInput,
@@ -151,6 +153,21 @@ def archive_battle(battle_id: str, db: Session = Depends(get_db)) -> Battle:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/{battle_id}/turns/end", response_model=EndTurnResult)
+def end_turn(
+    battle_id: str,
+    payload: EndTurnInput,
+    db: Session = Depends(get_db),
+) -> EndTurnResult:
+    """结束当前回合，先执行 P0 回合末自动结算，再推进回合号。"""
+    try:
+        return BattleService(db).end_turn(battle_id, payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/{battle_id}/state", response_model=BattleStateOut)
 def get_battle_state(battle_id: str, db: Session = Depends(get_db)) -> BattleStateOut:
     """获取战斗完整状态。"""
@@ -183,8 +200,8 @@ def create_damage_event(
     """
     创建伤害事件。
 
-    当前不会执行真实伤害公式，也不会排除候选配置；响应中的 inference_result
-    会明确返回 formula_unavailable。
+    记录手动伤害事实；阶段 C 起会在伤害后尝试结算星陨等 post_attack 触发效果。
+    候选推算仍默认只做软评分，不硬排除。
     """
     try:
         return DamageEventService(db).create_damage_event(battle_id, payload)

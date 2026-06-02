@@ -14,8 +14,11 @@ import type {
   CandidateOut,
   CandidateSummaryOut,
   DamageEventCreate,
+  DamageEventCreateResult,
   EffectApplyInput,
   EffectDefinitionOut,
+  EndTurnInput,
+  EndTurnResult,
   ElfDefinitionOut,
   LineupInput,
   LineupOut,
@@ -145,12 +148,17 @@ export const api = {
       request<BattleOut>(`/battles/${battleId}/start`, { method: "POST", body: JSON.stringify(payload) }),
     switchElf: (battleId: string, payload: SwitchElfInput) =>
       request<BattleOut>(`/battles/${battleId}/switch`, { method: "POST", body: JSON.stringify(payload) }),
+    endTurn: (battleId: string, payload: EndTurnInput = {}) =>
+      request<EndTurnResult>(`/battles/${battleId}/turns/end`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
     finish: (battleId: string) =>
       request<BattleOut>(`/battles/${battleId}/finish`, { method: "POST" }),
     archive: (battleId: string) =>
       request<BattleOut>(`/battles/${battleId}/archive`, { method: "POST" }),
     createDamageEvent: (battleId: string, payload: DamageEventCreate) =>
-      request<Record<string, unknown>>(`/battles/${battleId}/damage-events`, {
+      request<DamageEventCreateResult>(`/battles/${battleId}/damage-events`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),

@@ -31,5 +31,7 @@ router.include_router(player_builds.router, prefix="/player-builds", tags=["play
 router.include_router(battles.router, prefix="/battles", tags=["battles"])
 router.include_router(candidates.router, prefix="/candidates", tags=["candidates"])
 router.include_router(observations.router, prefix="/observations", tags=["observations"])
-router.include_router(data_updates.router, prefix="/admin/data-updates", tags=["admin-data-updates"])
+router.include_router(
+    data_updates.router, prefix="/admin/data-updates", tags=["admin-data-updates"]
+)
 router.include_router(admin_battles.router, prefix="/admin/battles", tags=["admin-battles"])

@@ -47,6 +47,10 @@ class DamageFormulaContext(BaseModel):
     defender_elf_id: str | None = None
     skill_id: str | None = None
     skill_element_type: str | None = None
+    trigger_skill_id: str | None = None
+    trigger_skill_element_type: str | None = None
+    trigger_skill_category: str | None = None
+    starfall_element_type: str = "幻"
     attacker_element_types: list[str] = Field(default_factory=list)
     defender_element_types: list[str] = Field(default_factory=list)
     damage_display_type: str = "single_damage"
@@ -55,6 +59,7 @@ class DamageFormulaContext(BaseModel):
     attacker_panel_stats: PanelStats | None = None
     defender_panel_stats: PanelStats | None = None
     defender_max_hp: int | None = None
+    defender_hp_percent: float | None = None
     skill_category: str | None = None  # physical | magic
     base_power: Decimal | int | float | None = None
     display_power: Decimal | int | float | None = None
@@ -70,6 +75,10 @@ class DamageFormulaContext(BaseModel):
     unstable_multiplier: Decimal | int | float = Decimal("1")
     damage_reductions: list[Decimal | int | float] = Field(default_factory=list)
     hit_count: int = 1
+
+    # 状态/印记结算字段。
+    effect_id: str | None = None
+    effect_layers: int = 1
 
     # 观测字段。
     observed_damage_value: int | None = None
@@ -99,3 +108,4 @@ class CalculationPlaceholderResult(BaseModel):
     context_id: str | None = None
     message: str = "伤害公式尚未确认，本次只记录事实，不执行候选排除。"
     explanation: dict[str, Any] = Field(default_factory=dict)
+    secondary_events: list[dict[str, Any]] = Field(default_factory=list)

@@ -19,6 +19,8 @@ from app.models.static import ElfDefinition, ElfLearnableSkill, PlayerElfBuild, 
 from app.schemas.battle import (
     BattleCreate,
     BattleStateOut,
+    EndTurnInput,
+    EndTurnResult,
     LineupInput,
     LineupOut,
     SwitchElfInput,
@@ -32,8 +34,10 @@ from app.schemas.event import (
     BattleTimelineTurnOut,
 )
 from app.services.candidate_service import CandidateService
+from app.services.effect_operation_executor import EffectOperationExecutor
 from app.services.effect_service import BattleEffectService
 from app.services.snapshot_service import SnapshotService
+from app.services.turn_settlement_service import TurnSettlementService
 from app.utils.json import dumps_json, loads_json, model_to_dict
 
 
@@ -105,6 +109,64 @@ class BattleService:
         self.db.commit()
         self.db.refresh(battle)
         return battle
+
+    def end_turn(self, battle_id: str, payload: EndTurnInput) -> EndTurnResult:
+        """结束当前回合，记录事件、创建快照并推进回合号。
+
+        阶段 C 起会在推进回合前调用 TurnSettlementService，生成 P0 回合末状态
+        结算事件；上下文不足的状态只返回 skipped/partial 摘要，不改写状态。
+        """
+        battle = self.require_battle(battle_id)
+        if battle.phase != BattlePhase.BATTLE.value:
+            raise ValueError("只有 battle 阶段可以结束回合")
+
+        ended_turn_number = battle.turn_number
+        next_turn_number = ended_turn_number + 1
+        settlement_events = TurnSettlementService(self.db).settle_end_turn(
+            battle=battle,
+            turn_number=ended_turn_number,
+        )
+        settlement_status = self._settlement_status(settlement_events)
+        event = BattleEvent(
+            event_id=f"event_{uuid4().hex}",
+            battle_id=battle_id,
+            turn_number=ended_turn_number,
+            event_type=BattleEventType.TURN_END.value,
+            source=EventSource.MANUAL_INPUT.value,
+            manual_override=True,
+            payload_json=dumps_json(
+                {
+                    "ended_turn_number": ended_turn_number,
+                    "next_turn_number": next_turn_number,
+                    "settlement_status": settlement_status,
+                    "settlement_events": settlement_events,
+                }
+            ),
+            notes=payload.notes,
+        )
+        self.db.add(event)
+        self.db.flush()
+
+        battle.turn_number = next_turn_number
+        snapshot = SnapshotService(self.db).create_effect_snapshot(
+            battle_id,
+            next_turn_number,
+            source_event_id=event.event_id,
+            commit=False,
+        )
+        event.snapshot_id = snapshot.snapshot_id
+        self.db.commit()
+        self.db.refresh(battle)
+        self.db.refresh(event)
+        return EndTurnResult(
+            battle=battle,
+            battle_event=event,
+            ended_turn_number=ended_turn_number,
+            next_turn_number=next_turn_number,
+            snapshot_id=snapshot.snapshot_id,
+            settlement_status=settlement_status,
+            settlement_events=settlement_events,
+        )
 
     def setup_lineup(self, battle_id: str, payload: LineupInput) -> LineupOut:
         """
@@ -249,6 +311,20 @@ class BattleService:
                 turn_number=turn_number,
                 battle_event_id=event.event_id,
             )
+        switch_in_settlement_events = TurnSettlementService(self.db).settle_switch_in(
+            battle=battle,
+            turn_number=turn_number,
+            side=payload.side,
+            elf_id=payload.elf_id,
+        )
+        if switch_in_settlement_events:
+            event.payload_json = dumps_json(
+                {
+                    "from_elf_id": old_elf_id,
+                    "to_elf_id": payload.elf_id,
+                    "switch_in_settlement_events": switch_in_settlement_events,
+                }
+            )
 
         snapshot = SnapshotService(self.db).create_effect_snapshot(
             battle_id,
@@ -376,6 +452,17 @@ class BattleService:
         )
         self.db.add(event)
         self.db.flush()
+        effect_operation_results: list[dict] = []
+        if event.event_type == BattleEventType.SKILL_USE.value:
+            effect_operation_results = EffectOperationExecutor(self.db).execute_for_skill_event(
+                event
+            )
+            if effect_operation_results:
+                event_payload = loads_json(event.payload_json, {})
+                if not isinstance(event_payload, dict):
+                    event_payload = {"raw_payload": event.payload_json}
+                event_payload["effect_operation_results"] = effect_operation_results
+                event.payload_json = dumps_json(event_payload)
         # 泛用事件没有专用子表时仍创建快照，方便时间线解释和后续回放。
         if event.snapshot_id is None:
             snapshot = SnapshotService(self.db).create_effect_snapshot(
@@ -416,7 +503,9 @@ class BattleService:
                 source=EventSource.MANUAL_INPUT.value,
                 manual_override=True,
                 corrected_event_id=target.event_id,
-                payload_json=dumps_json({"voided_event_id": target.event_id, "reason": payload.reason}),
+                payload_json=dumps_json(
+                    {"voided_event_id": target.event_id, "reason": payload.reason}
+                ),
                 notes=payload.reason,
             )
             self.db.add(audit_event)
@@ -443,7 +532,10 @@ class BattleService:
         original = self._require_event(battle_id, event_id)
         if payload.void_original:
             original.is_voided = True
-            original.notes = self._append_note(original.notes, f"被修正：{payload.reason or '未填写'}")
+            original.notes = self._append_note(
+                original.notes,
+                f"被修正：{payload.reason or '未填写'}",
+            )
         replacement = payload.replacement_event
         replacement.corrected_event_id = event_id
         replacement.manual_override = True
@@ -483,6 +575,18 @@ class BattleService:
         if old_note:
             return f"{old_note}；{extra_note}"
         return extra_note
+
+    @staticmethod
+    def _settlement_status(settlement_events: list[dict]) -> str:
+        """根据自动结算结果汇总本次结束回合状态。"""
+        if not settlement_events:
+            return "settled"
+        statuses = {str(item.get("status")) for item in settlement_events}
+        if statuses <= {"settled", "checked"}:
+            return "settled"
+        if "settled" in statuses or "checked" in statuses:
+            return "partial"
+        return "partial"
 
     def _clear_runtime_data(self, battle_id: str) -> None:
         """重录阵容前清理第一阶段运行时数据。"""

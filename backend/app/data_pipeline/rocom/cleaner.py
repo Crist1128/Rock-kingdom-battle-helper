@@ -66,9 +66,7 @@ STAT_FIELD_MAP = {
     "spd": "base_speed_talent",
 }
 
-SPRITE_SKILL_RE = re.compile(
-    r"([^;()]+)\(LV(\d+)/([^/]*)/([^/]*)/(-?\d+)/(-?\d+)/(.*?)\)(?:;|$)"
-)
+SPRITE_SKILL_RE = re.compile(r"([^;()]+)\(LV(\d+)/([^/]*)/([^/]*)/(-?\d+)/(-?\d+)/(.*?)\)(?:;|$)")
 EVOLUTION_RE = re.compile(r"([^;()]+)\(([^/]*)/([^)]*)\)")
 
 
@@ -207,7 +205,9 @@ def parse_sprite_skills(skills_text: Any) -> list[dict[str, Any]]:
                 "element_type": normalize_element(attr),
                 "raw_category": normalize_text(category),
                 "skill_category": normalize_skill_category(category),
-                "base_power": None if safe_int(power) == 0 and category in {"状态", "防御"} else safe_int(power),
+                "base_power": None
+                if safe_int(power) == 0 and category in {"状态", "防御"}
+                else safe_int(power),
                 "base_energy_cost": safe_int(cost),
                 "description": normalize_text(desc),
             }
@@ -234,7 +234,9 @@ def parse_evolution_chain(value: Any) -> list[dict[str, Any]]:
     return chain
 
 
-def build_skill_catalog(skill_rows: list[dict[str, str]], sprite_rows: list[dict[str, str]]) -> dict[str, dict[str, Any]]:
+def build_skill_catalog(
+    skill_rows: list[dict[str, str]], sprite_rows: list[dict[str, str]]
+) -> dict[str, dict[str, Any]]:
     """合并 skills.csv 和 sprites.csv 技能池，生成去重技能字典。"""
     catalog: dict[str, dict[str, Any]] = {}
 
@@ -343,7 +345,9 @@ def build_skill_catalog(skill_rows: list[dict[str, str]], sprite_rows: list[dict
     return catalog
 
 
-def load_image_refs(url_rows: list[dict[str, str]], image_mode: str = "remote") -> dict[tuple[str, str], str]:
+def load_image_refs(
+    url_rows: list[dict[str, str]], image_mode: str = "remote"
+) -> dict[tuple[str, str], str]:
     """读取 urls.csv，按 (name, type) 返回图片引用。"""
     refs: dict[tuple[str, str], str] = {}
     for row in url_rows:
@@ -351,7 +355,11 @@ def load_image_refs(url_rows: list[dict[str, str]], image_mode: str = "remote") 
         img_type = normalize_text(row.get("type"))
         if not name or not img_type:
             continue
-        value = normalize_text(row.get("local_path")) if image_mode == "local" else normalize_text(row.get("url"))
+        value = (
+            normalize_text(row.get("local_path"))
+            if image_mode == "local"
+            else normalize_text(row.get("url"))
+        )
         if value:
             refs.setdefault((name, img_type), value)
     return refs
@@ -376,14 +384,22 @@ def build_lineup_usage(lineup_rows: list[dict[str, str]]) -> dict[str, dict[str,
                 },
             )
             bucket["count"] += 1
-            skills = [x.strip() for x in normalize_text(row.get(f"skills_{index}")).split(";") if x.strip()]
+            skills = [
+                x.strip()
+                for x in normalize_text(row.get(f"skills_{index}")).split(";")
+                if x.strip()
+            ]
             if skills:
                 key = dumps_json(skills)
                 bucket["skill_sets"][key] = bucket["skill_sets"].get(key, 0) + 1
             nature = normalize_text(row.get(f"nature_{index}"))
             if nature:
                 bucket["natures"][nature] = bucket["natures"].get(nature, 0) + 1
-            talents = [x.strip() for x in normalize_text(row.get(f"talents_{index}")).split(",") if x.strip()]
+            talents = [
+                x.strip()
+                for x in normalize_text(row.get(f"talents_{index}")).split(",")
+                if x.strip()
+            ]
             if talents:
                 key = dumps_json(talents)
                 bucket["talent_patterns"][key] = bucket["talent_patterns"].get(key, 0) + 1
@@ -393,7 +409,9 @@ def build_lineup_usage(lineup_rows: list[dict[str, str]]) -> dict[str, dict[str,
     return usage
 
 
-def ranked_usage(counter: dict[str, int], *, json_key: bool = False, limit: int = 10) -> list[dict[str, Any]]:
+def ranked_usage(
+    counter: dict[str, int], *, json_key: bool = False, limit: int = 10
+) -> list[dict[str, Any]]:
     """把计数字典转为排序后的 JSON 友好列表。"""
     items = sorted(counter.items(), key=lambda item: (-item[1], item[0]))[:limit]
     result: list[dict[str, Any]] = []
@@ -403,7 +421,9 @@ def ranked_usage(counter: dict[str, int], *, json_key: bool = False, limit: int 
     return result
 
 
-def lookup_lineup_usage(row: dict[str, Any], usage: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+def lookup_lineup_usage(
+    row: dict[str, Any], usage: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
     """按形态名和基础名查找配队统计。"""
     candidates = [display_name(row), normalize_text(row.get("name"))]
     for candidate in candidates:
@@ -501,7 +521,9 @@ def build_elf_skill_links(sprite_rows: list[dict[str, str]]) -> list[dict[str, A
     return links
 
 
-def build_type_effectiveness_rules(sprite_rows: list[dict[str, str]]) -> tuple[list[dict[str, Any]], list[str]]:
+def build_type_effectiveness_rules(
+    sprite_rows: list[dict[str, str]],
+) -> tuple[list[dict[str, Any]], list[str]]:
     """从单属性精灵的克制关系中保守推导属性克制规则。"""
     candidates: dict[tuple[str, str], float] = {}
     conflicts: list[str] = []
@@ -514,9 +536,11 @@ def build_type_effectiveness_rules(sprite_rows: list[dict[str, str]]) -> tuple[l
         key = (attack, defense)
         previous = candidates.get(key)
         if previous is not None and previous != multiplier:
-            conflicts.append(
-                f"属性克制冲突: {attack}->{defense} 已有 {previous}, 新值 {multiplier}, 来源 {source}"
+            message = (
+                f"属性克制冲突: {attack}->{defense} 已有 {previous}, "
+                f"新值 {multiplier}, 来源 {source}"
             )
+            conflicts.append(message)
             return
         candidates[key] = multiplier
 
@@ -551,7 +575,6 @@ def build_type_effectiveness_rules(sprite_rows: list[dict[str, str]]) -> tuple[l
 def default_data_version() -> str:
     """默认数据版本：按 UTC 日期生成。"""
     return "rocom_bwiki_" + datetime.now(UTC).strftime("%Y%m%d")
-
 
 
 def raw_sprite_to_row(sprite: dict[str, Any]) -> dict[str, Any]:
@@ -645,7 +668,9 @@ def clean_from_raw_sprites(
         skill["skill_icon"] = image_refs.get((skill["skill_name"], "skill"))
 
     elves = [
-        build_elf_record(row, image_refs=image_refs, lineup_usage=lineup_usage, data_version=version)
+        build_elf_record(
+            row, image_refs=image_refs, lineup_usage=lineup_usage, data_version=version
+        )
         for row in sprite_rows
     ]
     elf_skills = build_elf_skill_links(sprite_rows)
@@ -682,6 +707,7 @@ def clean_from_raw_sprites(
         },
     )
 
+
 def clean_from_csv(
     *,
     sprites_csv: str | Path,
@@ -707,7 +733,9 @@ def clean_from_csv(
         skill["skill_icon"] = image_refs.get((skill["skill_name"], "skill"))
 
     elves = [
-        build_elf_record(row, image_refs=image_refs, lineup_usage=lineup_usage, data_version=version)
+        build_elf_record(
+            row, image_refs=image_refs, lineup_usage=lineup_usage, data_version=version
+        )
         for row in sprite_rows
     ]
     elf_skills = build_elf_skill_links(sprite_rows)
@@ -720,7 +748,9 @@ def clean_from_csv(
     if not sprite_rows:
         warnings.append(f"未读取到 sprites.csv 数据: {sprites_csv}")
     if not skill_rows:
-        warnings.append("未提供或未读取到 skills.csv，已尝试仅根据 sprites.csv 技能池补齐技能定义。")
+        warnings.append(
+            "未提供或未读取到 skills.csv，已尝试仅根据 sprites.csv 技能池补齐技能定义。"
+        )
     if not url_rows:
         warnings.append("未提供或未读取到 urls.csv，avatar/skill_icon 将为空。")
 
@@ -766,7 +796,9 @@ def main() -> None:
     """命令行入口：清洗 raw JSON 或历史 CSV，不写数据库。"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="清洗洛克王国 BWIKI 爬虫 raw JSON 为后端可导入 JSON")
+    parser = argparse.ArgumentParser(
+        description="清洗洛克王国 BWIKI 爬虫 raw JSON 为后端可导入 JSON"
+    )
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--raw-json", help="爬虫产出的 sprites_raw.json，推荐入口")
     source.add_argument("--sprites-csv", help="历史兼容：爬虫产出的 sprites.csv")
@@ -807,7 +839,14 @@ def main() -> None:
         )
 
     write_cleaned_dataset(dataset, args.output_dir)
-    print(json.dumps({"stats": dataset.stats, "warnings": dataset.warnings[:20]}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {"stats": dataset.stats, "warnings": dataset.warnings[:20]},
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
 
 if __name__ == "__main__":
     main()

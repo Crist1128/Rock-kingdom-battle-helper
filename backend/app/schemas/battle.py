@@ -12,6 +12,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import ORMBase
+from app.schemas.event import BattleEventOut
 
 
 class BattleCreate(BaseModel):
@@ -134,6 +135,33 @@ class SwitchElfInput(BaseModel):
     elf_id: str = Field(..., description="新上场精灵 ID")
     turn_number: int | None = Field(default=None, description="发生回合，默认使用战斗当前回合")
     notes: str | None = Field(default=None, description="备注")
+
+
+class EndTurnInput(BaseModel):
+    """结束当前回合请求。
+
+    阶段 C 起会在记录 turn_end 前执行 P0 回合末状态自动结算。
+    """
+
+    notes: str | None = Field(default=None, description="备注")
+
+
+class EndTurnResult(BaseModel):
+    """结束回合响应。"""
+
+    battle: BattleOut
+    battle_event: BattleEventOut
+    ended_turn_number: int
+    next_turn_number: int
+    snapshot_id: str
+    settlement_status: str = Field(
+        default="settled",
+        description="回合末自动结算状态：settled/partial",
+    )
+    settlement_events: list[dict] = Field(
+        default_factory=list,
+        description="本次结束回合触发或跳过的自动结算摘要",
+    )
 
 
 class LineupOut(BaseModel):

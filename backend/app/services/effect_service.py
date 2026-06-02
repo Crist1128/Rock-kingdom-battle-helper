@@ -54,12 +54,13 @@ class BattleEffectService:
         施加或刷新状态。
 
         第一阶段支持最常见的三种重复施加策略：
-        - add：在现有层数上增加，受 max_layers 限制；
+        - add / add_layers：在现有层数上增加，受 max_layers 限制；
         - refresh：刷新持续时间，不改变层数；
         - replace / 其他：直接覆盖为新层数和持续时间。
         """
         battle = self._require_battle(payload.battle_id)
         definition = self._require_definition(payload.effect_id)
+        payload = self._normalize_apply_payload(payload, definition)
         turn_number = payload.turn_number if payload.turn_number is not None else battle.turn_number
         existing = self._find_existing_instance(payload, definition)
         battle_event = self._create_battle_event(
@@ -82,7 +83,7 @@ class BattleEffectService:
             layers_after = existing.layers
         else:
             layers_before = None
-            layers = payload.layers if payload.layers is not None else definition.default_layers
+            layers = self._resolve_layers(payload, definition)
             instance = BattleEffectInstance(
                 instance_id=f"effect_instance_{uuid4().hex}",
                 battle_id=payload.battle_id,
@@ -98,8 +99,8 @@ class BattleEffectService:
                 source_skill_id=payload.source_skill_id,
                 source_event_id=battle_event.event_id,
                 layers=layers,
-                remaining_turns=payload.remaining_turns or definition.default_duration_turns,
-                remaining_uses=payload.remaining_uses or definition.default_duration_uses,
+                remaining_turns=self._resolve_remaining_turns(payload, definition),
+                remaining_uses=self._resolve_remaining_uses(payload, definition),
                 is_active=True,
                 applied_turn=turn_number,
                 expire_turn=self._calculate_expire_turn(turn_number, payload, definition),
@@ -260,9 +261,9 @@ class BattleEffectService:
     ) -> None:
         """根据 stack_rule 更新已有状态实例。"""
         incoming_layers = (
-            payload.layers if payload.layers is not None else definition.default_layers
+            self._resolve_layers(payload, definition)
         )
-        if definition.stack_rule == "add":
+        if definition.stack_rule in {"add", "add_layers"}:
             next_layers = instance.layers + incoming_layers
             if definition.max_layers is not None:
                 next_layers = min(next_layers, definition.max_layers)
@@ -272,8 +273,8 @@ class BattleEffectService:
             pass
         else:
             instance.layers = incoming_layers
-        instance.remaining_turns = payload.remaining_turns or definition.default_duration_turns
-        instance.remaining_uses = payload.remaining_uses or definition.default_duration_uses
+        instance.remaining_turns = self._resolve_remaining_turns(payload, definition)
+        instance.remaining_uses = self._resolve_remaining_uses(payload, definition)
         instance.expire_turn = self._calculate_expire_turn(turn_number, payload, definition)
         instance.last_updated_turn = turn_number
         instance.notes = payload.notes
@@ -381,8 +382,6 @@ class BattleEffectService:
             commit=False,
         )
         battle_event.snapshot_id = snapshot.snapshot_id
-
-
     @staticmethod
     def _calculate_expire_turn(
         turn_number: int,
@@ -390,10 +389,88 @@ class BattleEffectService:
         definition: EffectDefinition,
     ) -> int | None:
         """根据剩余回合计算过期回合；未知持续时间返回 None。"""
-        remaining_turns = payload.remaining_turns or definition.default_duration_turns
+        remaining_turns = BattleEffectService._resolve_remaining_turns(payload, definition)
         if remaining_turns is None:
             return None
         return turn_number + remaining_turns
+
+    def _normalize_apply_payload(
+        self,
+        payload: EffectApplyInput,
+        definition: EffectDefinition,
+    ) -> EffectApplyInput:
+        """按状态定义归一化挂载目标，并校验必要字段。"""
+        updates: dict[str, object] = {"owner_scope": definition.owner_scope}
+        if definition.owner_scope == OwnerScope.ELF.value:
+            if not payload.owner_side or not payload.owner_elf_id:
+                raise ValueError("owner_scope=elf 的状态必须提供 owner_side 和 owner_elf_id")
+            updates.update(
+                {
+                    "owner_skill_slot_id": None,
+                    "field_id": None,
+                }
+            )
+        elif definition.owner_scope == OwnerScope.SIDE.value:
+            if not payload.owner_side:
+                raise ValueError("owner_scope=side 的状态必须提供 owner_side")
+            updates.update(
+                {
+                    "owner_elf_id": None,
+                    "owner_skill_slot_id": None,
+                    "field_id": None,
+                }
+            )
+        elif definition.owner_scope == OwnerScope.FIELD.value:
+            updates.update(
+                {
+                    "owner_side": None,
+                    "owner_elf_id": None,
+                    "owner_skill_slot_id": None,
+                    "field_id": payload.field_id or "main",
+                }
+            )
+        elif definition.owner_scope == OwnerScope.SKILL_SLOT.value:
+            if not payload.owner_skill_slot_id:
+                raise ValueError("owner_scope=skill_slot 的状态必须提供 owner_skill_slot_id")
+            updates.update({"field_id": None})
+        elif definition.owner_scope == OwnerScope.TURN.value:
+            updates.update({"field_id": None})
+        else:
+            raise ValueError(f"状态定义 owner_scope 不受支持：{definition.owner_scope}")
+
+        return payload.model_copy(update=updates)
+
+    @staticmethod
+    def _resolve_layers(payload: EffectApplyInput, definition: EffectDefinition) -> int:
+        """解析并按 max_layers 限制层数。"""
+        layers = payload.layers if payload.layers is not None else definition.default_layers
+        if definition.max_layers is not None:
+            layers = min(layers, definition.max_layers)
+        return layers
+
+    @staticmethod
+    def _resolve_remaining_turns(
+        payload: EffectApplyInput,
+        definition: EffectDefinition,
+    ) -> int | None:
+        """解析剩余回合，保留显式 0。"""
+        return (
+            payload.remaining_turns
+            if payload.remaining_turns is not None
+            else definition.default_duration_turns
+        )
+
+    @staticmethod
+    def _resolve_remaining_uses(
+        payload: EffectApplyInput,
+        definition: EffectDefinition,
+    ) -> int | None:
+        """解析剩余次数，保留显式 0。"""
+        return (
+            payload.remaining_uses
+            if payload.remaining_uses is not None
+            else definition.default_duration_uses
+        )
 
     def _require_battle(self, battle_id: str) -> Battle:
         """读取战斗并校验存在。"""

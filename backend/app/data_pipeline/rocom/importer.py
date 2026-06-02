@@ -31,10 +31,20 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.data_pipeline.rocom.cleaner import CleanedDataset, clean_from_csv, clean_from_raw_sprites, write_cleaned_dataset
+from app.data_pipeline.rocom.cleaner import (
+    CleanedDataset,
+    clean_from_csv,
+    clean_from_raw_sprites,
+    write_cleaned_dataset,
+)
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
-from app.models.static import ElfDefinition, ElfLearnableSkill, SkillDefinition, TypeEffectivenessRule
+from app.models.static import (
+    ElfDefinition,
+    ElfLearnableSkill,
+    SkillDefinition,
+    TypeEffectivenessRule,
+)
 
 ELF_FIELDS = [
     "elf_name",
@@ -247,7 +257,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="图片引用使用远程 URL 还是本地路径；MVP 推荐 remote",
     )
     parser.add_argument("--skip-init-db", action="store_true", help="跳过 init_db()")
-    parser.add_argument("--commit", action="store_true", help="实际提交数据库事务；默认 dry-run 并 rollback")
+    parser.add_argument(
+        "--commit", action="store_true", help="实际提交数据库事务；默认 dry-run 并 rollback"
+    )
     return parser
 
 

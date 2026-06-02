@@ -18,6 +18,7 @@ from app.models.event import BattleEvent, DamageEvent, ResourceChangeEvent
 from app.schemas.event import DamageEventCreate, DamageEventCreateResult
 from app.services.battle_service import BattleService
 from app.services.snapshot_service import SnapshotService
+from app.services.turn_settlement_service import TurnSettlementService
 from app.utils.json import dumps_json, loads_json
 
 
@@ -131,6 +132,16 @@ class DamageEventService:
             hp_percent_delta=hp_percent_delta,
         )
         self._update_defender_hp_state(battle, payload, total_damage)
+        post_settlement_events = TurnSettlementService(self.db).settle_post_attack(
+            battle=battle,
+            turn_number=turn_number,
+            trigger_battle_event_id=battle_event.event_id,
+            attacker_side=payload.attacker_side,
+            attacker_elf_id=payload.attacker_elf_id,
+            defender_side=payload.defender_side,
+            defender_elf_id=payload.defender_elf_id,
+            trigger_skill_id=payload.skill_id,
+        )
 
         self.db.commit()
         self.db.refresh(battle_event)
@@ -140,6 +151,7 @@ class DamageEventService:
             damage_event=damage_event,
             snapshot_id=snapshot.snapshot_id,
             inference_result=inference_result,
+            post_settlement_events=post_settlement_events,
         )
 
     @staticmethod
