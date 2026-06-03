@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -14,7 +14,7 @@ export function ManualEventDrawer({ battleId, state }: { battleId?: string | nul
   const queryClient = useQueryClient();
   const { activeDrawer, drawerSide, closeDrawer } = useAppStore();
   const active = activeDrawer !== null;
-  const title = activeDrawer === "damage" ? "录入伤害" : activeDrawer === "resource" ? "录入治疗 / 能量" : activeDrawer === "effect" ? "录入状态" : activeDrawer === "switch" ? "切换精灵" : "手动事件";
+  const title = activeDrawer === "skill" ? "使用技能" : activeDrawer === "damage" ? "录入伤害" : activeDrawer === "resource" ? "录入治疗 / 能量" : activeDrawer === "effect" ? "录入状态" : activeDrawer === "switch" ? "切换精灵" : "手动事件";
 
   const invalidate = async () => {
     await Promise.all([
@@ -23,17 +23,71 @@ export function ManualEventDrawer({ battleId, state }: { battleId?: string | nul
       queryClient.invalidateQueries({ queryKey: ["candidate-summary"] }),
       queryClient.invalidateQueries({ queryKey: ["candidate-detail"] }),
       queryClient.invalidateQueries({ queryKey: ["candidate-list"] }),
+      queryClient.invalidateQueries({ queryKey: ["candidate-evidence"] }),
     ]);
   };
 
   return (
     <Sheet open={active} title={title} description="MVP 手动输入：只记录事实，不执行真实公式。" onClose={closeDrawer}>
+      {battleId && state && activeDrawer === "skill" ? <SkillUseForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {battleId && state && activeDrawer === "damage" ? <DamageForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {battleId && state && activeDrawer === "resource" ? <ResourceForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {battleId && state && activeDrawer === "effect" ? <EffectForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {battleId && state && activeDrawer === "switch" ? <SwitchForm battleId={battleId} state={state} defaultSide={drawerSide ?? "self"} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {!battleId || !state ? <div className="text-sm text-muted-foreground">请先选择战斗并进入工作台。</div> : null}
     </Sheet>
+  );
+}
+
+function SkillUseForm({ battleId, state, defaultSide, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; onDone: () => void }) {
+  const activeIds = useActiveElfIds(state, defaultSide);
+  const [actorSide, setActorSide] = useState<Side>(activeIds.attackerSide as Side);
+  const [targetSide, setTargetSide] = useState<Side>(activeIds.defenderSide as Side);
+  const [skillId, setSkillId] = useState<string | null>(null);
+  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("");
+  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("");
+  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("");
+  const [notes, setNotes] = useState("");
+  const actorElfId = actorSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
+  const targetElfId = targetSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
+
+  const conditionFlags = buildConditionFlags({
+    response_attack_success: optionalBool(responseAttackSuccess),
+    response_defense_success: optionalBool(responseDefenseSuccess),
+    response_status_success: optionalBool(responseStatusSuccess),
+  });
+  const mutation = useMutation({
+    mutationFn: () => api.battles.createSkillEvent(battleId, {
+      turn_number: state.battle.turn_number,
+      actor_side: actorSide,
+      actor_elf_id: actorElfId,
+      target_side: targetSide,
+      target_elf_id: targetElfId,
+      skill_id: skillId!,
+      skill_confirmed: Boolean(skillId),
+      condition_flags: Object.keys(conditionFlags).length > 0 ? conditionFlags : undefined,
+      notes,
+    }),
+    onSuccess: onDone,
+  });
+
+  return (
+    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (skillId) mutation.mutate(); }}>
+      <SideSelect label="行动方" value={actorSide} onChange={setActorSide} />
+      <SideSelect label="目标方" value={targetSide} onChange={setTargetSide} />
+      <SkillSearchSelect label="使用技能" value={skillId} onChange={(id) => setSkillId(id)} elfId={actorElfId} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <ResponseResultSelect label="应对攻击" value={responseAttackSuccess} onChange={setResponseAttackSuccess} />
+        <ResponseResultSelect label="应对防御" value={responseDefenseSuccess} onChange={setResponseDefenseSuccess} />
+        <ResponseResultSelect label="应对状态" value={responseStatusSuccess} onChange={setResponseStatusSuccess} />
+      </div>
+      <div className="rounded-2xl border bg-emerald-50 p-3 text-sm text-emerald-900">
+        技能使用会记录 `skill_use` 事件；若该技能已入库结构化操作，后端会自动执行可确定的状态、天气或资源操作。
+      </div>
+      {mutation.error ? <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">提交失败：{String((mutation.error as Error).message)}</div> : null}
+      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="备注" />
+      <SubmitButton loading={mutation.isPending} disabled={!skillId} />
+    </form>
   );
 }
 
@@ -376,6 +430,11 @@ function optionalBool(value: OptionalBoolInput): boolean | undefined {
   if (value === "true") return true;
   if (value === "false") return false;
   return undefined;
+}
+function buildConditionFlags(flags: Record<string, boolean | undefined>): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(flags).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
+  );
 }
 function SubmitButton({ loading, disabled }: { loading: boolean; disabled?: boolean }) {
   return <Button className="w-full" type="submit" disabled={loading || disabled}>{loading ? "提交中..." : "提交事件"}</Button>;

@@ -32,7 +32,7 @@
 - 阶段 A 已完成：`EffectDefinitionOut` 已扩展完整审阅字段，effect importer 已新增 `--status` 只读状态查询，前端类型和接口文档已同步。
 - 阶段 B 已开始：`EffectService.apply_effect` 按 `EffectDefinition.owner_scope` 归一化状态挂载目标，避免星陨、天气等状态被挂错位置。
 - 阶段 C 最小闭环已完成：`turns/end` 已接入灼烧、中毒、中毒印记、寄生、冻结阈值和暴风雪施加冻结；伤害事件后已接入星陨；切换入场已接入棘刺。自动结算会生成系统事件、资源变化、必要的状态变化和快照，敌方受击伤害会写入 Observation 软评分 evidence。
-- 阶段 D 已完成：已新增 `EffectOperationExecutor` 并接入 `skill_use` 通用事件；支持 `apply_effect`、`add_layers`、`dynamic_apply_effect`、`remove_effect`、`clear_effects`、`change_weather`、`resource_change`、`multiply_layers` 和 `conditional_branch`。星陨相关技能规则已整理为 `backend/app/seed/starfall_skill_operations_p0.json`，并提供 dry-run/commit 导入器写入 `SkillDefinition.effect_operations_json`；当前本地库已 commit 10 个星陨相关技能的操作规则。
+- 阶段 D 已完成：已新增 `EffectOperationExecutor` 并接入 `skill_use`；后端已提供专用 `POST /battles/{battle_id}/skill-events` 入口，支持 `apply_effect`、`add_layers`、`dynamic_apply_effect`、`remove_effect`、`clear_effects`、`change_weather`、`resource_change`、`multiply_layers` 和 `conditional_branch`。星陨相关技能规则已整理为 `backend/app/seed/starfall_skill_operations_p0.json`，并提供 dry-run/commit 导入器写入 `SkillDefinition.effect_operations_json`；当前本地库已 commit 10 个星陨相关技能的操作规则。
 - 阶段 E 已进入最小闭环：`ModifierResolver` 可解析 payload、`defense_skill_id` 和历史快照状态中的结构化减伤来源；`ResponseResolver` 可解析应对倍率，并在应对成功未知时只记录 unknown；手动伤害事件已可把 `defense_skill_id` 与 `response_attack_success` / `response_defense_success` / `response_status_success` 写入事件 payload、公式上下文和 observation payload；rocom cleaner 可从 raw/cleaned 技能定义中提取稳定的“减伤 X% / 应对目标”规则，正式运行以入库后的 `skill_definition` 为准。
 - 已实现候选 `match_score`、`confidence`、匹配/冲突事件与 evidence 写入；Observation 伤害 payload 已标准化为 `observation_payload_v1` 并保留旧平铺字段兼容；候选 evidence 聚合接口和前端最近 evidence 展示已接入；默认不硬排除。
 - 已实现 BWIKI 数据管线：爬取、清洗、dry-run、导入。
@@ -48,9 +48,10 @@
 - 已接入准备阶段阵容录入和开始战斗。
 - 已接入战斗工作台快捷录入：伤害、资源、状态、切换。
 - 战斗工作台已接入 `turns/end`：可从顶部或快捷录入区结束当前回合，刷新状态、时间线与候选信息，并展示最近一次自动结算摘要。
+- 战斗工作台已接入专用 `skill-events` 录入：可测试已入库 `effect_operations_json` 的状态、天气和资源操作。
 - 已接入候选摘要、速度分布占位和时间线展示。
 - 已接入 Observation API：伤害录入后可按条件同步提交候选反推观察，并刷新候选摘要/详情/Top 候选。
-- 已接入候选 Top 5 展示和最近 evidence 展示，方便测试普通攻击、状态/星陨和应对/防御上下文对候选软评分的影响。
+- 已接入候选 Top 5、最近 evidence、候选重新生成、事件作废/通用修正、重放占位和快照详情展示，方便测试普通攻击、状态/星陨、技能结构化操作和应对/防御上下文对候选软评分的影响。
 - 已接入 rocom 数据更新管理入口和归档战斗清理入口。
 
 ### 数据

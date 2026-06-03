@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Side } from "@/types/api";
 
-export type DrawerMode = "damage" | "resource" | "effect" | "switch" | null;
+export type DrawerMode = "skill" | "damage" | "resource" | "effect" | "switch" | null;
 
 interface RecentBattle {
   battle_id: string;

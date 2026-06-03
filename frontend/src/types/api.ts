@@ -510,6 +510,40 @@ export interface BattleEventOut {
   notes?: string | null;
 }
 
+export interface BattleEventCreate {
+  turn_number: number;
+  event_type: string;
+  action_order?: number | null;
+  actor_side?: Side | null;
+  actor_elf_id?: string | null;
+  target_side?: Side | null;
+  target_elf_id?: string | null;
+  skill_id?: string | null;
+  skill_confirmed?: boolean;
+  snapshot_id?: string | null;
+  source?: string;
+  recognition_confidence?: number | null;
+  manual_override?: boolean;
+  corrected_event_id?: string | null;
+  is_voided?: boolean;
+  payload_json?: string | null;
+  notes?: string | null;
+}
+
+export interface SkillUseEventCreate {
+  turn_number?: number | null;
+  action_order?: number | null;
+  actor_side?: Side | null;
+  actor_elf_id?: string | null;
+  target_side?: Side | null;
+  target_elf_id?: string | null;
+  skill_id: string;
+  skill_confirmed?: boolean;
+  condition_flags?: Record<string, boolean> | null;
+  manual_flags?: Record<string, boolean> | null;
+  notes?: string | null;
+}
+
 export interface BattleTimelineEventOut {
   event: BattleEventOut;
   detail_type?: string | null;
@@ -553,6 +587,24 @@ export interface BattleReplayResult {
   from_event_id: string;
   status: string;
   message: string;
+}
+
+export interface BattleEffectSnapshotOut {
+  snapshot_id: string;
+  battle_id: string;
+  turn_number: number;
+  active_effect_instance_ids_json: string;
+  self_active_elf_id?: string | null;
+  enemy_active_elf_id?: string | null;
+  self_elf_effect_ids_json?: string | null;
+  enemy_elf_effect_ids_json?: string | null;
+  self_side_effect_ids_json?: string | null;
+  enemy_side_effect_ids_json?: string | null;
+  field_effect_ids_json?: string | null;
+  skill_slot_effect_ids_json?: string | null;
+  turn_effect_ids_json?: string | null;
+  full_snapshot_json?: string | null;
+  source_event_id?: string | null;
 }
 
 export interface CandidateEvidenceOut {

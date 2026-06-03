@@ -77,6 +77,32 @@ class BattleEventOut(ORMBase):
     notes: str | None = None
 
 
+class SkillUseEventCreate(BaseModel):
+    """专用技能使用事件输入。
+
+    该结构会被 API 层转换成通用 `BattleEventCreate(event_type="skill_use")`，
+    供现有 `EffectOperationExecutor` 执行 `effect_operations_json`。
+    """
+
+    turn_number: int | None = Field(default=None, description="发生回合，默认使用战斗当前回合")
+    action_order: int | None = Field(default=None, description="同回合内的人工排序号")
+    actor_side: str | None = Field(default=None, description="行动方阵营")
+    actor_elf_id: str | None = Field(default=None, description="行动方精灵 ID")
+    target_side: str | None = Field(default=None, description="目标方阵营")
+    target_elf_id: str | None = Field(default=None, description="目标方精灵 ID")
+    skill_id: str = Field(..., description="使用的技能 ID")
+    skill_confirmed: bool = Field(default=True, description="技能是否已确认")
+    condition_flags: dict[str, bool] | None = Field(
+        default=None,
+        description="技能结构化操作的条件旗标，例如 response_defense_success",
+    )
+    manual_flags: dict[str, bool] | None = Field(
+        default=None,
+        description="人工标记旗标；保留给后续规则分支读取",
+    )
+    notes: str | None = Field(default=None, description="备注")
+
+
 class DamageEventCreate(BaseModel):
     """
     伤害事件创建请求。

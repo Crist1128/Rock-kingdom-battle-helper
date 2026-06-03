@@ -1,5 +1,7 @@
 import type {
   BattleCreate,
+  BattleEffectSnapshotOut,
+  BattleEventCreate,
   BattleEventCorrectInput,
   BattleEventOut,
   BattleEventVoidInput,
@@ -35,6 +37,7 @@ import type {
   RocomDataUpdateRequest,
   RocomLocalImportRequest,
   SkillDefinitionOut,
+  SkillUseEventCreate,
   StartBattleInput,
   SwitchElfInput,
 } from "@/types/api";
@@ -167,7 +170,19 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    createEvent: (battleId: string, payload: BattleEventCreate) =>
+      request<BattleEventOut>(`/battles/${battleId}/events`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    createSkillEvent: (battleId: string, payload: SkillUseEventCreate) =>
+      request<BattleEventOut>(`/battles/${battleId}/skill-events`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
     timeline: (battleId: string) => request<BattleTimelineTurnOut[]>(`/battles/${battleId}/timeline`),
+    snapshot: (battleId: string, snapshotId: string) =>
+      request<BattleEffectSnapshotOut>(`/battles/${battleId}/snapshots/${snapshotId}`),
     events: (battleId: string) => request<BattleEventOut[]>(`/battles/${battleId}/events`),
     voidEvent: (battleId: string, eventId: string, payload: BattleEventVoidInput) =>
       request<BattleEventOut>(`/battles/${battleId}/events/${eventId}/void`, { method: "POST", body: JSON.stringify(payload) }),

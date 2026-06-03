@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { compactId, formatTalentPattern, statName } from "@/lib/utils";
 
 export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; elfId?: string | null }) {
+  const queryClient = useQueryClient();
   const enabled = Boolean(battleId && elfId);
   const summaryQuery = useQuery({
     queryKey: ["candidate-summary", battleId, elfId],
@@ -31,6 +32,15 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
   });
   const natures = useQuery({ queryKey: ["natures", "candidate-panel"], queryFn: () => api.natures.list({ limit: 100 }) });
   const natureMap = useMemo(() => new Map((natures.data ?? []).map((nature) => [nature.nature_id, nature.nature_name])), [natures.data]);
+  const generateMutation = useMutation({
+    mutationFn: () => api.candidates.generate(battleId!, elfId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidate-summary", battleId, elfId] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-detail", battleId, elfId] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-list", battleId, elfId] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-evidence", battleId, elfId] });
+    },
+  });
 
   if (!battleId || !elfId) {
     return (
@@ -136,7 +146,20 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
           </div>
         </div>
 
-        <Button className="w-full" variant="outline" onClick={() => { summaryQuery.refetch(); detailQuery.refetch(); topCandidatesQuery.refetch(); evidenceQuery.refetch(); }}>刷新候选与证据</Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" onClick={() => { summaryQuery.refetch(); detailQuery.refetch(); topCandidatesQuery.refetch(); evidenceQuery.refetch(); }}>刷新候选与证据</Button>
+          <Button
+            variant="secondary"
+            disabled={generateMutation.isPending}
+            onClick={() => {
+              if (window.confirm("重新生成该敌方精灵的候选配置？现有候选记录会按后端逻辑重建。")) {
+                generateMutation.mutate();
+              }
+            }}
+          >
+            {generateMutation.isPending ? "生成中..." : "重新生成候选"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

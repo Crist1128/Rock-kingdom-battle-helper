@@ -36,10 +36,12 @@ from app.schemas.event import (
     DamageEventCreateResult,
     ResourceChangeEventCreate,
     ResourceChangeEventCreateResult,
+    SkillUseEventCreate,
 )
 from app.services.battle_service import BattleService
 from app.services.damage_event_service import DamageEventService
 from app.services.resource_event_service import ResourceEventService
+from app.utils.json import dumps_json
 
 router = APIRouter()
 
@@ -189,6 +191,45 @@ def create_battle_event(
         return BattleService(db).create_event(battle_id, payload)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{battle_id}/skill-events", response_model=BattleEventOut, status_code=201)
+def create_skill_use_event(
+    battle_id: str,
+    payload: SkillUseEventCreate,
+    db: Session = Depends(get_db),
+) -> BattleEvent:
+    """创建技能使用事件，并复用结构化技能操作执行器。"""
+    service = BattleService(db)
+    try:
+        battle = service.require_battle(battle_id)
+        event_payload: dict[str, object] = {}
+        if payload.condition_flags:
+            event_payload["condition_flags"] = payload.condition_flags
+        if payload.manual_flags:
+            event_payload["manual_flags"] = payload.manual_flags
+        return service.create_event(
+            battle_id,
+            BattleEventCreate(
+                turn_number=payload.turn_number or battle.turn_number,
+                action_order=payload.action_order,
+                event_type="skill_use",
+                actor_side=payload.actor_side,
+                actor_elf_id=payload.actor_elf_id,
+                target_side=payload.target_side,
+                target_elf_id=payload.target_elf_id,
+                skill_id=payload.skill_id,
+                skill_confirmed=payload.skill_confirmed,
+                source="manual_input",
+                manual_override=False,
+                payload_json=dumps_json(event_payload) if event_payload else None,
+                notes=payload.notes,
+            ),
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/{battle_id}/damage-events", response_model=DamageEventCreateResult, status_code=201)

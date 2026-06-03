@@ -121,18 +121,26 @@ export function BattleWorkbenchPage() {
               <CardHeader>
                 <CardTitle>快捷录入</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-4 gap-2">
-                <Button onClick={() => openDrawer("damage", "self")}>造成伤害</Button>
-                <Button variant="outline" onClick={() => openDrawer("damage", "enemy")}>受到伤害</Button>
-                <Button variant="outline" onClick={() => openDrawer("resource", "self")}>治疗/能量</Button>
-                <Button variant="outline" onClick={() => openDrawer("effect", "self")}>添加状态</Button>
-                <Button variant="outline" onClick={() => openDrawer("effect", "enemy")}>敌方状态</Button>
-                <Button variant="outline" onClick={() => openDrawer("switch", "self")}>我方切换</Button>
-                <Button variant="outline" onClick={() => openDrawer("switch", "enemy")}>敌方切换</Button>
-                <Button variant="secondary" disabled={!canEndTurn || endTurn.isPending} onClick={requestEndTurn}>
-                  {endTurn.isPending ? "结算中..." : "结束回合"}
-                </Button>
-                <Button variant="ghost" onClick={() => stateQuery.refetch()}>刷新</Button>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  <Button onClick={() => openDrawer("skill", "self")}>我方用技能</Button>
+                  <Button variant="outline" onClick={() => openDrawer("skill", "enemy")}>敌方用技能</Button>
+                  <Button variant="outline" onClick={() => openDrawer("damage", "self")}>造成伤害</Button>
+                  <Button variant="outline" onClick={() => openDrawer("damage", "enemy")}>受到伤害</Button>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <Button variant="outline" onClick={() => openDrawer("resource", "self")}>治疗/能量</Button>
+                  <Button variant="outline" onClick={() => openDrawer("effect", "self")}>我方状态</Button>
+                  <Button variant="outline" onClick={() => openDrawer("effect", "enemy")}>敌方状态</Button>
+                  <Button variant="secondary" disabled={!canEndTurn || endTurn.isPending} onClick={requestEndTurn}>
+                    {endTurn.isPending ? "结算中..." : "结束回合"}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button variant="outline" onClick={() => openDrawer("switch", "self")}>我方切换</Button>
+                  <Button variant="outline" onClick={() => openDrawer("switch", "enemy")}>敌方切换</Button>
+                  <Button variant="ghost" onClick={() => stateQuery.refetch()}>刷新</Button>
+                </div>
               </CardContent>
             </Card>
 

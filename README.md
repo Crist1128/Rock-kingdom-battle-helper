@@ -16,8 +16,8 @@
 - 伤害与规则解析：已实现普通攻击最小公式、P0 状态伤害、星陨伤害、伤害观测匹配、`RuleResolver` 雏形、`ModifierResolver` 与 `ResponseResolver` 最小闭环；可解析技能基础信息、本系、属性克制、双属性合并、应对倍率、防御技能减伤、payload 减伤来源和快照状态减伤来源；手动伤害事件已可把 `defense_skill_id` 与应对成功标记写入事件 payload 和公式上下文。
 - 状态定义：已有 P0 状态定义 JSON 种子、dry-run/commit 导入器和 `--status` 只读查询；`/effects` 已返回完整审阅字段。
 - 自动结算：阶段 C 最小闭环已完成，支持回合末灼烧/中毒/中毒印记/寄生/冻结阈值/暴风雪施加冻结，伤害后星陨，切换入场棘刺；敌方受击的自动伤害会进入 Observation 软评分 evidence。
-- 技能结构化操作：阶段 D 已接入 `EffectOperationExecutor`，`skill_use` 可按 `effect_operations_json` 自动施加/移除/清除状态，切换天气，修改 HP/energy，执行条件分支和层数翻倍；星陨相关技能规则已有可 dry-run 导入的种子。
-- 前端联动：战斗工作台伤害录入可同步提交 observation，候选面板可展示 Top 候选和最近 evidence；工作台已接入结束回合按钮、最近回合结算摘要，并提示当前可测的普通攻击、状态/星陨、应对/防御和软评分能力。
+- 技能结构化操作：阶段 D 已接入 `EffectOperationExecutor`，`skill_use` 可按 `effect_operations_json` 自动施加/移除/清除状态，切换天气，修改 HP/energy，执行条件分支和层数翻倍；后端已提供专用 `POST /battles/{battle_id}/skill-events` 入口，星陨相关技能规则已有可 dry-run 导入的种子。
+- 前端联动：战斗工作台伤害录入可同步提交 observation，技能使用可触发已入库的结构化操作，候选面板可展示 Top 候选、最近 evidence 并支持重新生成候选；工作台已接入结束回合按钮和最近回合结算摘要，事件日志可选择事件、作废/修正/重放占位并查看快照详情。
 - 管理功能：规则数据更新入口、归档战斗 dry-run 与物理清理入口。
 
 ## 当前明确未完成内容

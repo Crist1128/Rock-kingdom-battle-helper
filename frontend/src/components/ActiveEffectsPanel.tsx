@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,15 @@ import { effectCategoryName, ownerScopeName, sideName } from "@/lib/utils";
 import type { BattleEffectInstanceDict } from "@/types/api";
 
 export function ActiveEffectsPanel({ battleId, effects }: { battleId: string; effects: BattleEffectInstanceDict[] }) {
+  const queryClient = useQueryClient();
   const { data: definitions = [] } = useQuery({ queryKey: ["effects", "all"], queryFn: () => api.effects.list({ limit: 500 }) });
+  const removeMutation = useMutation({
+    mutationFn: (instanceId: string) => api.effects.remove(instanceId, { reason: "manual_remove" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", battleId] });
+    },
+  });
   const defById = Object.fromEntries(definitions.map((item) => [item.effect_id, item]));
 
   const groups = [
@@ -43,7 +51,8 @@ export function ActiveEffectsPanel({ battleId, effects }: { battleId: string; ef
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => api.effects.remove(effect.instance_id, { reason: "manual_remove" }).then(() => window.location.reload())}
+                        disabled={removeMutation.isPending}
+                        onClick={() => removeMutation.mutate(effect.instance_id)}
                       >移除</Button>
                     </div>
                   </div>

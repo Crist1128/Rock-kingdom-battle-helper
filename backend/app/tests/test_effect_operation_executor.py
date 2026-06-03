@@ -124,6 +124,53 @@ def test_skill_use_applies_starfall_mark_to_enemy_side(
         assert snapshot_items[0]["effect_id"] == "effect_starfall_mark"
 
 
+def test_dedicated_skill_event_endpoint_executes_operations(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """专用 skill-events 接口会生成 skill_use 并传递条件旗标。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(
+            session,
+            skill_id="skill_projection",
+            layers=4,
+            condition="response_defense_success",
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_projection",
+            "condition_flags": {"response_defense_success": True},
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["turn_number"] == 1
+    assert body["event_type"] == BattleEventType.SKILL_USE.value
+    payload = loads_json(body["payload_json"], {})
+    assert payload["condition_flags"] == {"response_defense_success": True}
+    assert payload["effect_operation_results"][0]["status"] == "executed"
+    assert body["snapshot_id"]
+
+    with session_factory() as session:
+        instance = session.scalar(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == "battle_ops",
+                BattleEffectInstance.effect_id == "effect_starfall_mark",
+            )
+        )
+        assert instance is not None
+        assert instance.owner_side == "enemy"
+        assert instance.layers == 4
+
+
 def test_skill_use_adds_layers_to_existing_starfall_mark(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
