@@ -6,7 +6,7 @@
 
 项目已经从“后端骨架”推进到 **前后端可联调的手动输入 MVP + 候选反推软评分初步闭环阶段**。
 
-当前核心目标是：在保持本地规则库、己方配置、战斗事件、状态快照和候选配置链路稳定的基础上，继续补齐状态自动结算、技能规则分支、候选解释链、速度判断和事件重放。后端 MVP 完成路线已记录在 `docs/03_系统设计/后端MVP完成路线_v0.1.md`。候选推算当前坚持软评分，不因未验证公式进行硬排除。
+当前核心目标是：在保持本地规则库、己方配置、战斗事件、状态快照和候选配置链路稳定的基础上，继续补齐天气/状态公式修正、完整应对/防御结算、候选解释链、速度判断和事件重放。后端 MVP 完成路线已记录在 `docs/03_系统设计/后端MVP完成路线_v0.1.md`。候选推算当前坚持软评分，不因未验证公式进行硬排除。
 
 ## 已完成内容
 
@@ -26,13 +26,14 @@
 - 已实现状态快照服务。
 - 已实现敌方候选生成和候选摘要/详情/分页接口。
 - 已实现 Observation API：支持伤害值、扣血百分比、技能出现、速度先后手等观测驱动候选软评分。
-- 已实现普通攻击最小伤害计算、P0 状态伤害计算、星陨伤害计算、伤害观测匹配和 `RuleResolver` 雏形。
+- 已实现普通攻击最小伤害计算、P0 状态伤害计算、星陨伤害计算、伤害观测匹配、`RuleResolver` 雏形、`ModifierResolver` 与 `ResponseResolver` 最小闭环。
 - 星陨已按独立公式接入 `DamageCalculator`：触发条件看非幻系攻击技能，伤害按幻系计算克制/抵抗，攻防属性跟随触发技能类别。
 - Observation API 的伤害观测上下文已允许通过 payload 指定 `formula_type = status | starfall`，可先进入候选软评分。
 - 阶段 A 已完成：`EffectDefinitionOut` 已扩展完整审阅字段，effect importer 已新增 `--status` 只读状态查询，前端类型和接口文档已同步。
 - 阶段 B 已开始：`EffectService.apply_effect` 按 `EffectDefinition.owner_scope` 归一化状态挂载目标，避免星陨、天气等状态被挂错位置。
 - 阶段 C 最小闭环已完成：`turns/end` 已接入灼烧、中毒、中毒印记、寄生、冻结阈值和暴风雪施加冻结；伤害事件后已接入星陨；切换入场已接入棘刺。自动结算会生成系统事件、资源变化、必要的状态变化和快照，敌方受击伤害会写入 Observation 软评分 evidence。
 - 阶段 D 已完成：已新增 `EffectOperationExecutor` 并接入 `skill_use` 通用事件；支持 `apply_effect`、`add_layers`、`dynamic_apply_effect`、`remove_effect`、`clear_effects`、`change_weather`、`resource_change`、`multiply_layers` 和 `conditional_branch`。星陨相关技能规则已整理为 `backend/app/seed/starfall_skill_operations_p0.json`，并提供 dry-run/commit 导入器写入 `SkillDefinition.effect_operations_json`；当前本地库已 commit 10 个星陨相关技能的操作规则。
+- 阶段 E 已进入最小闭环：`ModifierResolver` 可解析 payload、`defense_skill_id` 和历史快照状态中的结构化减伤来源；`ResponseResolver` 可解析应对倍率，并在应对成功未知时只记录 unknown；手动伤害事件已可把 `defense_skill_id` 与 `response_attack_success` / `response_defense_success` / `response_status_success` 写入事件 payload、公式上下文和 observation payload；rocom cleaner 可从 raw/cleaned 技能定义中提取稳定的“减伤 X% / 应对目标”规则，正式运行以入库后的 `skill_definition` 为准。
 - 已实现候选 `match_score`、`confidence`、匹配/冲突事件与 evidence 写入；默认不硬排除。
 - 已实现 BWIKI 数据管线：爬取、清洗、dry-run、导入。
 - 已实现管理接口：远程检查、远程同步、本地 cleaned JSON 导入、任务查询。
@@ -58,13 +59,13 @@
   - 技能：469
   - 精灵可学习技能：21447
   - 属性克制规则：113
-- 本地数据库已有真实 rocom 静态数据。
+- 本地数据库已有真实 rocom 静态数据，当前 `skill_definition` 已统一导入 `rocom_bwiki_20260603` 版本；45 个防御技能中 44 个固定减伤规则已写入 `damage_rule_json`，无固定减伤的“硬门”保持未解析。
 - 30 种性格已拆为正式核心规则，后端启动时会幂等自检查并写入/修正。
 - P0 状态定义已可通过 `backend/app/seed/effect_definitions_p0.json` 和 effect importer 写入；当前工作库已导入 10 条 P0 状态定义。
 
 ## 当前未完成内容
 
-- 完整真实伤害体系尚未全部实现：当前已有普通攻击最小公式、P0 状态伤害、星陨、阶段 C 自动结算和阶段 D 技能效果操作；复杂公式分支、天气/状态 modifier、应对/防御独立结算仍需补齐。
+- 完整真实伤害体系尚未全部实现：当前已有普通攻击最小公式、P0 状态伤害、星陨、阶段 C 自动结算、阶段 D 技能效果操作和阶段 E 最小减伤/应对解析；复杂公式分支、天气/状态 modifier、完整应对/防御独立结算仍需补齐。
 - 候选硬排除尚未开启；当前只做软评分、置信度和 evidence 记录。
 - 速度先手概率未实现；当前只有基础面板速度观测匹配。
 - 事件重放重算仍为占位。
@@ -79,9 +80,10 @@
 - 前端 `npm.cmd run typecheck` 通过。
 - 前端 `npm.cmd run build` 通过。
 - 后端阶段 D 新增测试 `python -m pytest app/tests/test_effect_operation_executor.py -q`：`9 passed`。
-- 后端全量测试 `python -m pytest -q`：`54 passed`，仍有 FastAPI `on_event` deprecation warnings。
-- 后端阶段 D 相关 Ruff 检查通过；全量 `python -m ruff check app` 仍受既有 rocom/config 等历史行宽和导入顺序问题影响，非本阶段新增问题。
-- 后端相关模块 Ruff 检查通过。
+- 后端阶段 E 聚焦测试 `python -m pytest app/tests/test_modifier_resolver.py app/tests/test_rule_resolver.py app/tests/test_rocom_cleaner_defense_rules.py app/tests/test_starfall_damage_calculator.py -q`：`15 passed`。
+- rocom cleaned 重新生成与导入已验证：`python -m app.data_pipeline.rocom.cleaner --raw-json ../data/rocom/raw/sprites_raw.json --image-urls-json ../data/rocom/raw/image_urls.json --output-dir ../data/rocom/cleaned` 生成 469 个技能且无 warning；`python -m app.data_pipeline.rocom.importer --cleaned-dir ../data/rocom/cleaned` dry-run 后再 `--commit` 写入本地 DB；星陨技能操作 seed dry-run 后 commit，最终保留 10 个结构化星陨技能操作。
+- 后端全量测试 `python -m pytest -q`：`60 passed`，仍有 FastAPI `on_event` deprecation warnings。
+- 后端全量 Ruff `python -m ruff check app` 通过。
 
 新环境仍需先安装依赖：
 
@@ -102,7 +104,7 @@ docs/03_系统设计/后端MVP完成路线_v0.1.md
 当前建议立即推进：
 
 1. 完善前端结束回合/伤害后/切换后反馈，展示自动结算了哪些状态、跳过了哪些状态、为什么跳过。
-2. 进入阶段 E：补应对/防御独立结算层、`ModifierResolver`，把天气、状态、减伤和应对结果统一解析进公式上下文。
+2. 继续推进阶段 E：扩展天气/状态 modifier、更多结构化防御技能规则和完整应对/防御独立结算层。
 3. 标准化 Observation payload 与候选 evidence，增强状态/星陨/技能触发的解释链。
 4. 实现事件重放重算，并继续保持候选硬排除默认关闭。
 
@@ -116,5 +118,5 @@ docs/03_系统设计/后端MVP完成路线_v0.1.md
 4. 实现状态伤害计算：灼烧、中毒、寄生、冻结阈值、棘刺。
 5. 实现星陨伤害计算：触发技能只负责判定和选择物攻/魔攻分支，实际伤害按幻系计算克制/抵抗。
 6. 规则可审阅接口、状态实例挂载校验、最小结束回合接口和阶段 C 自动结算已落地。
-7. 自动结算稳定后，`EffectOperationExecutor` 已完成阶段 D；后续补应对/防御独立结算层和 `ModifierResolver`。
+7. 自动结算稳定后，`EffectOperationExecutor` 已完成阶段 D；`ModifierResolver` / `ResponseResolver` 已有阶段 E 最小闭环，后续补完整应对/防御独立结算层。
 8. 计算稳定后接入更多候选软评分和前端解释链，仍不急于开启硬排除。

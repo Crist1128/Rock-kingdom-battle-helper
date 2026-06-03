@@ -96,6 +96,13 @@ class DamageEventCreate(BaseModel):
     defender_elf_id: str | None = Field(default=None, description="防御方精灵 ID")
     skill_id: str | None = Field(default=None, description="技能 ID")
     skill_confirmed: bool = Field(default=False, description="技能是否确认")
+    defense_skill_id: str | None = Field(
+        default=None,
+        description="防御方本次用于应对/防御的技能 ID",
+    )
+    response_attack_success: bool | None = Field(default=None, description="本次是否成功应对攻击")
+    response_defense_success: bool | None = Field(default=None, description="本次是否成功应对防御")
+    response_status_success: bool | None = Field(default=None, description="本次是否成功应对状态")
     damage_display_type: DamageDisplayType = Field(..., description="伤害显示类型")
     damage_value: int | None = Field(default=None, ge=0, description="单次或总伤害")
     final_total_damage_value: int | None = Field(

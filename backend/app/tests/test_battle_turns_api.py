@@ -339,6 +339,80 @@ def test_damage_event_triggers_starfall_and_candidate_observation(
         assert evidence[-1]["predicted_value"] == 50
 
 
+def test_damage_event_records_defense_skill_context(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """伤害事件应记录防御技能和应对结果，并把 defense_skill_id 接入规则解析。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_two_active_elves(session, battle_id="battle_defense_context")
+        session.add_all(
+            [
+                SkillDefinition(
+                    skill_id="skill_fire",
+                    skill_name="火系测试技能",
+                    element_type="火",
+                    skill_category="physical",
+                    base_power=50,
+                    base_energy_cost=0,
+                    priority_modifier=0,
+                ),
+                SkillDefinition(
+                    skill_id="skill_guard",
+                    skill_name="防御测试技能",
+                    element_type="普通",
+                    skill_category="status",
+                    base_power=None,
+                    base_energy_cost=1,
+                    priority_modifier=0,
+                    damage_rule_json=dumps_json(
+                        {
+                            "damage_type": "defense_modifier",
+                            "damage_reduction": 0.7,
+                            "active": True,
+                            "condition": "response_attack_success",
+                        }
+                    ),
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_defense_context/damage-events",
+        json={
+            "attacker_side": "self",
+            "attacker_elf_id": "elf_self",
+            "defender_side": "enemy",
+            "defender_elf_id": "elf_enemy",
+            "skill_id": "skill_fire",
+            "skill_confirmed": True,
+            "defense_skill_id": "skill_guard",
+            "response_attack_success": True,
+            "response_defense_success": False,
+            "damage_display_type": "single_damage",
+            "damage_value": 10,
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    event_payload = loads_json(body["battle_event"]["payload_json"], {})
+    assert event_payload["defense_skill_id"] == "skill_guard"
+    assert event_payload["response_attack_success"] is True
+    assert event_payload["response_defense_success"] is False
+
+    context = loads_json(body["damage_event"]["formula_context_json"], {})
+    assert context["defense_skill_id"] == "skill_guard"
+    assert context["response_attack_success"] is True
+    assert context["response_defense_success"] is False
+    assert context["rule_resolution_enabled"] is True
+    damage_reductions = context["rule_resolution_details"]["damage_reductions"]
+    assert damage_reductions["items"][0]["source_id"] == "skill_guard"
+    assert damage_reductions["items"][0]["reduction"] == "0.7"
+    assert context["damage_reductions"] == ["0.7"]
+
+
 def test_switch_in_settles_thorn_mark(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:

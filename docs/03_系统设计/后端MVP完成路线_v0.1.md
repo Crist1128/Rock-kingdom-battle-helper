@@ -45,7 +45,7 @@
 - 状态自动结算尚未实现。
 - 星陨、灼烧、中毒、寄生、冻结、棘刺和暴风雪施加冻结已具备阶段 C 的最小自动结算入口。
 - 技能效果操作执行器尚未实现，技能不会自动施加状态、印记、天气或资源变化。
-- `ModifierResolver` 尚未成型，天气、状态、印记、应对/防御减伤仍未统一进入公式修正链。
+- `ModifierResolver` / `ResponseResolver` 已有阶段 E 最小闭环，可解析防御技能减伤、payload 减伤来源、历史快照状态减伤来源和未知应对分支；天气、状态、印记的完整 modifier 仍需扩展。
 - 复杂技能分支 DSL 尚未实现。
 - 事件重放重算仍是占位。
 - 候选 evidence 查询仍偏摘要，缺少完整解释页。
@@ -255,9 +255,11 @@ backend/app/services/effect_operation_executor.py
 - 已补齐阶段 D 通用操作：`dynamic_apply_effect`、`remove_effect`、`clear_effects`、`change_weather`、`resource_change`、`multiply_layers`、`conditional_branch`。
 - `change_weather` 会按天气冲突组清除旧天气并施加新天气；`resource_change` 会更新战斗精灵 HP/energy 并写入 `ResourceChangeEvent`。
 - 动态层数当前支持从目标现有状态层数读取；缺少上下文或层数为 0 时跳过，不假造状态。
-- 已新增星陨技能规则种子 `backend/app/seed/starfall_skill_operations_p0.json`，覆盖 `skills.csv` 中含“星陨”的技能：超维投射、冥想、多维击打、心灵洞悉、二律背反、星轨裂变、超新星馈赠、空间压迫、星链、错乱。
+- 已新增星陨技能规则种子 `backend/app/seed/starfall_skill_operations_p0.json`，覆盖 rocom cleaned / `skill_definition` 中含“星陨”的技能：超维投射、冥想、多维击打、心灵洞悉、二律背反、星轨裂变、超新星馈赠、空间压迫、星链、错乱。
 - 已新增技能操作规则导入器 `backend/app/data_pipeline/skill_operations/importer.py`，支持按 `skill_name` 或 `skill_id` 写入 `effect_operations_json`，默认 dry-run，传 `--commit` 后才提交。
 - 当前仍不把“修改连击数/公式参数”放入 EffectOperationExecutor 自动执行；这类内容后续由 RuleResolver / ModifierResolver 统一进入公式上下文。
+- 已新增 `backend/app/calculation/modifier_resolver.py` 和 `backend/app/calculation/response_resolver.py`，由 `RuleResolver` 统一调用，避免调用方分散处理公式修正。
+- 手动伤害事件已接入 `defense_skill_id` 和 `response_attack_success` / `response_defense_success` / `response_status_success`：字段进入 `BattleEvent.payload_json`、`DamageFormulaContext` 和 observation payload；存在应对/防御上下文时会启用 `RuleResolver` 解析，但仍不触发候选硬排除。
 
 ### 阶段 E：ModifierResolver 与应对/防御结算层
 
@@ -288,9 +290,10 @@ backend/app/calculation/response_resolver.py
 
 验收：
 
-- 应对/防御造成的减伤能进入 `damage_reductions`。
-- 若应对是否成功未知，候选匹配返回 unknown，不扣分。
-- 星陨仍只吃幻系克制和防御减伤，不吃本系、天气、显示威力。
+- 已完成最小验收：应对/防御造成的结构化减伤可进入 `damage_reductions`。
+- 已完成最小验收：若应对是否成功未知，解析层写入 `response_success_unknown`，不强行套用倍率。
+- 已保持：星陨仍只吃幻系克制和防御减伤，不吃本系、天气、显示威力。
+- 待扩展：天气/状态/印记 modifier、更多技能分支和完整应对/防御结算事件。
 
 ### 阶段 F：候选软评分增强
 

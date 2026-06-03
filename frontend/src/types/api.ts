@@ -255,6 +255,10 @@ export interface DamageEventCreate {
   defender_elf_id?: string | null;
   skill_id?: string | null;
   skill_confirmed?: boolean;
+  defense_skill_id?: string | null;
+  response_attack_success?: boolean | null;
+  response_defense_success?: boolean | null;
+  response_status_success?: boolean | null;
   damage_display_type: DamageDisplayType;
   damage_value?: number | null;
   final_total_damage_value?: number | null;

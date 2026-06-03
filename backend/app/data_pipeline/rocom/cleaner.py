@@ -161,6 +161,44 @@ def normalize_skill_category(value: Any) -> str:
     return SKILL_CATEGORY_MAP.get(text, "special" if text else "status")
 
 
+def parse_defense_damage_rule(raw_category: str, description: str) -> dict[str, Any] | None:
+    """从防御技能描述中提取稳定的减伤规则。"""
+    if raw_category != "防御" or not description:
+        return None
+
+    reduction_match = re.search(r"减伤\s*(\d+(?:\.\d+)?)%", description)
+    if reduction_match is None:
+        return None
+
+    reduction = float(reduction_match.group(1)) / 100
+    response_match = re.search(r"应对(攻击|防御|状态)", description)
+    response_target_map = {
+        "攻击": "attack",
+        "防御": "defense",
+        "状态": "status",
+    }
+    response_target = (
+        response_target_map.get(response_match.group(1)) if response_match is not None else None
+    )
+    response_rule = None
+    if response_target is not None:
+        response_rule = {
+            "target": response_target,
+            "condition": f"response_{response_target}_success",
+            "branch_status": "raw_unparsed",
+        }
+
+    return {
+        "status": "parsed_defense_reduction",
+        "damage_type": "defense_modifier",
+        "damage_reduction": reduction,
+        "active": True,
+        "response_rule": response_rule,
+        "raw_description": description,
+        "source": "rocom_skill_definition_parser",
+    }
+
+
 def short_hash(value: str, length: int = 8) -> str:
     """生成稳定短 hash，用于跨版本保持 ID 可复现。"""
     return hashlib.sha1(value.encode("utf-8")).hexdigest()[:length]
@@ -261,7 +299,11 @@ def build_skill_catalog(
         if power is None and category in {"physical", "magic"}:
             tags.append("power_missing")
 
-        if category == "physical":
+        defense_rule = parse_defense_damage_rule(raw_category, description)
+        if defense_rule is not None:
+            tags.append("defense_reduction")
+            damage_rule: dict[str, Any] | None = defense_rule
+        elif category == "physical":
             damage_rule: dict[str, Any] | None = {
                 "status": "formula_unavailable",
                 "damage_type": "normal_formula",

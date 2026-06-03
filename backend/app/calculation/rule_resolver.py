@@ -21,6 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.calculation.formula_context import DamageFormulaContext
+from app.calculation.modifier_resolver import ModifierResolver
+from app.calculation.response_resolver import ResponseResolver
 from app.models.static import ElfDefinition, SkillDefinition, TypeEffectivenessRule
 from app.utils.json import loads_json
 
@@ -32,6 +34,8 @@ class RuleResolver:
 
     def __init__(self, db: Session | None = None) -> None:
         self.db = db
+        self.modifier_resolver = ModifierResolver(db)
+        self.response_resolver = ResponseResolver()
 
     def resolve_damage_context(
         self,
@@ -43,17 +47,17 @@ class RuleResolver:
         该方法会原地补全并返回 ``context``。这样可以避免在候选循环中频繁复制大型对象，
         也让后续 evidence 能直接看到最终参与计算的上下文。
         """
-        payload = payload or {}
+        payload = dict(payload or {})
         if not self._payload_bool(payload, "resolve_rules", False):
             return context
 
         details: dict[str, Any] = {}
         self._fill_skill_definition(context, details)
         self._fill_element_types(context, payload, details)
-        self._resolve_response_multiplier(context, payload, details)
+        details.update(self.response_resolver.resolve_response_modifiers(context, payload))
         self._resolve_stab_multiplier(context, payload, details)
         self._resolve_type_multiplier(context, payload, details)
-        self._resolve_damage_reductions(context, payload, details)
+        details.update(self.modifier_resolver.resolve_formula_modifiers(context, payload))
 
         context.rule_resolution_enabled = True
         context.rule_resolution_details = details

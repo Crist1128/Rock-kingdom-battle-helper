@@ -7,6 +7,8 @@
 
 from app.calculation.damage_calculator import DamageCalculator
 from app.calculation.formula_context import CalculationPlaceholderResult, DamageFormulaContext
+from app.calculation.modifier_resolver import ModifierResolver
+from app.calculation.response_resolver import ResponseResolver
 from app.calculation.stat_calculator import (
     BaseTalentBlock,
     IndividualTalentDistribution,
@@ -21,7 +23,9 @@ __all__ = [
     "DamageCalculator",
     "DamageFormulaContext",
     "IndividualTalentDistribution",
+    "ModifierResolver",
     "NatureRule",
+    "ResponseResolver",
     "PanelStats",
     "StatCalculator",
 ]

@@ -179,6 +179,10 @@ class ObservationMatcher:
             defender_panel_stats=defender_panel,
             defender_max_hp=defender_max_hp,
             skill_id=self._optional_str(payload.get("skill_id")),
+            defense_skill_id=self._optional_str(payload.get("defense_skill_id")),
+            response_attack_success=self._optional_bool(payload.get("response_attack_success")),
+            response_defense_success=self._optional_bool(payload.get("response_defense_success")),
+            response_status_success=self._optional_bool(payload.get("response_status_success")),
             skill_element_type=self._optional_str(payload.get("skill_element_type")),
             trigger_skill_id=self._optional_str(payload.get("trigger_skill_id")),
             trigger_skill_element_type=self._optional_str(
@@ -262,6 +266,16 @@ class ObservationMatcher:
         if value is None or value == "":
             return None
         return str(value)
+
+    @staticmethod
+    def _optional_bool(value: Any) -> bool | None:
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() not in {"0", "false", "no", "off"}
+        return bool(value)
 
     @staticmethod
     def _event_weight(observation: ObservationEventInput, default: float) -> float:

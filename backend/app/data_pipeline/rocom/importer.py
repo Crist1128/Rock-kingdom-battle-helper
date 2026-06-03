@@ -125,10 +125,56 @@ def upsert_skill(db: Session, row: dict[str, Any]) -> str:
         skill = SkillDefinition(skill_id=row["skill_id"], **clean_row)
         db.add(skill)
         return "created"
+    clean_row["effect_operations_json"] = _merged_effect_operations_json(
+        current_json=skill.effect_operations_json,
+        incoming_json=clean_row.get("effect_operations_json"),
+    )
     for field in SKILL_FIELDS:
         setattr(skill, field, clean_row.get(field))
     skill.deleted_at = None
     return "updated"
+
+
+def _merged_effect_operations_json(
+    *,
+    current_json: str | None,
+    incoming_json: str | None,
+) -> str | None:
+    """保留已结构化技能操作，避免 cleaned 基线把人工规则覆盖回 unparsed。"""
+    if incoming_json is None and _has_structured_operation_payload(current_json):
+        return current_json
+    if not _is_unparsed_operation_payload(incoming_json):
+        return incoming_json
+    if _has_structured_operation_payload(current_json):
+        return current_json
+    return incoming_json
+
+
+def _has_structured_operation_payload(value: str | None) -> bool:
+    operations = _loads_json_list(value)
+    if not operations:
+        return False
+    return any(isinstance(item, dict) and item.get("op_type") for item in operations)
+
+
+def _is_unparsed_operation_payload(value: str | None) -> bool:
+    operations = _loads_json_list(value)
+    if not operations:
+        return False
+    return all(
+        isinstance(item, dict) and item.get("status") == "unparsed" and not item.get("op_type")
+        for item in operations
+    )
+
+
+def _loads_json_list(value: str | None) -> list[Any]:
+    if not value:
+        return []
+    try:
+        data = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return data if isinstance(data, list) else []
 
 
 def upsert_elf_skill_link(db: Session, row: dict[str, Any]) -> str:

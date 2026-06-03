@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.calculation.formula_context import DamageFormulaContext
+from app.calculation.rule_resolver import RuleResolver
 from app.core.enums import BattleEventType, DamageDisplayType, EventSource
 from app.inference.inference_engine import InferenceEngine
 from app.models.battle import Battle, BattleElfState
@@ -48,6 +49,9 @@ class DamageEventService:
         turn_number = payload.turn_number if payload.turn_number is not None else battle.turn_number
         total_damage = self._resolve_total_damage(payload)
         hp_percent_delta = self._resolve_hp_percent_delta(payload)
+        rule_payload = payload.model_dump(mode="json")
+        if self._should_resolve_rules(rule_payload):
+            rule_payload["resolve_rules"] = True
 
         battle_event = BattleEvent(
             event_id=f"event_{uuid4().hex}",
@@ -113,12 +117,17 @@ class DamageEventService:
             defender_side=payload.defender_side,
             defender_elf_id=payload.defender_elf_id,
             skill_id=payload.skill_id,
+            defense_skill_id=payload.defense_skill_id,
+            response_attack_success=payload.response_attack_success,
+            response_defense_success=payload.response_defense_success,
+            response_status_success=payload.response_status_success,
             damage_display_type=payload.damage_display_type.value,
             observed_damage_value=total_damage,
             observed_hp_percent_delta=hp_percent_delta,
             snapshot_payload=loads_json(snapshot.full_snapshot_json, []),
             notes=payload.notes,
         )
+        context = RuleResolver(self.db).resolve_damage_context(context, rule_payload)
         damage_event.formula_context_json = dumps_json(context)
         inference_result = InferenceEngine(self.db).process_damage_event(
             damage_event=damage_event,
@@ -187,6 +196,19 @@ class DamageEventService:
         if display_type == DamageDisplayType.COMBO_REPEATED_DAMAGE:
             return BattleEventType.COMBO_DAMAGE.value
         return BattleEventType.DAMAGE.value
+
+    @staticmethod
+    def _should_resolve_rules(payload: dict) -> bool:
+        """有应对/防御上下文时启用规则解析，但不改变候选硬排除策略。"""
+        return any(
+            payload.get(key) is not None
+            for key in (
+                "defense_skill_id",
+                "response_attack_success",
+                "response_defense_success",
+                "response_status_success",
+            )
+        )
 
     def _create_resource_change_for_damage(
         self,

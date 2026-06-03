@@ -46,6 +46,10 @@ class DamageFormulaContext(BaseModel):
     defender_side: str | None = None
     defender_elf_id: str | None = None
     skill_id: str | None = None
+    defense_skill_id: str | None = None
+    response_attack_success: bool | None = None
+    response_defense_success: bool | None = None
+    response_status_success: bool | None = None
     skill_element_type: str | None = None
     trigger_skill_id: str | None = None
     trigger_skill_element_type: str | None = None

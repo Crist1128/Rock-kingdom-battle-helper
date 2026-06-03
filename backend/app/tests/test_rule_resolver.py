@@ -78,6 +78,22 @@ def db_session() -> Iterator[Session]:
                 base_energy_cost=0,
                 priority_modifier=0,
             ),
+            SkillDefinition(
+                skill_id="defense_skill",
+                skill_name="防御测试技能",
+                element_type="normal",
+                skill_category="status",
+                base_power=None,
+                base_energy_cost=1,
+                priority_modifier=0,
+                damage_rule_json=dumps_json(
+                    {
+                        "damage_type": "defense_modifier",
+                        "damage_reduction": 0.7,
+                        "active": True,
+                    }
+                ),
+            ),
             TypeEffectivenessRule(
                 attack_element_type="fire",
                 defense_element_type="grass",
@@ -174,6 +190,21 @@ def test_rule_resolver_marks_unknown_when_response_branch_is_unknown(
 
     assert "response_success_unknown" in context.unknown_factors
     assert context.response_multiplier == Decimal("1")
+
+
+def test_rule_resolver_applies_defense_skill_reduction(db_session: Session) -> None:
+    """传入防御技能时，减伤应进入 damage_reductions 并参与普通伤害计算。"""
+    context = RuleResolver(db_session).resolve_damage_context(
+        _context("grass_elf"),
+        {"resolve_rules": True, "defense_skill_id": "defense_skill"},
+    )
+
+    assert context.damage_reductions == [Decimal("0.7")]
+
+    result = DamageCalculator().calculate(context)
+    assert result.status == "calculated"
+    assert result.damage_value == 67
+    assert result.explanation["damage_reductions"] == ["0.7"]
 
 
 def test_rule_resolver_uses_starfall_element_for_type_multiplier(db_session: Session) -> None:

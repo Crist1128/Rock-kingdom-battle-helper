@@ -49,6 +49,10 @@ ROCOM_DATA_DIR=../data/rocom
 
 历史 CSV 入口在 `cleaner.py` / `importer.py` 中保留，仅用于兼容旧数据，不作为新流程使用。
 
+重新导入 cleaned JSON 时，`skill_definition` 是运行时主来源；如果数据库里已有结构化
+`effect_operations_json`，而 cleaned 基线只提供空值或 `unparsed` 占位，导入器会保留数据库中的
+结构化操作，避免覆盖星陨等人工整理规则。新的结构化 cleaned 规则仍会正常写入数据库。
+
 ## 主动接口
 
 接口位置：

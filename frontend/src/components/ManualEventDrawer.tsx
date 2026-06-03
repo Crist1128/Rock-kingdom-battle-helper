@@ -53,6 +53,10 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
   const [attackerSide, setAttackerSide] = useState<Side>(activeIds.attackerSide as Side);
   const [defenderSide, setDefenderSide] = useState<Side>(activeIds.defenderSide as Side);
   const [skillId, setSkillId] = useState<string | null>(null);
+  const [defenseSkillId, setDefenseSkillId] = useState<string | null>(null);
+  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("");
+  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("");
+  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("");
   const [damageValue, setDamageValue] = useState(0);
   const [perHitDamage, setPerHitDamage] = useState(0);
   const [hitCount, setHitCount] = useState(2);
@@ -81,6 +85,10 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
     attackerPanelStats,
     defenderPanelStats,
     skillId,
+    defenseSkillId,
+    responseAttackSuccess: optionalBool(responseAttackSuccess),
+    responseDefenseSuccess: optionalBool(responseDefenseSuccess),
+    responseStatusSuccess: optionalBool(responseStatusSuccess),
     observedTotalDamage,
     damageTolerance,
     hitCount: damageDisplayType === "combo_repeated_damage" ? hitCount : 1,
@@ -95,6 +103,10 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
       defender_elf_id: defenderElfId,
       skill_id: skillId,
       skill_confirmed: Boolean(skillId),
+      defense_skill_id: defenseSkillId,
+      response_attack_success: optionalBool(responseAttackSuccess),
+      response_defense_success: optionalBool(responseDefenseSuccess),
+      response_status_success: optionalBool(responseStatusSuccess),
       damage_display_type: damageDisplayType,
       damage_value: damageDisplayType === "single_damage" ? damageValue : undefined,
       final_total_damage_value: damageDisplayType === "visual_total_damage" ? damageValue : undefined,
@@ -115,6 +127,29 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
       <SideSelect label="攻击方" value={attackerSide} onChange={setAttackerSide} />
       <SideSelect label="防御方" value={defenderSide} onChange={setDefenderSide} />
       <SkillSearchSelect label="技能" value={skillId} onChange={(id) => setSkillId(id)} />
+      <SkillSearchSelect
+        label="防御/应对技能"
+        value={defenseSkillId}
+        onChange={(id) => setDefenseSkillId(id)}
+        elfId={defenderElfId}
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <ResponseResultSelect
+          label="应对攻击"
+          value={responseAttackSuccess}
+          onChange={setResponseAttackSuccess}
+        />
+        <ResponseResultSelect
+          label="应对防御"
+          value={responseDefenseSuccess}
+          onChange={setResponseDefenseSuccess}
+        />
+        <ResponseResultSelect
+          label="应对状态"
+          value={responseStatusSuccess}
+          onChange={setResponseStatusSuccess}
+        />
+      </div>
       <div>
         <label className="text-sm font-medium">伤害显示类型</label>
         <Select value={damageDisplayType} onChange={(e) => setDamageDisplayType(e.target.value as DamageDisplayType)}>
@@ -165,6 +200,10 @@ interface DamageObservationBuildInput {
   attackerPanelStats: PanelStatsInput | null;
   defenderPanelStats: PanelStatsInput | null;
   skillId?: string | null;
+  defenseSkillId?: string | null;
+  responseAttackSuccess?: boolean | null;
+  responseDefenseSuccess?: boolean | null;
+  responseStatusSuccess?: boolean | null;
   observedTotalDamage: number;
   damageTolerance: number;
   hitCount: number;
@@ -181,6 +220,10 @@ function buildDamageObservationPayload(input: DamageObservationBuildInput): Obse
     resolve_rules: input.resolveRules,
     enemy_role: enemyIsAttacker ? "attacker" : "defender",
     skill_id: input.skillId || undefined,
+    defense_skill_id: input.defenseSkillId || undefined,
+    response_attack_success: input.responseAttackSuccess ?? undefined,
+    response_defense_success: input.responseDefenseSuccess ?? undefined,
+    response_status_success: input.responseStatusSuccess ?? undefined,
     damage_tolerance: input.damageTolerance,
     hit_count: input.hitCount,
   };
@@ -310,6 +353,24 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
 }
 function NumberMaybeField({ label, value, onChange }: { label: string; value: number | ""; onChange: (value: number | "") => void }) {
   return <div><label className="text-sm font-medium">{label}</label><Input type="number" value={value} onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))} /></div>;
+}
+type OptionalBoolInput = "" | "true" | "false";
+function ResponseResultSelect({ label, value, onChange }: { label: string; value: OptionalBoolInput; onChange: (value: OptionalBoolInput) => void }) {
+  return (
+    <div>
+      <label className="text-sm font-medium">{label}</label>
+      <Select value={value} onChange={(e) => onChange(e.target.value as OptionalBoolInput)}>
+        <option value="">未知</option>
+        <option value="true">成功</option>
+        <option value="false">失败</option>
+      </Select>
+    </div>
+  );
+}
+function optionalBool(value: OptionalBoolInput): boolean | undefined {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
 }
 function SubmitButton({ loading, disabled }: { loading: boolean; disabled?: boolean }) {
   return <Button className="w-full" type="submit" disabled={loading || disabled}>{loading ? "提交中..." : "提交事件"}</Button>;
