@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAppStore } from "@/store/useAppStore";
@@ -11,10 +12,12 @@ import { EventTimeline } from "@/components/EventTimeline";
 import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
 import { phaseName, sideName } from "@/lib/utils";
+import type { EndTurnResult } from "@/types/api";
 
 export function BattleWorkbenchPage() {
   const queryClient = useQueryClient();
   const { currentBattleId, openDrawer, setCandidatePanelElfId, candidatePanelElfId } = useAppStore();
+  const [lastEndTurnResult, setLastEndTurnResult] = useState<EndTurnResult | null>(null);
   const stateQuery = useQuery({
     queryKey: ["battle-state", currentBattleId],
     queryFn: () => api.battles.state(currentBattleId!),
@@ -27,6 +30,7 @@ export function BattleWorkbenchPage() {
   const selfActive = selfElves.find((elf) => elf.elf_id === state?.battle.self_active_elf_id);
   const enemyActive = enemyElves.find((elf) => elf.elf_id === state?.battle.enemy_active_elf_id);
   const candidateElfId = candidatePanelElfId ?? state?.battle.enemy_active_elf_id;
+  const canEndTurn = Boolean(currentBattleId && state && state.battle.phase === "battle");
 
   const finishBattle = useMutation({
     mutationFn: () => api.battles.finish(currentBattleId!),
@@ -35,6 +39,26 @@ export function BattleWorkbenchPage() {
       queryClient.invalidateQueries({ queryKey: ["battles"] });
     },
   });
+
+  const endTurn = useMutation({
+    mutationFn: () => api.battles.endTurn(currentBattleId!, {}),
+    onSuccess: (result) => {
+      setLastEndTurnResult(result);
+      queryClient.invalidateQueries({ queryKey: ["battle-state", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-list"] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-evidence"] });
+      queryClient.invalidateQueries({ queryKey: ["battles"] });
+    },
+  });
+
+  const requestEndTurn = () => {
+    if (!currentBattleId || !state) return;
+    if (!window.confirm(`确认结束第 ${state.battle.turn_number} 回合并执行回合末结算？`)) return;
+    endTurn.mutate();
+  };
 
   const requestFinishBattle = () => {
     if (!currentBattleId) return;
@@ -53,6 +77,14 @@ export function BattleWorkbenchPage() {
           <Badge variant="outline">{phaseName(state?.battle.phase)}</Badge>
           <Badge variant="secondary">回合 {state?.battle.turn_number ?? "--"}</Badge>
           <Badge variant="success">soft scoring</Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!canEndTurn || endTurn.isPending}
+            onClick={requestEndTurn}
+          >
+            {endTurn.isPending ? "结算中..." : "结束回合"}
+          </Button>
           <Button
             variant="destructive"
             size="sm"
@@ -97,9 +129,14 @@ export function BattleWorkbenchPage() {
                 <Button variant="outline" onClick={() => openDrawer("effect", "enemy")}>敌方状态</Button>
                 <Button variant="outline" onClick={() => openDrawer("switch", "self")}>我方切换</Button>
                 <Button variant="outline" onClick={() => openDrawer("switch", "enemy")}>敌方切换</Button>
+                <Button variant="secondary" disabled={!canEndTurn || endTurn.isPending} onClick={requestEndTurn}>
+                  {endTurn.isPending ? "结算中..." : "结束回合"}
+                </Button>
                 <Button variant="ghost" onClick={() => stateQuery.refetch()}>刷新</Button>
               </CardContent>
             </Card>
+
+            {lastEndTurnResult ? <EndTurnSummary result={lastEndTurnResult} /> : null}
 
             <Card>
               <CardHeader><CardTitle>统一状态系统</CardTitle></CardHeader>
@@ -126,6 +163,87 @@ export function BattleWorkbenchPage() {
       ) : null}
 
       <ManualEventDrawer battleId={currentBattleId} state={state ? { battle: state.battle, elves: state.elves } : undefined} />
+    </div>
+  );
+}
+
+function EndTurnSummary({ result }: { result: EndTurnResult }) {
+  const eventCount = result.settlement_events.length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>最近回合结算</CardTitle>
+          <Badge variant={result.settlement_status === "settled" ? "success" : "warning"}>
+            {result.settlement_status}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <div className="grid grid-cols-4 gap-2">
+          <Metric label="已结回合" value={result.ended_turn_number} />
+          <Metric label="当前回合" value={result.next_turn_number} />
+          <Metric label="结算事件" value={eventCount} />
+          <Metric label="快照" value={result.snapshot_id.slice(0, 8)} />
+        </div>
+        {eventCount > 0 ? (
+          <div className="space-y-2">
+            {result.settlement_events.slice(0, 6).map((item, index) => (
+              <SettlementEventItem key={`${result.battle_event.event_id}-${index}`} item={item} />
+            ))}
+            {eventCount > 6 ? (
+              <div className="text-xs text-muted-foreground">还有 {eventCount - 6} 条结算事件，请在时间线查看完整记录。</div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="rounded-xl border bg-muted/40 p-3 text-muted-foreground">
+            本回合没有产生自动结算事件。
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SettlementEventItem({ item }: { item: Record<string, unknown> }) {
+  const observationResult =
+    typeof item.observation_result === "object" && item.observation_result !== null
+      ? (item.observation_result as Record<string, unknown>)
+      : null;
+
+  return (
+    <div className="rounded-xl border bg-white p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline">{String(item.status ?? "event")}</Badge>
+        {item.settlement_phase ? <Badge variant="secondary">{String(item.settlement_phase)}</Badge> : null}
+        {item.effect_id ? <span className="font-semibold">{String(item.effect_id)}</span> : null}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+        {item.target_side ? <span>目标：{String(item.target_side)} / {String(item.target_elf_id ?? "--")}</span> : null}
+        {item.damage_value !== undefined ? <span>伤害：{String(item.damage_value)}</span> : null}
+        {item.layers_before !== undefined || item.layers_after !== undefined ? (
+          <span>
+            层数：{String(item.layers_before ?? "--")} -&gt; {String(item.layers_after ?? "--")}
+          </span>
+        ) : null}
+        {item.reason ? <span>原因：{String(item.reason)}</span> : null}
+      </div>
+      {observationResult ? (
+        <div className="mt-2 text-xs text-muted-foreground">
+          候选反馈：匹配 {String(observationResult.matched_count ?? "--")}，冲突{" "}
+          {String(observationResult.mismatched_count ?? "--")}，未知 {String(observationResult.unknown_count ?? "--")}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border bg-white p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 font-semibold">{value}</div>
     </div>
   );
 }

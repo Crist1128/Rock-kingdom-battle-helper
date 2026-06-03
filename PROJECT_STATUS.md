@@ -1,6 +1,6 @@
 # 当前项目状态
 
-更新日期：2026-05-31
+更新日期：2026-06-03
 
 ## 总体阶段
 
@@ -47,6 +47,7 @@
 - 已接入 health 检测、战斗列表、战斗归档、己方配置 CRUD、规则库查询。
 - 已接入准备阶段阵容录入和开始战斗。
 - 已接入战斗工作台快捷录入：伤害、资源、状态、切换。
+- 战斗工作台已接入 `turns/end`：可从顶部或快捷录入区结束当前回合，刷新状态、时间线与候选信息，并展示最近一次自动结算摘要。
 - 已接入候选摘要、速度分布占位和时间线展示。
 - 已接入 Observation API：伤害录入后可按条件同步提交候选反推观察，并刷新候选摘要/详情/Top 候选。
 - 已接入候选 Top 5 展示和最近 evidence 展示，方便测试普通攻击、状态/星陨和应对/防御上下文对候选软评分的影响。
@@ -78,6 +79,7 @@
 最近进度文档记录的验证结果：
 
 - 前端 `npm.cmd run typecheck` 通过。
+- 前端结束回合接入后，`npm.cmd run typecheck` 通过，`BattleWorkbenchPage.tsx` 编码扫描通过。
 - 前端 `npm.cmd run build` 通过。
 - 后端阶段 D 新增测试 `python -m pytest app/tests/test_effect_operation_executor.py -q`：`9 passed`。
 - 后端阶段 E 聚焦测试 `python -m pytest app/tests/test_modifier_resolver.py app/tests/test_rule_resolver.py app/tests/test_rocom_cleaner_defense_rules.py app/tests/test_starfall_damage_calculator.py -q`：`15 passed`。
@@ -103,7 +105,7 @@ docs/03_系统设计/后端MVP完成路线_v0.1.md
 
 当前建议立即推进：
 
-1. 完善前端结束回合/伤害后/切换后反馈，展示自动结算了哪些状态、跳过了哪些状态、为什么跳过。
+1. 完善前端伤害后/切换后反馈，展示自动结算了哪些状态、跳过了哪些状态、为什么跳过。
 2. 继续推进阶段 E：扩展天气/状态 modifier、更多结构化防御技能规则和完整应对/防御独立结算层。
 3. 继续增强候选 evidence，补状态/星陨/技能触发的完整公式上下文解释链。
 4. 实现事件重放重算，并继续保持候选硬排除默认关闭。
