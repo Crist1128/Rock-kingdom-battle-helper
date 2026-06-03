@@ -12,6 +12,7 @@ from app.calculation.rule_resolver import RuleResolver
 from app.core.enums import BattleEventType, DamageDisplayType, EventSource
 from app.inference.inference_engine import InferenceEngine
 from app.inference.observation_matcher import ObservationEventInput
+from app.inference.observation_payload import build_damage_observation_payload
 from app.inference.observation_types import ObservationType
 from app.models.battle import Battle, BattleElfState
 from app.models.effect import BattleEffectInstance
@@ -333,14 +334,13 @@ class TurnSettlementService:
             target=target,
             event_id=damage_event_id,
             observed_damage=result.damage_value,
-            payload={
-                "formula_type": "status",
-                "effect_id": instance.effect_id,
-                "effect_layers": result.explanation.get("layers", instance.layers),
-                "skill_element_type": resource_rule.get("element_type"),
-                "resolve_rules": True,
-                "observed_damage_value": result.damage_value,
-            },
+            payload=build_damage_observation_payload(
+                formula_type="status",
+                observed_damage_value=result.damage_value,
+                effect_id=instance.effect_id,
+                effect_layers=result.explanation.get("layers", instance.layers),
+                skill_element_type=resource_rule.get("element_type"),
+            ),
         )
         summary = {
             **self._base_summary(instance),
@@ -496,17 +496,19 @@ class TurnSettlementService:
         if damage_event is not None:
             damage_event.formula_context_json = dumps_json(context)
 
-        observation_payload = {
-            "formula_type": "starfall",
-            "effect_id": instance.effect_id,
-            "effect_layers": result.explanation.get("layers", instance.layers),
-            "trigger_skill_id": trigger_skill_id,
-            "trigger_skill_element_type": context.trigger_skill_element_type,
-            "trigger_skill_category": context.trigger_skill_category,
-            "attacker_panel_stats": attacker_panel.model_dump(),
-            "resolve_rules": True,
-            "observed_damage_value": result.damage_value,
-        }
+        observation_payload = build_damage_observation_payload(
+            formula_type="starfall",
+            observed_damage_value=result.damage_value,
+            attacker_panel_stats=attacker_panel.model_dump(),
+            attacker_elf_id=attacker.elf_id,
+            defender_elf_id=defender.elf_id,
+            effect_id=instance.effect_id,
+            effect_layers=result.explanation.get("layers", instance.layers),
+            trigger_skill_id=trigger_skill_id,
+            trigger_skill_element_type=context.trigger_skill_element_type,
+            trigger_skill_category=context.trigger_skill_category,
+            starfall_element_type=context.starfall_element_type,
+        )
         observation_result = self._process_damage_observation(
             battle_id=battle.battle_id,
             target=defender,

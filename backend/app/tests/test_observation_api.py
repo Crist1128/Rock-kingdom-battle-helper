@@ -190,6 +190,16 @@ def test_process_damage_observation_updates_candidate_scores(
     assert evidence[0]["reason"] == "damage_value_matched"
     assert evidence[0]["predicted_value"] == 90
 
+    evidence_response = client.get("/api/v1/candidates/battle_1/enemy_elf/evidence")
+    assert evidence_response.status_code == 200
+    evidence_body = evidence_response.json()
+    assert evidence_body["formula_status"] == "soft_scoring"
+    assert any(
+        item["event_id"] == "event_damage_api_1"
+        and item["candidate_id"] == "candidate_low_defense"
+        for item in evidence_body["evidence_items"]
+    )
+
 
 def test_process_observation_returns_404_for_missing_battle(
     api_client: tuple[TestClient, sessionmaker[Session]],
@@ -272,3 +282,53 @@ def test_process_damage_observation_can_resolve_basic_rules(
     assert Decimal(details["display_power"]) == Decimal("125")
     assert details["rule_resolution_enabled"] is True
     assert details["rule_resolution_details"]["type_multiplier"]["value"] == "2.0"
+
+
+def test_process_damage_observation_accepts_v1_payload(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """v1 嵌套 Observation payload 应被归一化后进入现有伤害 matcher。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        session.add_all(
+            [
+                _candidate("candidate_v1_low_defense", physical_defense=100),
+                _candidate("candidate_v1_high_defense", physical_defense=200),
+            ]
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/observations/battle_1",
+        json={
+            "enemy_elf_id": "enemy_elf",
+            "event_id": "event_damage_v1_api_1",
+            "observation_type": "damage_value",
+            "observed_value": 90,
+            "payload": {
+                "schema_version": "observation_payload_v1",
+                "context_kind": "damage",
+                "roles": {"enemy_role": "defender"},
+                "panels": {
+                    "attacker": {
+                        "hp": 300,
+                        "physical_attack": 200,
+                        "physical_defense": 100,
+                        "magic_attack": 100,
+                        "magic_defense": 100,
+                        "speed": 100,
+                    }
+                },
+                "skill": {"skill_category": "physical"},
+                "formula": {"formula_type": "attack", "base_power": 50},
+                "observed": {"damage_value": 90},
+                "matching": {"damage_tolerance": 0},
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["matched_count"] == 1
+    assert body["mismatched_count"] == 1
+    assert body["top_candidate_id"] == "candidate_v1_low_defense"

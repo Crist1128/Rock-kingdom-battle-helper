@@ -12,12 +12,12 @@
 - 静态规则数据：已接入洛克王国 BWIKI 爬虫、清洗、dry-run、导入流程。
 - 已有真实数据：精灵、技能、精灵可学习技能、属性克制规则。
 - 手动 MVP：己方配置、战斗创建、阵容录入、首发确认、切换、伤害/资源/状态手动事件、状态快照、时间线、候选摘要。
-- 候选反推：已提供 Observation API，可根据伤害值、扣血百分比、技能出现、速度先后手等观测更新 `match_score`、`confidence` 和 evidence；默认只软评分，不硬排除。
+- 候选反推：已提供 Observation API，可根据伤害值、扣血百分比、技能出现、速度先后手等观测更新 `match_score`、`confidence` 和 evidence；伤害观测已标准化为 `observation_payload_v1`，候选 evidence 聚合接口和前端最近 evidence 展示已接入；默认只软评分，不硬排除。
 - 伤害与规则解析：已实现普通攻击最小公式、P0 状态伤害、星陨伤害、伤害观测匹配、`RuleResolver` 雏形、`ModifierResolver` 与 `ResponseResolver` 最小闭环；可解析技能基础信息、本系、属性克制、双属性合并、应对倍率、防御技能减伤、payload 减伤来源和快照状态减伤来源；手动伤害事件已可把 `defense_skill_id` 与应对成功标记写入事件 payload 和公式上下文。
 - 状态定义：已有 P0 状态定义 JSON 种子、dry-run/commit 导入器和 `--status` 只读查询；`/effects` 已返回完整审阅字段。
 - 自动结算：阶段 C 最小闭环已完成，支持回合末灼烧/中毒/中毒印记/寄生/冻结阈值/暴风雪施加冻结，伤害后星陨，切换入场棘刺；敌方受击的自动伤害会进入 Observation 软评分 evidence。
 - 技能结构化操作：阶段 D 已接入 `EffectOperationExecutor`，`skill_use` 可按 `effect_operations_json` 自动施加/移除/清除状态，切换天气，修改 HP/energy，执行条件分支和层数翻倍；星陨相关技能规则已有可 dry-run 导入的种子。
-- 前端联动：战斗工作台伤害录入可同步提交 observation，候选面板可展示 Top 候选。
+- 前端联动：战斗工作台伤害录入可同步提交 observation，候选面板可展示 Top 候选和最近 evidence，工作台提示已跟进当前可测的普通攻击、状态/星陨、应对/防御和软评分能力。
 - 管理功能：规则数据更新入口、归档战斗 dry-run 与物理清理入口。
 
 ## 当前明确未完成内容
@@ -114,5 +114,5 @@ npm.cmd run build
 1. 完善前端结束回合、伤害后和切换后的自动结算反馈。
 2. 继续扩展 `ModifierResolver`：接入天气/状态 modifier、更多快照状态修正与特殊公式。
 3. 补完整应对/防御独立结算层，并把应对结果作为公式修正和技能操作条件来源。
-4. 标准化 Observation payload 和候选 evidence 解释链。
+4. 继续完善候选 evidence 解释链，补更完整的公式上下文字段展示。
 5. 实现事件重放重算，并完善候选证据链展示；候选硬排除仍默认关闭。

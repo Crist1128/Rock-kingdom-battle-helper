@@ -22,6 +22,7 @@ from app.calculation.damage_calculator import DamageCalculator
 from app.calculation.formula_context import DamageFormulaContext
 from app.inference.match_result import ObservationMatchResult
 from app.inference.observation_matcher import ObservationEventInput, ObservationMatcher
+from app.inference.observation_payload import normalize_observation_payload
 from app.models.candidate import BuildCandidate
 from app.models.event import DamageEvent
 from app.utils.json import dumps_json, loads_json
@@ -73,6 +74,15 @@ class InferenceEngine:
         Returns:
             dict: 本次处理摘要，包括匹配数量、冲突数量、unknown 数量和 Top 候选信息。
         """
+        observation = observation.model_copy(
+            update={
+                "payload": normalize_observation_payload(
+                    observation.payload,
+                    observation_type=observation.observation_type,
+                    observed_value=observation.observed_value,
+                )
+            }
+        )
         candidates = self._load_active_candidates(observation.battle_id, observation.enemy_elf_id)
         matched_count = 0
         mismatched_count = 0

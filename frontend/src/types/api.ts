@@ -358,12 +358,49 @@ export interface PanelStatsInput {
   speed: number;
 }
 
+export interface ObservationPayloadV1 {
+  schema_version: "observation_payload_v1";
+  context_kind: "damage" | "skill" | "speed" | "state" | "survival";
+  roles?: {
+    enemy_role?: "attacker" | "defender";
+  };
+  participants?: {
+    attacker_side?: Side | null;
+    attacker_elf_id?: string | null;
+    defender_side?: Side | null;
+    defender_elf_id?: string | null;
+  };
+  panels?: {
+    attacker?: PanelStatsInput | null;
+    defender?: PanelStatsInput | null;
+    defender_max_hp?: number | null;
+  };
+  skill?: {
+    skill_id?: string | null;
+    defense_skill_id?: string | null;
+    skill_category?: string | null;
+    skill_element_type?: string | null;
+    trigger_skill_id?: string | null;
+    trigger_skill_element_type?: string | null;
+    trigger_skill_category?: string | null;
+  };
+  response?: {
+    attack_success?: boolean | null;
+    defense_success?: boolean | null;
+    status_success?: boolean | null;
+  };
+  formula?: Record<string, unknown>;
+  effects?: Record<string, unknown>;
+  observed?: Record<string, unknown>;
+  matching?: Record<string, unknown>;
+}
+
 export interface ObservationCreate {
   enemy_elf_id: string;
   event_id?: string | null;
   observation_type: ObservationType;
   observed_value?: number | string | null;
-  payload?: Record<string, unknown>;
+  payload?: ObservationPayloadV1 | Record<string, unknown>;
   event_weight?: number | null;
   allow_hard_exclude?: boolean;
 }

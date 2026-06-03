@@ -24,6 +24,7 @@ from app.models.candidate import BuildCandidate
 from app.models.static import ElfDefinition, ElfLearnableSkill, NatureDefinition
 from app.schemas.candidate import (
     CandidateDetailOut,
+    CandidateEvidenceOut,
     CandidateNatureDistributionItem,
     CandidatePatternDistributionItem,
     CandidateSpeedBucketItem,
@@ -244,7 +245,7 @@ class CandidateService:
             min_speed=min_speed,
             max_speed=max_speed,
             top_confidence=top_confidence,
-            formula_status="formula_unavailable",
+            formula_status="soft_scoring",
         )
 
 
@@ -303,6 +304,41 @@ class CandidateService:
             .offset(offset)
         )
         return list(self.db.scalars(stmt).all())
+
+    def get_evidence(self, battle_id: str, elf_id: str, *, limit: int = 50) -> CandidateEvidenceOut:
+        """汇总候选软评分过程中写入的 evidence，供前端测试和排查使用。"""
+        rows = self.list_candidates(
+            battle_id,
+            elf_id,
+            include_excluded=True,
+            limit=200,
+            offset=0,
+        )
+        evidence_items: list[dict] = []
+        for row in rows:
+            raw_items = loads_json(row.evidence_ids_json, [])
+            if not isinstance(raw_items, list):
+                continue
+            for item in raw_items:
+                if not isinstance(item, dict):
+                    continue
+                evidence_items.append(
+                    {
+                        "candidate_id": row.candidate_id,
+                        "candidate_confidence": row.confidence,
+                        "candidate_match_score": row.match_score,
+                        "candidate_excluded": row.is_excluded,
+                        **item,
+                    }
+                )
+
+        return CandidateEvidenceOut(
+            battle_id=battle_id,
+            elf_id=elf_id,
+            formula_status="soft_scoring",
+            evidence_items=evidence_items[-limit:],
+            message="候选 evidence 来自 Observation 软评分；当前默认不硬排除。",
+        )
 
 
     def _load_candidates_for_detail(

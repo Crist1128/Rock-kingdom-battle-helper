@@ -21,7 +21,7 @@ class CandidateSummaryOut(BaseModel):
         min_speed: 尚未排除候选中的最低速度。
         max_speed: 尚未排除候选中的最高速度。
         top_confidence: 当前最高置信度。
-        formula_status: 公式状态。第一阶段为 formula_unavailable。
+        formula_status: 公式与候选评分状态；当前为 soft_scoring。
     """
 
     battle_id: str
@@ -32,7 +32,7 @@ class CandidateSummaryOut(BaseModel):
     min_speed: int | None = None
     max_speed: int | None = None
     top_confidence: float | None = None
-    formula_status: str = "formula_unavailable"
+    formula_status: str = "soft_scoring"
 
 
 class CandidateOut(BaseModel):
@@ -131,6 +131,6 @@ class CandidateEvidenceOut(BaseModel):
 
     battle_id: str
     elf_id: str
-    formula_status: str = "formula_unavailable"
+    formula_status: str = "soft_scoring"
     evidence_items: list[dict] = Field(default_factory=list)
     message: str = "伤害公式尚未确认，暂不生成候选保留/排除证据。"

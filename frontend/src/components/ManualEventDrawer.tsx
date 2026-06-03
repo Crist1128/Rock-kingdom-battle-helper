@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Sheet } from "@/components/ui/sheet";
 import { EffectSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { useAppStore } from "@/store/useAppStore";
+import { buildDamageObservationPayloadV1 } from "@/lib/observationPayload";
 import type { BattleElfStateDict, DamageDisplayType, ObservationCreate, PanelStatsInput, Side } from "@/types/api";
 
 export function ManualEventDrawer({ battleId, state }: { battleId?: string | null; state?: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } } }) {
@@ -217,25 +218,29 @@ function buildDamageObservationPayload(input: DamageObservationBuildInput): Obse
 
   const enemyIsAttacker = input.attackerSide === "enemy";
   const payload: Record<string, unknown> = {
-    resolve_rules: input.resolveRules,
-    enemy_role: enemyIsAttacker ? "attacker" : "defender",
-    skill_id: input.skillId || undefined,
-    defense_skill_id: input.defenseSkillId || undefined,
-    response_attack_success: input.responseAttackSuccess ?? undefined,
-    response_defense_success: input.responseDefenseSuccess ?? undefined,
-    response_status_success: input.responseStatusSuccess ?? undefined,
-    damage_tolerance: input.damageTolerance,
-    hit_count: input.hitCount,
+    ...buildDamageObservationPayloadV1({
+      resolveRules: input.resolveRules,
+      attackerSide: input.attackerSide,
+      defenderSide: input.defenderSide,
+      attackerElfId: input.attackerElfId,
+      defenderElfId: input.defenderElfId,
+      attackerPanelStats: input.attackerPanelStats,
+      defenderPanelStats: input.defenderPanelStats,
+      skillId: input.skillId,
+      defenseSkillId: input.defenseSkillId,
+      responseAttackSuccess: input.responseAttackSuccess,
+      responseDefenseSuccess: input.responseDefenseSuccess,
+      responseStatusSuccess: input.responseStatusSuccess,
+      observedDamageValue: input.observedTotalDamage,
+      damageTolerance: input.damageTolerance,
+      hitCount: input.hitCount,
+    }),
   };
 
   if (enemyIsAttacker) {
     if (!input.defenderPanelStats) return null;
-    payload.defender_panel_stats = input.defenderPanelStats;
-    payload.defender_elf_id = input.defenderElfId || undefined;
   } else {
     if (!input.attackerPanelStats) return null;
-    payload.attacker_panel_stats = input.attackerPanelStats;
-    payload.attacker_elf_id = input.attackerElfId || undefined;
   }
 
   return {

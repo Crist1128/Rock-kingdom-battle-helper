@@ -52,7 +52,7 @@ export function BattleWorkbenchPage() {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge variant="outline">{phaseName(state?.battle.phase)}</Badge>
           <Badge variant="secondary">回合 {state?.battle.turn_number ?? "--"}</Badge>
-          <Badge variant="warning">manual only</Badge>
+          <Badge variant="success">soft scoring</Badge>
           <Button
             variant="destructive"
             size="sm"
@@ -112,11 +112,13 @@ export function BattleWorkbenchPage() {
           <div className="space-y-4">
             <CandidatePanel battleId={currentBattleId} elfId={candidateElfId} />
             <Card>
-              <CardHeader><CardTitle>速度与伤害提示</CardTitle></CardHeader>
+              <CardHeader><CardTitle>测试能力</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div className="rounded-2xl border bg-white p-3">真实先手概率：<span className="font-semibold text-amber-700">未实现</span></div>
-                <div className="rounded-2xl border bg-white p-3">真实伤害区间：<span className="font-semibold text-amber-700">未实现</span></div>
-                <div className="rounded-2xl border bg-white p-3">击杀判断：<span className="font-semibold text-amber-700">未实现</span></div>
+                <Capability label="普通攻击" value="最小公式可测" />
+                <Capability label="状态/星陨" value="自动结算可测" />
+                <Capability label="应对/防御" value="减伤上下文可测" />
+                <Capability label="候选推理" value="软评分与 evidence" />
+                <Capability label="硬排除" value="默认关闭" muted />
               </CardContent>
             </Card>
           </div>
@@ -124,6 +126,15 @@ export function BattleWorkbenchPage() {
       ) : null}
 
       <ManualEventDrawer battleId={currentBattleId} state={state ? { battle: state.battle, elves: state.elves } : undefined} />
+    </div>
+  );
+}
+
+function Capability({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border bg-white p-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={muted ? "font-semibold text-amber-700" : "font-semibold text-emerald-700"}>{value}</span>
     </div>
   );
 }

@@ -24,6 +24,11 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
     queryFn: () => api.candidates.list(battleId!, elfId!, { limit: 5, offset: 0 }),
     enabled,
   });
+  const evidenceQuery = useQuery({
+    queryKey: ["candidate-evidence", battleId, elfId],
+    queryFn: () => api.candidates.evidence(battleId!, elfId!),
+    enabled,
+  });
   const natures = useQuery({ queryKey: ["natures", "candidate-panel"], queryFn: () => api.natures.list({ limit: 100 }) });
   const natureMap = useMemo(() => new Map((natures.data ?? []).map((nature) => [nature.nature_id, nature.nature_name])), [natures.data]);
 
@@ -48,6 +53,7 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
   const talentData = detailQuery.data?.talent_distribution ?? [];
   const patternData = detailQuery.data?.pattern_distribution?.slice(0, 5) ?? [];
   const topCandidates = topCandidatesQuery.data ?? [];
+  const evidenceItems = (evidenceQuery.data?.evidence_items ?? []).slice(-6).reverse();
 
   return (
     <Card>
@@ -57,7 +63,7 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
             <CardTitle>候选配置</CardTitle>
             <CardDescription>{compactId(elfId)}</CardDescription>
           </div>
-          <Badge variant="warning">{summary?.formula_status ?? "formula_unavailable"}</Badge>
+          <Badge variant="success">{summary?.formula_status ?? "soft_scoring"}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -70,8 +76,8 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
           <Metric label="最高置信" value={summary?.top_confidence ?? "--"} />
         </div>
 
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          当前只展示候选池、速度分桶、性格分布和个体资质组合。真实伤害公式未接入，不会基于占位结果强排除候选。
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          当前可测试普通攻击、状态伤害、星陨、防御技能减伤和 Observation 软评分。候选默认只调整分数与置信度，不硬排除。
         </div>
 
         {speedData.length > 0 ? (
@@ -117,10 +123,54 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
           </div>
         </div>
 
-        <Button className="w-full" variant="outline" onClick={() => { summaryQuery.refetch(); detailQuery.refetch(); topCandidatesQuery.refetch(); }}>刷新候选摘要</Button>
+        <div className="rounded-2xl border bg-white p-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold">最近 evidence</div>
+            <Badge variant="outline">{evidenceQuery.data?.formula_status ?? "soft_scoring"}</Badge>
+          </div>
+          {evidenceItems.length === 0 ? <div className="text-sm text-muted-foreground">暂无 observation evidence。</div> : null}
+          <div className="space-y-2">
+            {evidenceItems.map((item, index) => (
+              <EvidenceItem key={`${String(item.event_id ?? "event")}-${index}`} item={item} />
+            ))}
+          </div>
+        </div>
+
+        <Button className="w-full" variant="outline" onClick={() => { summaryQuery.refetch(); detailQuery.refetch(); topCandidatesQuery.refetch(); evidenceQuery.refetch(); }}>刷新候选与证据</Button>
       </CardContent>
     </Card>
   );
+}
+
+function EvidenceItem({ item }: { item: Record<string, unknown> }) {
+  const matched = item.matched;
+  const badgeVariant = matched === true ? "success" : matched === false ? "destructive" : "warning";
+  return (
+    <div className="rounded-xl border bg-slate-50 p-2 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate font-medium">{String(item.observation_type ?? "observation")}</span>
+        <Badge variant={badgeVariant}>{matched === true ? "匹配" : matched === false ? "冲突" : "未知"}</Badge>
+      </div>
+      <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
+        <span className="truncate">候选 {compactId(String(item.candidate_id ?? ""))}</span>
+        <span>分数 {formatNumber(item.score_delta)}</span>
+        <span>观测 {formatEvidenceValue(item.observed_value)}</span>
+        <span>预测 {formatEvidenceValue(item.predicted_value ?? item.predicted_range)}</span>
+      </div>
+      <div className="mt-1 truncate text-muted-foreground">原因 {String(item.reason ?? "--")}</div>
+    </div>
+  );
+}
+
+function formatNumber(value: unknown) {
+  return typeof value === "number" ? value.toFixed(2) : "--";
+}
+
+function formatEvidenceValue(value: unknown) {
+  if (value === null || value === undefined) return "--";
+  if (Array.isArray(value)) return value.join("-");
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {

@@ -80,10 +80,10 @@ def get_candidate_evidence(
     elf_id: str,
     db: Session = Depends(get_db),
 ) -> CandidateEvidenceOut:
-    """获取候选证据链占位数据。"""
+    """获取候选软评分 evidence 摘要。"""
     try:
         BattleService(db).require_battle(battle_id)
-        return CandidateEvidenceOut(battle_id=battle_id, elf_id=elf_id)
+        return CandidateService(db).get_evidence(battle_id, elf_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
