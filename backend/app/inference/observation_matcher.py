@@ -148,9 +148,29 @@ class ObservationMatcher:
         默认场景是“我方攻击，敌方作为防御方”，即候选面板替换 defender_panel_stats。
         若后续需要反推敌方作为攻击方，可在 payload 中传入 ``enemy_role='attacker'``。
         """
+        candidate_panel = self._panel_from_candidate(candidate)
+        return self.build_damage_context_for_candidate_panel(
+            observation=observation,
+            candidate_elf_id=candidate.elf_id,
+            candidate_panel=candidate_panel,
+            candidate_max_hp=candidate.final_hp,
+        )
+
+    def build_damage_context_for_candidate_panel(
+        self,
+        *,
+        observation: ObservationEventInput,
+        candidate_elf_id: str,
+        candidate_panel: PanelStats,
+        candidate_max_hp: int,
+        resolve_rules: bool = True,
+    ) -> DamageFormulaContext:
+        """用指定候选面板组装伤害公式上下文。
+
+        该方法供逐候选匹配和批量优化路径共用，避免两处各自解释 payload。
+        """
         payload = observation.payload
         enemy_role = str(payload.get("enemy_role", "defender"))
-        candidate_panel = self._panel_from_candidate(candidate)
         provided_attacker = self._panel_from_payload(payload.get("attacker_panel_stats"))
         provided_defender = self._panel_from_payload(payload.get("defender_panel_stats"))
 
@@ -158,14 +178,14 @@ class ObservationMatcher:
             attacker_panel = candidate_panel
             defender_panel = provided_defender
             defender_max_hp = self._optional_int(payload.get("defender_max_hp"))
-            attacker_elf_id = candidate.elf_id
+            attacker_elf_id = candidate_elf_id
             defender_elf_id = self._optional_str(payload.get("defender_elf_id"))
         else:
             attacker_panel = provided_attacker
             defender_panel = candidate_panel
-            defender_max_hp = candidate.final_hp
+            defender_max_hp = candidate_max_hp
             attacker_elf_id = self._optional_str(payload.get("attacker_elf_id"))
-            defender_elf_id = candidate.elf_id
+            defender_elf_id = candidate_elf_id
 
         context = DamageFormulaContext(
             battle_id=observation.battle_id,
@@ -215,6 +235,8 @@ class ObservationMatcher:
             ),
             unknown_factors=[str(item) for item in payload.get("unknown_factors", []) or []],
         )
+        if not resolve_rules:
+            return context
         return self.rule_resolver.resolve_damage_context(context, payload)
 
 

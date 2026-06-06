@@ -24,7 +24,7 @@
 - 已实现事件接口：通用事件、伤害事件、资源事件、时间线、作废、修正、重放占位。
 - 已实现状态实例接口：施加、移除、切换清除/保留。
 - 已实现状态快照服务。
-- 已实现敌方候选生成和候选摘要/详情/分页接口。
+- 已实现敌方候选生成和候选摘要/详情/分页接口；候选生成默认使用 `standard` 常规培养空间（正面性格维度投入 8 及以上资质，非零资质只枚举 8/9/10），保留 `full` 全量模式用于后台补全或手动重建。
 - 已实现 Observation API：支持伤害值、扣血百分比、技能出现、速度先后手等观测驱动候选软评分。
 - 已实现普通攻击最小伤害计算、P0 状态伤害计算、星陨伤害计算、伤害观测匹配、`RuleResolver` 雏形、`ModifierResolver` 与 `ResponseResolver` 最小闭环。
 - 星陨已按独立公式接入 `DamageCalculator`：触发条件看非幻系攻击技能，伤害按幻系计算克制/抵抗，攻防属性跟随触发技能类别。
@@ -34,6 +34,7 @@
 - 阶段 C 最小闭环已完成：`turns/end` 已接入灼烧、中毒、中毒印记、寄生、冻结阈值和暴风雪施加冻结；伤害事件后已接入星陨；切换入场已接入棘刺。自动结算会生成系统事件、资源变化、必要的状态变化和快照，敌方受击伤害会写入 Observation 软评分 evidence。
 - 阶段 D 已完成：已新增 `EffectOperationExecutor` 并接入 `skill_use`；后端已提供专用 `POST /battles/{battle_id}/skill-events` 入口，支持 `apply_effect`、`add_layers`、`dynamic_apply_effect`、`remove_effect`、`clear_effects`、`change_weather`、`resource_change`、`multiply_layers` 和 `conditional_branch`。星陨相关技能规则已整理为 `backend/app/seed/starfall_skill_operations_p0.json`，并提供 dry-run/commit 导入器写入 `SkillDefinition.effect_operations_json`；当前本地库已 commit 10 个星陨相关技能的操作规则。
 - 阶段 E 已进入最小闭环：`ModifierResolver` 可解析 payload、`defense_skill_id` 和历史快照状态中的结构化减伤来源；`ResponseResolver` 可解析应对倍率，并在应对成功未知时只记录 unknown；手动伤害事件已可把 `defense_skill_id` 与 `response_attack_success` / `response_defense_success` / `response_status_success` 写入事件 payload、公式上下文和 observation payload；rocom cleaner 可从 raw/cleaned 技能定义中提取稳定的“减伤 X% / 应对目标”规则，正式运行以入库后的 `skill_definition` 为准。
+- 核心默认战斗规则已补齐：后端启动时幂等写入通用技能“聚能”（状态技能、能耗 0、获得 5 能量），阵容录入后的双方精灵初始能量为 10，敌方候选技能池和精灵可学技能查询会虚拟包含该默认技能。
 - 已实现候选 `match_score`、`confidence`、匹配/冲突事件与 evidence 写入；Observation 伤害 payload 已标准化为 `observation_payload_v1` 并保留旧平铺字段兼容；候选 evidence 聚合接口和前端最近 evidence 展示已接入；默认不硬排除。
 - 已实现 BWIKI 数据管线：爬取、清洗、dry-run、导入。
 - 已实现管理接口：远程检查、远程同步、本地 cleaned JSON 导入、任务查询。

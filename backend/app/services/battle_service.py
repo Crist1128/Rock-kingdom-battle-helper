@@ -10,12 +10,23 @@ from uuid import uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core.default_skills import (
+    DEFAULT_COMMON_SKILL_ID,
+    DEFAULT_INITIAL_ENERGY,
+    append_default_common_skill_ids,
+)
 from app.core.enums import BattleEventType, BattlePhase, EventSource, Side
 from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.candidate import BuildCandidate
 from app.models.effect import BattleEffectInstance
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
-from app.models.static import ElfDefinition, ElfLearnableSkill, PlayerElfBuild, PlayerElfBuildSkill
+from app.models.static import (
+    ElfDefinition,
+    ElfLearnableSkill,
+    PlayerElfBuild,
+    PlayerElfBuildSkill,
+    SkillDefinition,
+)
 from app.schemas.battle import (
     BattleCreate,
     BattleStateOut,
@@ -454,6 +465,7 @@ class BattleService:
         self.db.flush()
         effect_operation_results: list[dict] = []
         if event.event_type == BattleEventType.SKILL_USE.value:
+            self._consume_skill_energy_cost(event)
             effect_operation_results = EffectOperationExecutor(self.db).execute_for_skill_event(
                 event
             )
@@ -475,6 +487,46 @@ class BattleService:
         self.db.commit()
         self.db.refresh(event)
         return event
+
+    def _consume_skill_energy_cost(self, event: BattleEvent) -> None:
+        """技能使用时先扣除技能定义里的基础能耗，并写入资源变化事件。"""
+        if event.skill_id is None or event.actor_side is None or event.actor_elf_id is None:
+            return
+        skill = self.db.get(SkillDefinition, event.skill_id)
+        if skill is None or skill.deleted_at is not None or skill.base_energy_cost <= 0:
+            return
+        state = self.db.scalars(
+            select(BattleElfState).where(
+                BattleElfState.battle_id == event.battle_id,
+                BattleElfState.side == event.actor_side,
+                BattleElfState.elf_id == event.actor_elf_id,
+            )
+        ).first()
+        if state is None or state.energy is None:
+            return
+
+        before_value = state.energy
+        after_value = max(before_value - skill.base_energy_cost, 0)
+        state.energy = after_value
+        self.db.add(
+            ResourceChangeEvent(
+                event_id=f"resource_event_{uuid4().hex}",
+                battle_id=event.battle_id,
+                battle_event_id=event.event_id,
+                resource_type="energy",
+                change_type="consume",
+                source_side=event.actor_side,
+                source_elf_id=event.actor_elf_id,
+                target_side=event.actor_side,
+                target_elf_id=event.actor_elf_id,
+                value_type="value",
+                value=float(skill.base_energy_cost),
+                before_value=float(before_value),
+                after_value=float(after_value),
+                confidence=1.0,
+                manual_override=False,
+            )
+        )
 
     def void_event(
         self,
@@ -605,8 +657,9 @@ class BattleService:
             raise ValueError("build_id 对应精灵与 lineup.elf_id 不一致")
 
         final_stats = loads_json(build.final_stats_json, {})
-        skill_ids = self._load_build_skill_ids(build.build_id)
-        self._create_battle_skill_slots(battle_id, item.side, item.elf_id, skill_ids)
+        build_skill_ids = self._load_build_skill_ids(build.build_id)
+        skill_ids = self._with_available_default_skill_ids(build_skill_ids)
+        self._create_battle_skill_slots(battle_id, item.side, item.elf_id, build_skill_ids)
 
         return BattleElfState(
             state_id=f"battle_elf_state_{uuid4().hex}",
@@ -618,7 +671,7 @@ class BattleService:
             panel_stats_json=build.final_stats_json or dumps_json({}),
             current_hp_value=final_stats.get("hp") if isinstance(final_stats, dict) else None,
             current_hp_percent=100.0,
-            energy=0,
+            energy=DEFAULT_INITIAL_ENERGY,
             skill_ids_json=dumps_json(skill_ids),
             confirmed_skill_ids_json=dumps_json(skill_ids),
             active_effect_instance_ids_json=dumps_json([]),
@@ -630,13 +683,13 @@ class BattleService:
 
     def _create_enemy_elf_state(self, battle_id: str, item, elf: ElfDefinition) -> BattleElfState:
         """根据敌方精灵 ID 创建未知配置运行时状态。"""
-        possible_skill_ids = list(
+        possible_skill_ids = self._with_available_default_skill_ids(list(
             self.db.scalars(
                 select(ElfLearnableSkill.skill_id)
                 .where(ElfLearnableSkill.elf_id == item.elf_id)
                 .order_by(ElfLearnableSkill.skill_id)
             ).all()
-        )
+        ))
         return BattleElfState(
             state_id=f"battle_elf_state_{uuid4().hex}",
             battle_id=battle_id,
@@ -656,7 +709,7 @@ class BattleService:
             ),
             current_hp_value=None,
             current_hp_percent=100.0,
-            energy=0,
+            energy=DEFAULT_INITIAL_ENERGY,
             skill_ids_json=dumps_json(possible_skill_ids),
             confirmed_skill_ids_json=dumps_json([]),
             active_effect_instance_ids_json=dumps_json([]),
@@ -712,6 +765,13 @@ class BattleService:
                 .order_by(PlayerElfBuildSkill.slot_index)
             ).all()
         )
+
+    def _with_available_default_skill_ids(self, skill_ids: list[str]) -> list[str]:
+        """只在核心默认技能已入库时，把它加入运行时可用技能列表。"""
+        skill = self.db.get(SkillDefinition, DEFAULT_COMMON_SKILL_ID)
+        if skill is None or skill.deleted_at is not None:
+            return skill_ids
+        return append_default_common_skill_ids(skill_ids)
 
     def _require_elf(self, elf_id: str) -> ElfDefinition:
         """读取精灵定义。"""

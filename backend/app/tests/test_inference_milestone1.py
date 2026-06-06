@@ -278,6 +278,103 @@ def test_inference_engine_updates_damage_value_soft_scores(db_session: Session) 
     assert evidence[0]["predicted_value"] == 90
 
 
+def test_damage_observation_uses_grouped_fast_path(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """普通伤害观测应走分组计算路径，避免逐候选重复解析规则。"""
+    db_session.add_all(
+        [
+            _candidate("candidate_low_defense_a", physical_defense=100),
+            _candidate("candidate_low_defense_b", physical_defense=100),
+            _candidate("candidate_high_defense", physical_defense=200),
+        ]
+    )
+    db_session.commit()
+
+    engine = InferenceEngine(db_session)
+
+    def fail_if_general_path_used(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("damage observation should use grouped fast path")
+
+    monkeypatch.setattr(engine.observation_matcher, "match_candidate", fail_if_general_path_used)
+    summary = engine.process_observation_event(
+        ObservationEventInput(
+            battle_id="battle_1",
+            enemy_elf_id="enemy_elf",
+            event_id="event_damage_fast_path",
+            observation_type=ObservationType.DAMAGE_VALUE,
+            observed_value=90,
+            payload={
+                "attacker_panel_stats": {
+                    "hp": 300,
+                    "physical_attack": 200,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+                "skill_category": "physical",
+                "base_power": 50,
+                "damage_tolerance": 0,
+            },
+        )
+    )
+
+    assert summary["candidate_count"] == 3
+    assert summary["matched_count"] == 2
+    assert summary["mismatched_count"] == 1
+
+
+def test_damage_observation_missing_formula_context_returns_fast_unknown(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """缺少技能/威力时应直接返回 unknown 摘要，不逐候选写无效 evidence。"""
+    db_session.add_all(
+        [
+            _candidate("candidate_a", physical_defense=100),
+            _candidate("candidate_b", physical_defense=200),
+        ]
+    )
+    db_session.commit()
+
+    engine = InferenceEngine(db_session)
+
+    def fail_if_general_path_used(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("missing formula context should not loop candidates")
+
+    monkeypatch.setattr(engine.observation_matcher, "match_candidate", fail_if_general_path_used)
+    summary = engine.process_observation_event(
+        ObservationEventInput(
+            battle_id="battle_1",
+            enemy_elf_id="enemy_elf",
+            event_id="event_damage_missing_context",
+            observation_type=ObservationType.DAMAGE_VALUE,
+            observed_value=90,
+            payload={
+                "attacker_panel_stats": {
+                    "hp": 300,
+                    "physical_attack": 200,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+                "damage_tolerance": 0,
+            },
+        )
+    )
+
+    rows = {row.candidate_id: row for row in db_session.query(BuildCandidate).all()}
+    assert summary["candidate_count"] == 2
+    assert summary["matched_count"] == 0
+    assert summary["mismatched_count"] == 0
+    assert summary["unknown_count"] == 2
+    assert loads_json(rows["candidate_a"].evidence_ids_json, []) == []
+    assert loads_json(rows["candidate_b"].evidence_ids_json, []) == []
+
+
 def test_inference_engine_updates_hp_percent_delta_soft_scores(db_session: Session) -> None:
     """扣血百分比观测应同时受理论伤害与候选最大 HP 影响。"""
     db_session.add_all(

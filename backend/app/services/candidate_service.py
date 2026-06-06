@@ -7,6 +7,7 @@
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 from itertools import combinations, product
 from uuid import uuid4
 
@@ -19,9 +20,14 @@ from app.calculation.stat_calculator import (
     NatureRule,
     StatCalculator,
 )
+from app.core.default_skills import (
+    DEFAULT_COMMON_SKILL_ID,
+    append_default_common_skill_ids,
+)
 from app.core.enums import StatKey
+from app.db.base import utc_now
 from app.models.candidate import BuildCandidate
-from app.models.static import ElfDefinition, ElfLearnableSkill, NatureDefinition
+from app.models.static import ElfDefinition, ElfLearnableSkill, NatureDefinition, SkillDefinition
 from app.schemas.candidate import (
     CandidateDetailOut,
     CandidateEvidenceOut,
@@ -42,6 +48,13 @@ STAT_KEYS = [
     StatKey.MAGIC_DEFENSE,
     StatKey.SPEED,
 ]
+
+
+class CandidateGenerationMode(StrEnum):
+    """候选生成范围。"""
+
+    STANDARD = "standard"
+    FULL = "full"
 
 
 @dataclass(frozen=True)
@@ -99,11 +112,44 @@ class CandidateGenerator:
                 )
         return rules
 
-    def generate_candidate_count(self) -> int:
+    def generate_individual_talent_distributions_for_nature(
+        self,
+        nature: NatureRule,
+        *,
+        mode: CandidateGenerationMode = CandidateGenerationMode.STANDARD,
+    ) -> list[IndividualTalentDistribution]:
+        """按性格生成个体资质分布。"""
+        distributions = self.generate_individual_talent_distributions()
+        if mode == CandidateGenerationMode.FULL:
+            return distributions
+
+        positive_key = nature.positive_stat.value
+        negative_key = nature.negative_stat.value
+        return [
+            distribution
+            for distribution in distributions
+            if getattr(distribution, positive_key) >= 8
+            and getattr(distribution, negative_key) == 0
+            and all(
+                getattr(distribution, stat_key.value) in {0, 8, 9, 10}
+                for stat_key in STAT_KEYS
+            )
+        ]
+
+    def generate_candidate_count(
+        self,
+        *,
+        mode: CandidateGenerationMode = CandidateGenerationMode.FULL,
+    ) -> int:
         """计算理论候选数量。"""
-        distribution_count = len(self.generate_individual_talent_distributions())
-        nature_count = len(self.generate_nature_rules())
-        return distribution_count * nature_count
+        nature_rules = self.generate_nature_rules()
+        if mode == CandidateGenerationMode.FULL:
+            distribution_count = len(self.generate_individual_talent_distributions())
+            return distribution_count * len(nature_rules)
+        return sum(
+            len(self.generate_individual_talent_distributions_for_nature(nature, mode=mode))
+            for nature in nature_rules
+        )
 
 
 class CandidateService:
@@ -123,6 +169,7 @@ class CandidateService:
         battle_id: str,
         elf_id: str,
         *,
+        mode: CandidateGenerationMode | str = CandidateGenerationMode.STANDARD,
         replace_existing: bool = True,
         commit: bool = True,
     ) -> int:
@@ -142,8 +189,8 @@ class CandidateService:
         if elf is None or elf.deleted_at is not None:
             raise ValueError(f"精灵不存在：{elf_id}")
 
+        generation_mode = CandidateGenerationMode(mode)
         nature_rules = self._load_nature_rules()
-        distributions = self.generator.generate_individual_talent_distributions()
         possible_skill_ids = self._load_learnable_skill_ids(elf_id)
         base = self._elf_to_base_talent_block(elf)
 
@@ -156,45 +203,54 @@ class CandidateService:
             )
 
         count = 0
-        buffer: list[BuildCandidate] = []
+        buffer: list[dict] = []
         possible_skill_ids_json = dumps_json(possible_skill_ids)
         confirmed_skill_ids_json = dumps_json([])
+        created_at = utc_now()
 
         for nature in nature_rules:
-            for distribution in distributions:
+            distributions = self.generator.generate_individual_talent_distributions_for_nature(
+                nature,
+                mode=generation_mode,
+            )
+            distribution_items = [
+                (distribution, dumps_json(distribution))
+                for distribution in distributions
+            ]
+            for distribution, distribution_json in distribution_items:
                 panel = StatCalculator.calculate_panel_stats(base, distribution, nature)
                 buffer.append(
-                    BuildCandidate(
-                        candidate_id=f"candidate_{uuid4().hex}",
-                        battle_id=battle_id,
-                        side="enemy",
-                        elf_id=elf_id,
-                        nature_id=nature.nature_id,
-                        individual_talent_distribution_json=dumps_json(distribution),
-                        final_hp=panel.hp,
-                        final_physical_attack=panel.physical_attack,
-                        final_physical_defense=panel.physical_defense,
-                        final_magic_attack=panel.magic_attack,
-                        final_magic_defense=panel.magic_defense,
-                        final_speed=panel.speed,
-                        possible_skill_ids_json=possible_skill_ids_json,
-                        confirmed_skill_ids_json=confirmed_skill_ids_json,
-                        match_score=0.0,
-                        confidence=0.0,
-                        is_excluded=False,
-                    )
+                    {
+                        "candidate_id": f"candidate_{uuid4().hex}",
+                        "battle_id": battle_id,
+                        "side": "enemy",
+                        "elf_id": elf_id,
+                        "nature_id": nature.nature_id,
+                        "individual_talent_distribution_json": distribution_json,
+                        "final_hp": panel.hp,
+                        "final_physical_attack": panel.physical_attack,
+                        "final_physical_defense": panel.physical_defense,
+                        "final_magic_attack": panel.magic_attack,
+                        "final_magic_defense": panel.magic_defense,
+                        "final_speed": panel.speed,
+                        "possible_skill_ids_json": possible_skill_ids_json,
+                        "confirmed_skill_ids_json": confirmed_skill_ids_json,
+                        "match_score": 0.0,
+                        "confidence": 0.0,
+                        "is_excluded": False,
+                        "created_at": created_at,
+                        "updated_at": created_at,
+                    }
                 )
                 count += 1
 
-                # 大量候选一次性 add 会占用较多内存，分批 flush 更稳妥。
-                if len(buffer) >= 1000:
-                    self.db.add_all(buffer)
-                    self.db.flush()
+                # 大量候选用 bulk insert，避免构造数万 ORM 对象拖慢准备阶段。
+                if len(buffer) >= 5000:
+                    self.db.bulk_insert_mappings(BuildCandidate, buffer)
                     buffer.clear()
 
         if buffer:
-            self.db.add_all(buffer)
-            self.db.flush()
+            self.db.bulk_insert_mappings(BuildCandidate, buffer)
 
         if commit:
             self.db.commit()
@@ -474,13 +530,17 @@ class CandidateService:
 
     def _load_learnable_skill_ids(self, elf_id: str) -> list[str]:
         """读取精灵可学习技能池。没有数据时返回空列表。"""
-        return list(
+        skill_ids = list(
             self.db.scalars(
                 select(ElfLearnableSkill.skill_id)
                 .where(ElfLearnableSkill.elf_id == elf_id)
                 .order_by(ElfLearnableSkill.skill_id)
             ).all()
         )
+        skill = self.db.get(SkillDefinition, DEFAULT_COMMON_SKILL_ID)
+        if skill is None or skill.deleted_at is not None:
+            return skill_ids
+        return append_default_common_skill_ids(skill_ids)
 
     @staticmethod
     def _elf_to_base_talent_block(elf: ElfDefinition) -> BaseTalentBlock:

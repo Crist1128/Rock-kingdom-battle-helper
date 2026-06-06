@@ -26,13 +26,13 @@ VITE_API_BASE_URL=/api/v1
 Vite 已配置 `/api` 代理到：
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8001
 ```
 
 如果不想使用代理，也可以把 `.env` 改成完整地址：
 
 ```text
-VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+VITE_API_BASE_URL=http://127.0.0.1:8001/api/v1
 ```
 
 ## 针对本次后端更新的适配

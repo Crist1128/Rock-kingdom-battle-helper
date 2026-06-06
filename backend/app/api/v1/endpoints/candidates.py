@@ -25,13 +25,14 @@ router = APIRouter()
 def generate_candidates(
     battle_id: str,
     elf_id: str,
+    mode: str = Query(default="standard", pattern="^(standard|full)$", description="候选生成范围"),
     db: Session = Depends(get_db),
 ) -> CandidateSummaryOut:
     """手动重新生成某只敌方精灵的候选配置。"""
     try:
         BattleService(db).require_battle(battle_id)
         service = CandidateService(db)
-        service.generate_for_enemy_elf(battle_id, elf_id)
+        service.generate_for_enemy_elf(battle_id, elf_id, mode=mode)
         return service.summarize(battle_id, elf_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -619,6 +619,8 @@ CREATE TABLE player_elf_build (
 | `updated_at` | TEXT | 是 | 系统生成 | 更新时间。 |
 | `deleted_at` | TEXT | 否 | 系统生成 | 软删除时间。 |
 
+说明：`individual_*` 字段保存玩家界面输入的显示个体资质，不直接保存 PVP 公式有效值。计算 `final_*` 面板缓存时，代码内部先转换为 `有效个体资质 = 显示个体资质 × 6`。
+
 ### 索引
 
 ```sql
@@ -959,6 +961,8 @@ CREATE TABLE build_candidate (
 | `evidence_ids_json` | TEXT(JSON) | 否 | 推算引擎 | 支撑或反驳该候选的事件 ID 列表。 |
 | `created_at` | TEXT | 是 | 系统生成 | 创建时间。 |
 | `updated_at` | TEXT | 是 | 系统生成 | 更新时间。 |
+
+说明：候选表的 `individual_*` 同样保存显示个体资质。候选生成计算 `final_*` 时统一走 `StatCalculator`，由计算层转换为 `有效个体资质 = 显示个体资质 × 6`，避免数据库字段混用两套单位。
 
 ### 索引
 

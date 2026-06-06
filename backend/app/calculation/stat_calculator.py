@@ -9,15 +9,18 @@
 计算规则基于需求文档中的 PVP 简化公式：
 - 等级固定 60
 - 生命成长值 100，非生命成长值 50
-- 生命属性四舍五入，非生命属性向上取整
+- 生命属性性格修正后四舍五入再加 100
+- 非生命属性基础段四舍五入，性格修正后再四舍五入，最后加 50
 """
 
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from pydantic import BaseModel
 
 from app.core.enums import StatKey
+
+PVP_INDIVIDUAL_TALENT_MULTIPLIER = Decimal("6")
 
 
 class BaseTalentBlock(BaseModel):
@@ -136,7 +139,8 @@ class StatCalculator:
     根据种族资质、个体资质和性格计算最终面板属性。
     使用 PVP 简化公式，等级固定 60，成长值固定（生命 100，非生命 50）。
 
-    说明：需求中生命为"四舍五入"。这里采用 ROUND_HALF_UP，避免 Python round 的 bankers rounding。
+    说明：玩家录入的是展示个体资质；PVP 公式中的有效个体资质按展示值 * 6 带入。
+    面板取整采用分段 ROUND_HALF_UP，避免 Python round 的 bankers rounding。
 
     Example:
         calculator = StatCalculator()
@@ -198,7 +202,7 @@ class StatCalculator:
         """
         计算生命属性。
 
-        公式：round((70 + 1.7 * 种族资质 + 0.85 * 个体资质) * 性格倍率 + 100)
+        公式：round((70 + 1.7 * 种族资质 + 0.85 * 有效个体资质) * 性格倍率) + 100
 
         Args:
             base_talent: 生命种族资质
@@ -208,9 +212,14 @@ class StatCalculator:
         Returns:
             int: 最终生命属性值（四舍五入）
         """
-        value = (Decimal("70") + Decimal("1.7") * base_talent + Decimal("0.85") * individual_talent)
-        value = value * nature_multiplier + Decimal("100")
-        return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        effective_individual_talent = StatCalculator.effective_individual_talent(individual_talent)
+        base_value = (
+            Decimal("70")
+            + Decimal("1.7") * base_talent
+            + Decimal("0.85") * effective_individual_talent
+        )
+        modified_value = base_value * nature_multiplier
+        return StatCalculator.round_half_up(modified_value) + 100
 
     @staticmethod
     def calculate_non_hp(
@@ -221,7 +230,7 @@ class StatCalculator:
         """
         计算非生命属性（物攻、物防、魔攻、魔防、速度）。
 
-        公式：ceil((10 + 1.1 * 种族资质 + 0.55 * 个体资质) * 性格倍率 + 50)
+        公式：round(round(10 + 1.1 * 种族资质 + 0.55 * 有效个体资质) * 性格倍率) + 50
 
         Args:
             base_talent: 种族资质
@@ -229,8 +238,24 @@ class StatCalculator:
             nature_multiplier: 性格修正倍率
 
         Returns:
-            int: 最终属性值（向上取整）
+            int: 最终属性值（四舍五入）
         """
-        value = (Decimal("10") + Decimal("1.1") * base_talent + Decimal("0.55") * individual_talent)
-        value = value * nature_multiplier + Decimal("50")
-        return int(value.quantize(Decimal("1"), rounding=ROUND_CEILING))
+        effective_individual_talent = StatCalculator.effective_individual_talent(individual_talent)
+        base_value = (
+            Decimal("10")
+            + Decimal("1.1") * base_talent
+            + Decimal("0.55") * effective_individual_talent
+        )
+        rounded_base_value = StatCalculator.round_half_up(base_value)
+        modified_value = Decimal(rounded_base_value) * nature_multiplier
+        return StatCalculator.round_half_up(modified_value) + 50
+
+    @staticmethod
+    def effective_individual_talent(individual_talent: int) -> Decimal:
+        """把玩家录入的个体资质转换为 PVP 公式使用的有效个体资质。"""
+        return Decimal(individual_talent) * PVP_INDIVIDUAL_TALENT_MULTIPLIER
+
+    @staticmethod
+    def round_half_up(value: Decimal) -> int:
+        """标准四舍五入，避免 Python 内置 round 的 bankers rounding。"""
+        return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))

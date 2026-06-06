@@ -209,8 +209,8 @@ export const api = {
       request<CandidateEvidenceOut>(`/candidates/${battleId}/${elfId}/evidence`),
     list: (battleId: string, elfId: string, params: { limit?: number; offset?: number; include_excluded?: boolean } = {}) =>
       request<CandidateOut[]>(`/candidates/${battleId}/${elfId}${qs({ limit: 50, offset: 0, ...params })}`),
-    generate: (battleId: string, elfId: string) =>
-      request<CandidateSummaryOut>(`/candidates/${battleId}/${elfId}/generate`, { method: "POST" }),
+    generate: (battleId: string, elfId: string, mode: "standard" | "full" = "standard") =>
+      request<CandidateSummaryOut>(`/candidates/${battleId}/${elfId}/generate${qs({ mode })}`, { method: "POST" }),
   },
 
   adminBattles: {

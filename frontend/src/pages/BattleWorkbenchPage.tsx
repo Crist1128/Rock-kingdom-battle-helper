@@ -12,7 +12,7 @@ import { EventTimeline } from "@/components/EventTimeline";
 import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
 import { phaseName, sideName } from "@/lib/utils";
-import type { EndTurnResult } from "@/types/api";
+import type { CandidateOut, EndTurnResult, StatBlock } from "@/types/api";
 
 export function BattleWorkbenchPage() {
   const queryClient = useQueryClient();
@@ -31,6 +31,12 @@ export function BattleWorkbenchPage() {
   const enemyActive = enemyElves.find((elf) => elf.elf_id === state?.battle.enemy_active_elf_id);
   const candidateElfId = candidatePanelElfId ?? state?.battle.enemy_active_elf_id;
   const canEndTurn = Boolean(currentBattleId && state && state.battle.phase === "battle");
+  const topEnemyCandidateQuery = useQuery({
+    queryKey: ["candidate-list", currentBattleId, state?.battle.enemy_active_elf_id, "matchup-top"],
+    queryFn: () => api.candidates.list(currentBattleId!, state!.battle.enemy_active_elf_id!, { limit: 1, offset: 0 }),
+    enabled: Boolean(currentBattleId && state?.battle.enemy_active_elf_id),
+  });
+  const enemyEstimatedStats = candidateToStats(topEnemyCandidateQuery.data?.[0]);
 
   const finishBattle = useMutation({
     mutationFn: () => api.battles.finish(currentBattleId!),
@@ -113,7 +119,7 @@ export function BattleWorkbenchPage() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
                 <ActiveSide title="我方上场" elf={selfActive} />
-                <ActiveSide title="敌方上场" elf={enemyActive} />
+                <ActiveSide title="敌方上场" elf={enemyActive} estimatedStats={enemyEstimatedStats} />
               </CardContent>
             </Card>
 
@@ -276,7 +282,8 @@ function TeamPanel({ title, elves, activeElfId, onSwitch, onSelectCandidate }: {
   );
 }
 
-function ActiveSide({ title, elf }: { title: string; elf?: any }) {
+function ActiveSide({ title, elf, estimatedStats }: { title: string; elf?: any; estimatedStats?: StatBlock | null }) {
+  const hasRuntimeStats = hasPanelStats(elf?.panel_stats_json);
   return (
     <div className="rounded-2xl border bg-white p-4">
       <div className="mb-2 flex items-center justify-between"><div className="font-semibold">{title}</div><Badge variant="outline">{sideName(elf?.side)}</Badge></div>
@@ -284,9 +291,44 @@ function ActiveSide({ title, elf }: { title: string; elf?: any }) {
         <div className="space-y-3">
           <div className="text-lg font-semibold">{elf.elf_name ?? elf.elf_id}</div>
           <div className="text-sm text-muted-foreground">HP {elf.current_hp_percent ?? "--"}% · 能量 {elf.energy ?? 0}</div>
-          <StatGrid statsJson={elf.panel_stats_json} />
+          <StatGrid statsJson={hasRuntimeStats ? elf.panel_stats_json : undefined} stats={!hasRuntimeStats ? estimatedStats : undefined} />
+          {!hasRuntimeStats && estimatedStats ? (
+            <div className="text-xs text-amber-700">显示候选 Top 1 估计面板，敌方真实六维尚未确认。</div>
+          ) : null}
+          {!hasRuntimeStats && !estimatedStats ? (
+            <div className="text-xs text-muted-foreground">敌方真实六维未知，候选生成后可显示估计面板。</div>
+          ) : null}
         </div>
       ) : <div className="text-sm text-muted-foreground">未选择上场精灵。</div>}
     </div>
   );
+}
+
+function candidateToStats(candidate?: CandidateOut): StatBlock | null {
+  if (!candidate) return null;
+  return {
+    hp: candidate.final_hp,
+    physical_attack: candidate.final_physical_attack,
+    physical_defense: candidate.final_physical_defense,
+    magic_attack: candidate.final_magic_attack,
+    magic_defense: candidate.final_magic_defense,
+    speed: candidate.final_speed,
+  };
+}
+
+function hasPanelStats(rawJson?: string | null): boolean {
+  if (!rawJson) return false;
+  try {
+    const value = JSON.parse(rawJson) as Partial<StatBlock>;
+    return (
+      Number.isFinite(value.hp)
+      && Number.isFinite(value.physical_attack)
+      && Number.isFinite(value.physical_defense)
+      && Number.isFinite(value.magic_attack)
+      && Number.isFinite(value.magic_defense)
+      && Number.isFinite(value.speed)
+    );
+  } catch {
+    return false;
+  }
 }

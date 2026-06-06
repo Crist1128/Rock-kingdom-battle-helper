@@ -12,6 +12,7 @@ Milestone 1 的重点是先跑通“玩家观测 -> 候选软评分 -> 候选分
 
 from __future__ import annotations
 
+from collections import defaultdict
 from math import exp
 from typing import Any
 
@@ -19,10 +20,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.calculation.damage_calculator import DamageCalculator
-from app.calculation.formula_context import DamageFormulaContext
+from app.calculation.formula_context import DamageFormulaContext, PanelStats
 from app.inference.match_result import ObservationMatchResult
 from app.inference.observation_matcher import ObservationEventInput, ObservationMatcher
 from app.inference.observation_payload import normalize_observation_payload
+from app.inference.observation_types import ObservationType
 from app.models.candidate import BuildCandidate
 from app.models.event import DamageEvent
 from app.utils.json import dumps_json, loads_json
@@ -84,6 +86,14 @@ class InferenceEngine:
             }
         )
         candidates = self._load_active_candidates(observation.battle_id, observation.enemy_elf_id)
+        optimized_result = self._try_process_grouped_damage_observation(
+            observation,
+            candidates,
+            commit=commit,
+        )
+        if optimized_result is not None:
+            return optimized_result
+
         matched_count = 0
         mismatched_count = 0
         unknown_count = 0
@@ -109,11 +119,11 @@ class InferenceEngine:
                 candidate.excluded_reason = match_result.reason
                 hard_excluded_count += 1
 
-        self._refresh_confidence(observation.battle_id, observation.enemy_elf_id)
+        self._refresh_confidence_for_candidates(candidates)
         if commit:
             self.db.commit()
 
-        top_candidate = self._load_top_candidate(observation.battle_id, observation.enemy_elf_id)
+        top_candidate = self._top_candidate_from_rows(candidates)
         return {
             "status": "processed",
             "battle_id": observation.battle_id,
@@ -128,6 +138,207 @@ class InferenceEngine:
             "hard_filter_applied": observation.allow_hard_exclude,
             "top_candidate_id": top_candidate.candidate_id if top_candidate else None,
             "top_confidence": top_candidate.confidence if top_candidate else None,
+        }
+
+    def _try_process_grouped_damage_observation(
+        self,
+        observation: ObservationEventInput,
+        candidates: list[BuildCandidate],
+        *,
+        commit: bool,
+    ) -> dict[str, Any] | None:
+        """对普通伤害观测使用按候选面板分组的快速路径。
+
+        候选池中大量候选共享相同防御面板。普通伤害公式在敌方作为防御方时只依赖
+        候选防御面板、技能规则和固定观测上下文，因此可以先解析一次规则，再按面板
+        分组计算，避免 4 万多次重复查技能/系别/克制。
+        """
+        if not candidates:
+            return self._empty_result(observation, commit=commit)
+        if observation.observation_type not in {
+            ObservationType.DAMAGE_VALUE,
+            ObservationType.HP_PERCENT_DELTA,
+        }:
+            return None
+
+        payload = observation.payload
+        if str(payload.get("formula_type", "attack") or "attack") != "attack":
+            return None
+        if str(payload.get("enemy_role", "defender")) != "defender":
+            return None
+
+        sample = candidates[0]
+        sample_context = self.observation_matcher.build_damage_context_for_candidate_panel(
+            observation=observation,
+            candidate_elf_id=sample.elf_id,
+            candidate_panel=self.observation_matcher._panel_from_candidate(sample),
+            candidate_max_hp=sample.final_hp,
+            resolve_rules=True,
+        )
+        sample_result = self.damage_calculator.calculate(sample_context)
+        if sample_result.status != "calculated":
+            if sample_result.missing_parts:
+                return self._unknown_damage_result(
+                    observation,
+                    candidates,
+                    missing_parts=sample_result.missing_parts,
+                    commit=commit,
+                )
+            return None
+        if sample_context.skill_category not in {"physical", "magic"}:
+            return None
+
+        grouped: dict[tuple[int, int, int], list[BuildCandidate]] = defaultdict(list)
+        for candidate in candidates:
+            grouped[
+                (
+                    candidate.final_hp,
+                    candidate.final_physical_defense,
+                    candidate.final_magic_defense,
+                )
+            ].append(candidate)
+
+        matched_count = 0
+        mismatched_count = 0
+        unknown_count = 0
+        hard_excluded_count = 0
+        match_by_group: dict[tuple[int, int, int], ObservationMatchResult] = {}
+
+        for key in grouped:
+            hp, physical_defense, magic_defense = key
+            context = sample_context.model_copy(
+                deep=True,
+                update={
+                    "defender_panel_stats": PanelStats(
+                        hp=hp,
+                        physical_attack=sample.final_physical_attack,
+                        physical_defense=physical_defense,
+                        magic_attack=sample.final_magic_attack,
+                        magic_defense=magic_defense,
+                        speed=sample.final_speed,
+                    ),
+                    "defender_max_hp": hp,
+                },
+            )
+            result = self.damage_calculator.calculate(context)
+            match_result = self._match_grouped_damage_result(observation, result, hp)
+            match_by_group[key] = match_result
+
+        for key, rows in grouped.items():
+            match_result = match_by_group[key]
+            row_count = len(rows)
+            if match_result.matched is True:
+                matched_count += row_count
+            elif match_result.matched is False:
+                mismatched_count += row_count
+            else:
+                unknown_count += row_count
+
+            for candidate in rows:
+                self._apply_match_result(candidate, observation, match_result)
+                if observation.allow_hard_exclude and match_result.can_hard_exclude:
+                    candidate.is_excluded = True
+                    candidate.excluded_reason = match_result.reason
+                    hard_excluded_count += 1
+
+        self._refresh_confidence_for_candidates(candidates)
+        if commit:
+            self.db.commit()
+
+        top_candidate = self._top_candidate_from_rows(candidates)
+        return {
+            "status": "processed",
+            "battle_id": observation.battle_id,
+            "enemy_elf_id": observation.enemy_elf_id,
+            "event_id": observation.event_id,
+            "observation_type": observation.observation_type.value,
+            "candidate_count": len(candidates),
+            "matched_count": matched_count,
+            "mismatched_count": mismatched_count,
+            "unknown_count": unknown_count,
+            "hard_excluded_count": hard_excluded_count,
+            "hard_filter_applied": observation.allow_hard_exclude,
+            "top_candidate_id": top_candidate.candidate_id if top_candidate else None,
+            "top_confidence": top_candidate.confidence if top_candidate else None,
+        }
+
+    def _match_grouped_damage_result(
+        self,
+        observation: ObservationEventInput,
+        result,
+        max_hp: int,
+    ) -> ObservationMatchResult:
+        """按观测类型比较分组计算结果。"""
+        if observation.observation_type == ObservationType.DAMAGE_VALUE:
+            observed = observation.payload.get("observed_damage_value", observation.observed_value)
+            return self.observation_matcher.damage_matcher.match_damage_value(
+                observed=self.observation_matcher._optional_int(observed),
+                result=result,
+                tolerance=int(observation.payload.get("damage_tolerance", 0) or 0),
+                event_weight=self.observation_matcher._event_weight(observation, 1.5),
+            )
+
+        observed = observation.payload.get("observed_hp_percent_delta", observation.observed_value)
+        return self.observation_matcher.damage_matcher.match_hp_percent_delta(
+            observed_pct=self.observation_matcher._optional_float(observed),
+            result=result,
+            max_hp=max_hp,
+            tolerance=float(observation.payload.get("percent_tolerance", 1.0) or 1.0),
+            event_weight=self.observation_matcher._event_weight(observation, 0.5),
+        )
+
+    def _empty_result(
+        self,
+        observation: ObservationEventInput,
+        *,
+        commit: bool,
+    ) -> dict[str, Any]:
+        """返回空候选池的稳定处理结果。"""
+        if commit:
+            self.db.commit()
+        return {
+            "status": "processed",
+            "battle_id": observation.battle_id,
+            "enemy_elf_id": observation.enemy_elf_id,
+            "event_id": observation.event_id,
+            "observation_type": observation.observation_type.value,
+            "candidate_count": 0,
+            "matched_count": 0,
+            "mismatched_count": 0,
+            "unknown_count": 0,
+            "hard_excluded_count": 0,
+            "hard_filter_applied": observation.allow_hard_exclude,
+            "top_candidate_id": None,
+            "top_confidence": None,
+        }
+
+    def _unknown_damage_result(
+        self,
+        observation: ObservationEventInput,
+        candidates: list[BuildCandidate],
+        *,
+        missing_parts: list[str],
+        commit: bool,
+    ) -> dict[str, Any]:
+        """公式关键上下文缺失时直接返回 unknown 摘要，避免全候选无意义写入。"""
+        if commit:
+            self.db.commit()
+        top_candidate = self._top_candidate_from_rows(candidates)
+        return {
+            "status": "processed",
+            "battle_id": observation.battle_id,
+            "enemy_elf_id": observation.enemy_elf_id,
+            "event_id": observation.event_id,
+            "observation_type": observation.observation_type.value,
+            "candidate_count": len(candidates),
+            "matched_count": 0,
+            "mismatched_count": 0,
+            "unknown_count": len(candidates),
+            "hard_excluded_count": 0,
+            "hard_filter_applied": observation.allow_hard_exclude,
+            "top_candidate_id": top_candidate.candidate_id if top_candidate else None,
+            "top_confidence": top_candidate.confidence if top_candidate else None,
+            "unknown_factors": missing_parts,
         }
 
     def _load_active_candidates(self, battle_id: str, elf_id: str) -> list[BuildCandidate]:
@@ -198,6 +409,14 @@ class InferenceEngine:
         变化自然反映到 Top-K 分布上，同时保留后续替换为更严谨概率模型的空间。
         """
         candidates = self._load_active_candidates(battle_id, elf_id)
+        self._refresh_confidence_for_candidates(candidates, temperature=temperature)
+
+    @staticmethod
+    def _refresh_confidence_for_candidates(
+        candidates: list[BuildCandidate],
+        temperature: float = 1.0,
+    ) -> None:
+        """按已加载候选池的 match_score 重新计算 softmax 置信度。"""
         if not candidates:
             return
 
@@ -216,6 +435,19 @@ class InferenceEngine:
 
         for candidate, weight in zip(candidates, weights, strict=True):
             candidate.confidence = weight / total_weight
+
+    @staticmethod
+    def _top_candidate_from_rows(candidates: list[BuildCandidate]) -> BuildCandidate | None:
+        """从已加载候选中取当前最高置信候选。"""
+        if not candidates:
+            return None
+        return max(
+            candidates,
+            key=lambda item: (
+                float(item.confidence or 0.0),
+                float(item.match_score or 0.0),
+            ),
+        )
 
     @staticmethod
     def _append_json_list(raw_json: str | None, item: Any) -> str:

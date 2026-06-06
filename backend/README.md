@@ -11,7 +11,7 @@ Windows CMD 推荐使用双引号：
 ```bash
 python -m pip install -e ".[dev]"
 python -m alembic upgrade head
-python -m uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001 --access-log --log-level info
 python -m pytest -q
 ```
 
@@ -32,6 +32,7 @@ python -m pytest -q
 - 战斗时间线：按回合聚合技能、伤害、状态和资源变化等事件。
 - 普通攻击伤害计算：支持最小普通攻击公式；上下文缺失时仍返回 `formula_unavailable`。
 - RuleResolver 雏形：支持技能基础信息、本系、属性克制、双属性合并、应对倍率和基础减伤解析。
+- 核心默认技能：后端启动时幂等补齐“聚能”（`core_skill_focus_energy`），所有精灵运行时初始能量为 10，聚能能耗 0，使用后增加 5 能量。
 - Observation API：`POST /api/v1/observations/{battle_id}`，可根据观测事件更新候选 `match_score`、`confidence` 和 evidence。
 - 候选推断策略：默认只软评分，不执行候选硬排除。
 - 数据管线管理接口：远程检查、远程同步、本地 cleaned JSON 导入。
@@ -95,7 +96,7 @@ X-Admin-Token: <your-token>
 ### 只检查是否可能有新增精灵
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/check \
+curl -X POST http://localhost:8001/api/v1/admin/data-updates/rocom/check \
   -H "Content-Type: application/json" \
   -d '{"limit": 0, "include_new_elves_limit": 100}'
 ```
@@ -105,7 +106,7 @@ curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/check \
 ### 远程同步 dry-run
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/sync \
+curl -X POST http://localhost:8001/api/v1/admin/data-updates/rocom/sync \
   -H "Content-Type: application/json" \
   -d '{"commit": false, "limit": 10, "force": false}'
 ```
@@ -113,7 +114,7 @@ curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/sync \
 确认后提交：
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/sync \
+curl -X POST http://localhost:8001/api/v1/admin/data-updates/rocom/sync \
   -H "Content-Type: application/json" \
   -d '{"commit": true, "limit": 0, "force": true}'
 ```
@@ -123,7 +124,7 @@ curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/sync \
 适合你已经用爬虫生成 cleaned JSON，只需要导入数据库的场景。
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/import-local \
+curl -X POST http://localhost:8001/api/v1/admin/data-updates/rocom/import-local \
   -H "Content-Type: application/json" \
   -d '{"commit": false, "cleaned_dir": "../data/rocom/cleaned"}'
 ```
@@ -131,7 +132,7 @@ curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/import-local 
 确认后提交：
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/admin/data-updates/rocom/import-local \
+curl -X POST http://localhost:8001/api/v1/admin/data-updates/rocom/import-local \
   -H "Content-Type: application/json" \
   -d '{"commit": true, "cleaned_dir": "../data/rocom/cleaned", "data_version": "rocom_bwiki_20260516"}'
 ```
@@ -192,7 +193,7 @@ project-root/
 ```text
 Alembic 建表
   ↓
-启动自检查写入/修正 30 种性格；状态定义通过后续导入器 dry-run/commit
+启动自检查写入/修正 30 种性格与默认技能“聚能”；状态定义通过后续导入器 dry-run/commit
   ↓
 rocom 数据管线导入精灵、技能、技能池和属性克制
 ```

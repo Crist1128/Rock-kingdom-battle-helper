@@ -245,7 +245,14 @@ export function PlayerBuildsPage() {
                   {statKeys.map((key) => (
                     <div key={key}>
                       <div className="mb-1 text-xs text-muted-foreground">{statName(key)}</div>
-                      <Input type="number" min={0} max={10} value={form.individual_talent_distribution[key]} onChange={(e) => setForm({ ...form, individual_talent_distribution: { ...form.individual_talent_distribution, [key]: Number(e.target.value) } })} />
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={form.individual_talent_distribution[key]}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => setForm({ ...form, individual_talent_distribution: { ...form.individual_talent_distribution, [key]: Number(e.target.value) } })}
+                      />
                     </div>
                   ))}
                 </div>

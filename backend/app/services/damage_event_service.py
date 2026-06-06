@@ -10,7 +10,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.calculation.formula_context import DamageFormulaContext
+from app.calculation.formula_context import DamageFormulaContext, PanelStats
 from app.calculation.rule_resolver import RuleResolver
 from app.core.enums import BattleEventType, DamageDisplayType, EventSource
 from app.inference.inference_engine import InferenceEngine
@@ -107,6 +107,18 @@ class DamageEventService:
         self.db.add(damage_event)
         self.db.flush()
 
+        attacker_state = self._get_elf_state(
+            battle_id=battle_id,
+            side=payload.attacker_side,
+            elf_id=payload.attacker_elf_id,
+        )
+        defender_state = self._get_elf_state(
+            battle_id=battle_id,
+            side=payload.defender_side,
+            elf_id=payload.defender_elf_id,
+        )
+        defender_panel_stats = self._panel_stats_from_state(defender_state)
+
         context = DamageFormulaContext(
             battle_id=battle_id,
             damage_event_id=damage_event.event_id,
@@ -121,6 +133,9 @@ class DamageEventService:
             response_attack_success=payload.response_attack_success,
             response_defense_success=payload.response_defense_success,
             response_status_success=payload.response_status_success,
+            attacker_panel_stats=self._panel_stats_from_state(attacker_state),
+            defender_panel_stats=defender_panel_stats,
+            defender_max_hp=defender_panel_stats.hp if defender_panel_stats is not None else None,
             damage_display_type=payload.damage_display_type.value,
             observed_damage_value=total_damage,
             observed_hp_percent_delta=hp_percent_delta,
@@ -199,15 +214,61 @@ class DamageEventService:
 
     @staticmethod
     def _should_resolve_rules(payload: dict) -> bool:
-        """有应对/防御上下文时启用规则解析，但不改变候选硬排除策略。"""
+        """有技能或应对/防御上下文时启用规则解析，但不改变候选硬排除策略。"""
         return any(
             payload.get(key) is not None
             for key in (
+                "skill_id",
                 "defense_skill_id",
                 "response_attack_success",
                 "response_defense_success",
                 "response_status_success",
             )
+        )
+
+    def _get_elf_state(
+        self,
+        *,
+        battle_id: str,
+        side: str | None,
+        elf_id: str | None,
+    ) -> BattleElfState | None:
+        """读取本场战斗中指定精灵的运行时状态。"""
+        if side is None or elf_id is None:
+            return None
+        return self.db.scalars(
+            select(BattleElfState).where(
+                BattleElfState.battle_id == battle_id,
+                BattleElfState.side == side,
+                BattleElfState.elf_id == elf_id,
+            )
+        ).first()
+
+    @staticmethod
+    def _panel_stats_from_state(state: BattleElfState | None) -> PanelStats | None:
+        """从运行时精灵状态解析伤害公式需要的六维面板。"""
+        if state is None:
+            return None
+        stats = loads_json(state.panel_stats_json, {})
+        if not isinstance(stats, dict):
+            return None
+        required = (
+            "hp",
+            "physical_attack",
+            "physical_defense",
+            "magic_attack",
+            "magic_defense",
+            "speed",
+        )
+        if any(stats.get(key) is None for key in required):
+            return None
+        return PanelStats(
+            hp=int(stats["hp"]),
+            physical_attack=int(stats["physical_attack"]),
+            physical_defense=int(stats["physical_defense"]),
+            magic_attack=int(stats["magic_attack"]),
+            magic_defense=int(stats["magic_defense"]),
+            speed=int(stats["speed"]),
         )
 
     def _create_resource_change_for_damage(

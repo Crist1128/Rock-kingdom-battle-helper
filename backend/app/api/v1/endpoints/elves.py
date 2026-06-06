@@ -7,9 +7,10 @@
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.default_skills import DEFAULT_COMMON_SKILL_ID
 from app.db.session import get_db
 from app.models.static import ElfDefinition, ElfLearnableSkill, SkillDefinition
 from app.schemas.static import ElfDefinitionOut, SkillDefinitionOut
@@ -67,10 +68,17 @@ def list_elf_learnable_skills(
     elf = db.get(ElfDefinition, elf_id)
     if elf is None or elf.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Elf not found")
-    stmt = (
-        select(SkillDefinition)
-        .join(ElfLearnableSkill, SkillDefinition.skill_id == ElfLearnableSkill.skill_id)
-        .where(ElfLearnableSkill.elf_id == elf_id, SkillDefinition.deleted_at.is_(None))
+    learnable_exists = (
+        select(ElfLearnableSkill.id)
+        .where(
+            ElfLearnableSkill.elf_id == elf_id,
+            ElfLearnableSkill.skill_id == SkillDefinition.skill_id,
+        )
+        .exists()
+    )
+    stmt = select(SkillDefinition).where(
+        SkillDefinition.deleted_at.is_(None),
+        or_(learnable_exists, SkillDefinition.skill_id == DEFAULT_COMMON_SKILL_ID),
     )
     if q:
         stmt = stmt.where(SkillDefinition.skill_name.contains(q))

@@ -16,24 +16,29 @@ export function ManualEventDrawer({ battleId, state }: { battleId?: string | nul
   const active = activeDrawer !== null;
   const title = activeDrawer === "skill" ? "使用技能" : activeDrawer === "damage" ? "录入伤害" : activeDrawer === "resource" ? "录入治疗 / 能量" : activeDrawer === "effect" ? "录入状态" : activeDrawer === "switch" ? "切换精灵" : "手动事件";
 
-  const invalidate = async () => {
-    await Promise.all([
+  const invalidate = async (options: { includeHeavyCandidateQueries?: boolean } = {}) => {
+    const queries = [
       queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] }),
       queryClient.invalidateQueries({ queryKey: ["timeline", battleId] }),
       queryClient.invalidateQueries({ queryKey: ["candidate-summary"] }),
-      queryClient.invalidateQueries({ queryKey: ["candidate-detail"] }),
       queryClient.invalidateQueries({ queryKey: ["candidate-list"] }),
-      queryClient.invalidateQueries({ queryKey: ["candidate-evidence"] }),
-    ]);
+    ];
+    if (options.includeHeavyCandidateQueries) {
+      queries.push(
+        queryClient.invalidateQueries({ queryKey: ["candidate-detail"] }),
+        queryClient.invalidateQueries({ queryKey: ["candidate-evidence"] }),
+      );
+    }
+    await Promise.all(queries);
   };
 
   return (
     <Sheet open={active} title={title} description="MVP 手动输入：只记录事实，不执行真实公式。" onClose={closeDrawer}>
-      {battleId && state && activeDrawer === "skill" ? <SkillUseForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
+      {battleId && state && activeDrawer === "skill" ? <SkillUseForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate({ includeHeavyCandidateQueries: true }); closeDrawer(); }} /> : null}
       {battleId && state && activeDrawer === "damage" ? <DamageForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {battleId && state && activeDrawer === "resource" ? <ResourceForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
-      {battleId && state && activeDrawer === "effect" ? <EffectForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
-      {battleId && state && activeDrawer === "switch" ? <SwitchForm battleId={battleId} state={state} defaultSide={drawerSide ?? "self"} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
+      {battleId && state && activeDrawer === "effect" ? <EffectForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate({ includeHeavyCandidateQueries: true }); closeDrawer(); }} /> : null}
+      {battleId && state && activeDrawer === "switch" ? <SwitchForm battleId={battleId} state={state} defaultSide={drawerSide ?? "self"} onDone={() => { invalidate({ includeHeavyCandidateQueries: true }); closeDrawer(); }} /> : null}
       {!battleId || !state ? <div className="text-sm text-muted-foreground">请先选择战斗并进入工作台。</div> : null}
     </Sheet>
   );
@@ -44,9 +49,9 @@ function SkillUseForm({ battleId, state, defaultSide, onDone }: { battleId: stri
   const [actorSide, setActorSide] = useState<Side>(activeIds.attackerSide as Side);
   const [targetSide, setTargetSide] = useState<Side>(activeIds.defenderSide as Side);
   const [skillId, setSkillId] = useState<string | null>(null);
-  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("");
-  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("");
-  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("");
+  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("false");
+  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("false");
+  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("false");
   const [notes, setNotes] = useState("");
   const actorElfId = actorSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
   const targetElfId = targetSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
@@ -109,9 +114,9 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
   const [defenderSide, setDefenderSide] = useState<Side>(activeIds.defenderSide as Side);
   const [skillId, setSkillId] = useState<string | null>(null);
   const [defenseSkillId, setDefenseSkillId] = useState<string | null>(null);
-  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("");
-  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("");
-  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("");
+  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("false");
+  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("false");
+  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("false");
   const [damageValue, setDamageValue] = useState(0);
   const [perHitDamage, setPerHitDamage] = useState(0);
   const [hitCount, setHitCount] = useState(2);
@@ -128,6 +133,10 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
   const defenderElf = state.elves.find((elf) => elf.side === defenderSide && elf.elf_id === defenderElfId);
   const attackerPanelStats = toPanelStats(attackerElf?.panel_stats_json);
   const defenderPanelStats = toPanelStats(defenderElf?.panel_stats_json);
+  useEffect(() => {
+    setHpBefore(normalizeHpPercent(defenderElf?.current_hp_percent) ?? 100);
+    setHpAfter("");
+  }, [defenderSide, defenderElfId, defenderElf?.current_hp_percent]);
   const observedTotalDamage = damageDisplayType === "combo_repeated_damage" ? perHitDamage * hitCount : damageValue;
   const observationPayload = buildDamageObservationPayload({
     syncObservation,
@@ -233,7 +242,7 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
         <NumberField label="伤害容差" value={damageTolerance} onChange={setDamageTolerance} />
         {syncObservation && !observationPayload ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-            当前缺少可用于反推的敌方目标、伤害值或面板信息，本次只会记录事件。
+            当前缺少可用于反推的技能、敌方目标、伤害值或面板信息，本次只会记录事件。
           </div>
         ) : null}
       </div>
@@ -266,6 +275,7 @@ interface DamageObservationBuildInput {
 
 function buildDamageObservationPayload(input: DamageObservationBuildInput): ObservationCreate | null {
   if (!input.syncObservation || input.observedTotalDamage <= 0) return null;
+  if (!input.skillId) return null;
 
   const enemyElfId = input.attackerSide === "enemy" ? input.attackerElfId : input.defenderElfId;
   if (!enemyElfId) return null;
@@ -321,6 +331,12 @@ function toPanelStats(rawJson?: string | null): PanelStatsInput | null {
   } catch {
     return null;
   }
+}
+
+function normalizeHpPercent(value?: number | null): number | null {
+  if (value === null || value === undefined) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function ResourceForm({ battleId, state, defaultSide, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; onDone: () => void }) {
@@ -419,9 +435,8 @@ function ResponseResultSelect({ label, value, onChange }: { label: string; value
     <div>
       <label className="text-sm font-medium">{label}</label>
       <Select value={value} onChange={(e) => onChange(e.target.value as OptionalBoolInput)}>
-        <option value="">未知</option>
-        <option value="true">成功</option>
         <option value="false">失败</option>
+        <option value="true">成功</option>
       </Select>
     </div>
   );
