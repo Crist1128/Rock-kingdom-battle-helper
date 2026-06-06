@@ -1,14 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { compactId, formatTalentPattern, statName } from "@/lib/utils";
+import { cn, compactId, statName } from "@/lib/utils";
 
 export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; elfId?: string | null }) {
   const queryClient = useQueryClient();
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const enabled = Boolean(battleId && elfId);
   const summaryQuery = useQuery({
     queryKey: ["candidate-summary", battleId, elfId],
@@ -54,15 +54,12 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
   }
 
   const summary = summaryQuery.data ?? detailQuery.data?.summary;
-  const speedData = (detailQuery.data?.speed_buckets ?? []).map((bucket) => ({
-    bucket: `${bucket.min_speed}-${bucket.max_speed}`,
-    count: bucket.count,
-    ratio: bucket.ratio,
-  }));
-  const natureData = detailQuery.data?.nature_distribution ?? [];
   const talentData = detailQuery.data?.talent_distribution ?? [];
-  const patternData = detailQuery.data?.pattern_distribution?.slice(0, 5) ?? [];
   const topCandidates = topCandidatesQuery.data ?? [];
+  const selectedCandidate =
+    topCandidates.find((candidate) => candidate.candidate_id === selectedCandidateId)
+    ?? topCandidates[0]
+    ?? null;
   const evidenceItems = (evidenceQuery.data?.evidence_items ?? []).slice(-6).reverse();
 
   return (
@@ -90,48 +87,77 @@ export function CandidatePanel({ battleId, elfId }: { battleId?: string | null; 
           当前可测试普通攻击、状态伤害、星陨、防御技能减伤和 Observation 软评分。候选默认只调整分数与置信度，不硬排除。
         </div>
 
-        {speedData.length > 0 ? (
-          <div className="h-52 rounded-2xl border bg-white p-3">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={speedData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="bucket" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" />
-              </BarChart>
-            </ResponsiveContainer>
+        <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-2xl border bg-white p-3">
+            <div className="mb-2 text-sm font-semibold">性格与资质组合 Top 5</div>
+            {topCandidates.length === 0 ? <div className="text-sm text-muted-foreground">暂无候选明细。</div> : null}
+            <div className="space-y-2">
+              {topCandidates.map((candidate, index) => {
+                const selected = selectedCandidate?.candidate_id === candidate.candidate_id;
+                return (
+                  <button
+                    key={candidate.candidate_id}
+                    type="button"
+                    className={cn(
+                      "w-full rounded-xl border bg-slate-50 p-2 text-left text-xs transition hover:border-primary/50 hover:bg-primary/5",
+                      selected && "border-primary bg-primary/10 shadow-sm",
+                    )}
+                    onClick={() => setSelectedCandidateId(candidate.candidate_id)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">
+                        #{index + 1} {natureMap.get(candidate.nature_id) ?? compactId(candidate.nature_id)}
+                      </span>
+                      <span className="text-muted-foreground">{((candidate.confidence ?? 0) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="mt-1 text-muted-foreground">
+                      {formatTalentValues(candidate.individual_talent_distribution_json)}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-2 text-muted-foreground">
+                      <span>评分 {candidate.match_score.toFixed(2)}</span>
+                      <span>{candidate.is_excluded ? "已排除" : "有效"}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        ) : (
-          <div className="rounded-2xl border bg-white p-3 text-sm text-muted-foreground">暂无速度分桶数据。</div>
-        )}
 
-        <DistributionList title="性格 Top" items={natureData.slice(0, 5).map((item) => ({ label: natureMap.get(item.nature_id) ?? compactId(item.nature_id), value: `${item.count} · ${(item.ratio * 100).toFixed(1)}%` }))} />
-        <DistributionList title="个体资质组合 Top" items={patternData.map((item) => ({ label: formatTalentPattern(item.pattern), value: `${item.count} · ${(item.ratio * 100).toFixed(1)}%` }))} />
-        <DistributionList title="个体资质维度统计" items={talentData.map((item) => ({ label: statName(item.stat_key), value: `有资质 ${item.non_zero_count} · 无资质 ${item.zero_count}` }))} />
-
-        <div className="rounded-2xl border bg-white p-3">
-          <div className="mb-2 text-sm font-semibold">候选 Top 5（按置信度）</div>
-          {topCandidates.length === 0 ? <div className="text-sm text-muted-foreground">暂无候选明细。</div> : null}
-          <div className="space-y-2">
-            {topCandidates.map((candidate, index) => (
-              <div key={candidate.candidate_id} className="rounded-xl border bg-slate-50 p-2 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">#{index + 1} {compactId(candidate.candidate_id)}</span>
-                  <span className="text-muted-foreground">{((candidate.confidence ?? 0) * 100).toFixed(1)}%</span>
+          <div className="rounded-2xl border bg-white p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold">估计面板</div>
+              {selectedCandidate ? <Badge variant="outline">{compactId(selectedCandidate.candidate_id)}</Badge> : null}
+            </div>
+            {selectedCandidate ? (
+              <div className="space-y-3">
+                <div className="rounded-xl border bg-slate-50 p-3 text-xs">
+                  <div className="font-medium">
+                    {natureMap.get(selectedCandidate.nature_id) ?? compactId(selectedCandidate.nature_id)}
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    {formatTalentValues(selectedCandidate.individual_talent_distribution_json)}
+                  </div>
                 </div>
-                <div className="mt-1 grid grid-cols-3 gap-1 text-muted-foreground">
-                  <span>评分 {candidate.match_score.toFixed(2)}</span>
-                  <span>HP {candidate.final_hp}</span>
-                  <span>速 {candidate.final_speed}</span>
-                  <span>物防 {candidate.final_physical_defense}</span>
-                  <span>魔防 {candidate.final_magic_defense}</span>
-                  <span>{candidate.is_excluded ? "已排除" : "有效"}</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <Metric label="生命" value={selectedCandidate.final_hp} />
+                  <Metric label="物攻" value={selectedCandidate.final_physical_attack} />
+                  <Metric label="物防" value={selectedCandidate.final_physical_defense} />
+                  <Metric label="魔攻" value={selectedCandidate.final_magic_attack} />
+                  <Metric label="魔防" value={selectedCandidate.final_magic_defense} />
+                  <Metric label="速度" value={selectedCandidate.final_speed} />
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <span>置信度 {((selectedCandidate.confidence ?? 0) * 100).toFixed(1)}%</span>
+                  <span>评分 {selectedCandidate.match_score.toFixed(2)}</span>
                 </div>
               </div>
-            ))}
+            ) : (
+              <div className="text-sm text-muted-foreground">暂无可展示的候选组合。</div>
+            )}
           </div>
         </div>
+
+        <DistributionList title="个体资质维度统计" items={talentData.map((item) => ({ label: statName(item.stat_key), value: `有资质 ${item.non_zero_count} · 无资质 ${item.zero_count}` }))} />
 
         <div className="rounded-2xl border bg-white p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -194,6 +220,28 @@ function formatEvidenceValue(value: unknown) {
   if (Array.isArray(value)) return value.join("-");
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function formatTalentValues(rawJson: string) {
+  const values = parseTalentDistribution(rawJson);
+  const parts = ["hp", "physical_attack", "physical_defense", "magic_attack", "magic_defense", "speed"].map(
+    (key) => `${statName(key)} ${values[key] ?? 0}`,
+  );
+  return parts.join(" · ");
+}
+
+function parseTalentDistribution(rawJson: string): Record<string, number> {
+  try {
+    const parsed = JSON.parse(rawJson) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>)
+        .filter(([, value]) => typeof value === "number")
+        .map(([key, value]) => [key, value as number]),
+    );
+  } catch {
+    return {};
+  }
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {

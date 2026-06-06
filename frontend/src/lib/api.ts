@@ -40,6 +40,8 @@ import type {
   SkillUseEventCreate,
   StartBattleInput,
   SwitchElfInput,
+  TeamPresetCreate,
+  TeamPresetOut,
 } from "@/types/api";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
@@ -138,6 +140,20 @@ export const api = {
       request<void>(`/player-builds/${buildId}`, { method: "DELETE" }),
   },
 
+  teamPresets: {
+    list: (params: { side_usage?: string; source_type?: string } = {}) =>
+      request<TeamPresetOut[]>(`/team-presets${qs(params)}`),
+    get: (presetId: string) => request<TeamPresetOut>(`/team-presets/${presetId}`),
+    create: (payload: TeamPresetCreate) =>
+      request<TeamPresetOut>("/team-presets", { method: "POST", body: JSON.stringify(payload) }),
+    update: (presetId: string, payload: TeamPresetCreate) =>
+      request<TeamPresetOut>(`/team-presets/${presetId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    delete: (presetId: string) => request<void>(`/team-presets/${presetId}`, { method: "DELETE" }),
+  },
+
   battles: {
     list: (params: { phase?: string; include_archived?: boolean; limit?: number; offset?: number } = {}) =>
       request<BattleOut[]>(`/battles${qs({ limit: 50, ...params })}`),
@@ -209,7 +225,11 @@ export const api = {
       request<CandidateEvidenceOut>(`/candidates/${battleId}/${elfId}/evidence`),
     list: (battleId: string, elfId: string, params: { limit?: number; offset?: number; include_excluded?: boolean } = {}) =>
       request<CandidateOut[]>(`/candidates/${battleId}/${elfId}${qs({ limit: 50, offset: 0, ...params })}`),
-    generate: (battleId: string, elfId: string, mode: "standard" | "full" = "standard") =>
+    generate: (
+      battleId: string,
+      elfId: string,
+      mode: "standard" | "wide" | "balanced" | "full" = "standard",
+    ) =>
       request<CandidateSummaryOut>(`/candidates/${battleId}/${elfId}/generate${qs({ mode })}`, { method: "POST" }),
   },
 

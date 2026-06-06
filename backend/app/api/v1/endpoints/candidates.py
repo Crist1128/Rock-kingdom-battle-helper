@@ -25,7 +25,11 @@ router = APIRouter()
 def generate_candidates(
     battle_id: str,
     elf_id: str,
-    mode: str = Query(default="standard", pattern="^(standard|full)$", description="候选生成范围"),
+    mode: str = Query(
+        default="standard",
+        pattern="^(standard|wide|balanced|full)$",
+        description="候选生成范围",
+    ),
     db: Session = Depends(get_db),
 ) -> CandidateSummaryOut:
     """手动重新生成某只敌方精灵的候选配置。"""

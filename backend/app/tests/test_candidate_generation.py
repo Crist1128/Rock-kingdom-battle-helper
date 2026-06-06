@@ -6,6 +6,8 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.calculation.stat_calculator import NatureRule
+from app.core.enums import StatKey
 from app.db.base import Base
 from app.models import battle as _battle_models  # noqa: F401
 from app.models import candidate as _candidate_models  # noqa: F401
@@ -67,24 +69,26 @@ def db_session() -> Iterator[Session]:
 
 
 def test_candidate_generator_standard_mode_reduces_candidate_count() -> None:
-    """standard 模式只保留 8 及以上资质的常规组合。"""
+    """候选生成支持分层收缩空间。"""
     generator = CandidateGenerator()
 
     assert generator.generate_candidate_count(mode=CandidateGenerationMode.FULL) == 46320
-    assert generator.generate_candidate_count(mode=CandidateGenerationMode.STANDARD) == 6030
+    assert generator.generate_candidate_count(mode=CandidateGenerationMode.BALANCED) == 3888
+    assert generator.generate_candidate_count(mode=CandidateGenerationMode.WIDE) == 576
+    assert generator.generate_candidate_count(mode=CandidateGenerationMode.STANDARD) == 188
 
 
 def test_candidate_service_standard_mode_keeps_positive_stat_investment(
     db_session: Session,
 ) -> None:
-    """加魔攻性格的 standard 候选应带 8 及以上魔攻资质，并默认不点负面物攻。"""
+    """standard 候选应符合主流极速空间规则。"""
     generated = CandidateService(db_session).generate_for_enemy_elf(
         "battle_candidate",
         "enemy_elf",
         mode=CandidateGenerationMode.STANDARD,
     )
 
-    assert generated == 402
+    assert generated == 48
     rows = list(
         db_session.scalars(
             select(BuildCandidate).where(
@@ -94,12 +98,55 @@ def test_candidate_service_standard_mode_keeps_positive_stat_investment(
             )
         )
     )
-    assert len(rows) == 201
+    assert len(rows) == 24
     for row in rows:
         distribution = loads_json(row.individual_talent_distribution_json, {})
-        assert int(distribution["magic_attack"]) >= 8
+        assert int(distribution["magic_attack"]) == 10
         assert int(distribution["physical_attack"]) == 0
-        assert all(int(value) in {0, 8, 9, 10} for value in distribution.values())
+        assert all(int(value) in {0, 9, 10} for value in distribution.values())
+        assert sum(1 for value in distribution.values() if int(value) > 0) == 3
+
+
+def test_candidate_service_wide_and_balanced_modes_expand_candidate_space(
+    db_session: Session,
+) -> None:
+    """宽松模式保留更多候选，用于主流空间匹配失败后的兜底扩展。"""
+    service = CandidateService(db_session)
+
+    assert service.generate_for_enemy_elf(
+        "battle_candidate",
+        "enemy_elf",
+        mode=CandidateGenerationMode.WIDE,
+    ) == 48
+    assert service.generate_for_enemy_elf(
+        "battle_candidate",
+        "enemy_elf",
+        mode=CandidateGenerationMode.BALANCED,
+    ) == 324
+
+
+def test_candidate_generator_standard_mode_ignores_unpopular_negative_stats() -> None:
+    """standard 不考虑负面减少生命、物防、魔防的性格。"""
+    generator = CandidateGenerator()
+    hp_negative = generator.generate_individual_talent_distributions_for_nature(
+        NatureRule(
+            nature_id="speed_plus_hp_minus",
+            positive_stat=StatKey.SPEED,
+            negative_stat=StatKey.HP,
+        ),
+        mode=CandidateGenerationMode.STANDARD,
+    )
+    physical_attack_negative = generator.generate_individual_talent_distributions_for_nature(
+        NatureRule(
+            nature_id="speed_plus_physical_attack_minus",
+            positive_stat=StatKey.SPEED,
+            negative_stat=StatKey.PHYSICAL_ATTACK,
+        ),
+        mode=CandidateGenerationMode.STANDARD,
+    )
+
+    assert hp_negative == []
+    assert len(physical_attack_negative) == 24
 
 
 def test_candidate_service_full_mode_still_available(db_session: Session) -> None:

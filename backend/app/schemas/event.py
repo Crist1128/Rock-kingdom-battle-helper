@@ -152,6 +152,16 @@ class DamageEventCreate(BaseModel):
         le=100,
         description="受击后生命百分比",
     )
+    hp_value_before: int | None = Field(
+        default=None,
+        ge=0,
+        description="受击前精确生命值；主要用于我方受击时记录屏幕可见数值",
+    )
+    hp_value_after: int | None = Field(
+        default=None,
+        ge=0,
+        description="受击后精确生命值；主要用于我方受击时记录屏幕可见数值",
+    )
     enemy_hp_percent_damage: float | None = Field(
         default=None,
         ge=0,

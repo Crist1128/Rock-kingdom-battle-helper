@@ -379,3 +379,51 @@ class PlayerElfBuildSkill(Base):
     build_id: Mapped[str] = mapped_column(ForeignKey("player_elf_build.build_id"), nullable=False)
     skill_id: Mapped[str] = mapped_column(ForeignKey("skill_definition.skill_id"), nullable=False)
     slot_index: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class TeamPreset(TimestampMixin, Base):
+    """
+    预设配队模型。
+
+    用于保存己方 6 只已配置精灵组成的配队，也用于保存只包含精灵种类的
+    热门敌方阵容。准备阶段读取本表和槽位表后，仍转换为现有 LineupInput，
+    不直接影响战斗事件流。
+    """
+
+    __tablename__ = "team_preset"
+    __table_args__ = (
+        Index("idx_team_preset_usage_source", "side_usage", "source_type"),
+        Index("idx_team_preset_name", "preset_name"),
+    )
+
+    preset_id: Mapped[str] = mapped_column(String, primary_key=True)
+    preset_name: Mapped[str] = mapped_column(String, nullable=False)
+    side_usage: Mapped[str] = mapped_column(String, nullable=False, default="self")
+    source_type: Mapped[str] = mapped_column(String, nullable=False, default="custom")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class TeamPresetSlot(Base):
+    """
+    预设配队槽位模型。
+
+    slot_index 固定为 0-5。己方配队通常同时保存 elf_id 与 build_id；
+    敌方热门阵容允许 build_id 为空，仅保存 elf_id。
+    """
+
+    __tablename__ = "team_preset_slot"
+    __table_args__ = (
+        UniqueConstraint("preset_id", "slot_index", name="uq_team_preset_slot_preset_slot"),
+        Index("idx_team_preset_slot_preset", "preset_id"),
+        Index("idx_team_preset_slot_elf", "elf_id"),
+    )
+
+    slot_id: Mapped[str] = mapped_column(String, primary_key=True)
+    preset_id: Mapped[str] = mapped_column(ForeignKey("team_preset.preset_id"), nullable=False)
+    slot_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    elf_id: Mapped[str] = mapped_column(ForeignKey("elf_definition.elf_id"), nullable=False)
+    build_id: Mapped[str | None] = mapped_column(
+        ForeignKey("player_elf_build.build_id"),
+        nullable=True,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)

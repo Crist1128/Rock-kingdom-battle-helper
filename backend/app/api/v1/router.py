@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     observations,
     player_builds,
     skills,
+    team_presets,
 )
 
 router = APIRouter()
@@ -28,6 +29,7 @@ router.include_router(skills.router, prefix="/skills", tags=["skills"])
 router.include_router(natures.router, prefix="/natures", tags=["natures"])
 router.include_router(effects.router, prefix="/effects", tags=["effects"])
 router.include_router(player_builds.router, prefix="/player-builds", tags=["player-builds"])
+router.include_router(team_presets.router, prefix="/team-presets", tags=["team-presets"])
 router.include_router(battles.router, prefix="/battles", tags=["battles"])
 router.include_router(candidates.router, prefix="/candidates", tags=["candidates"])
 router.include_router(observations.router, prefix="/observations", tags=["observations"])

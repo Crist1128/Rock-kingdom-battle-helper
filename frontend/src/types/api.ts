@@ -132,6 +132,48 @@ export interface PlayerElfBuildOut {
   notes?: string | null;
 }
 
+export type TeamPresetSideUsage = "self" | "enemy" | "both";
+export type TeamPresetSourceType = "custom" | "popular";
+
+export interface TeamPresetSlotInput {
+  slot_index: number;
+  elf_id: string;
+  build_id?: string | null;
+  notes?: string | null;
+}
+
+export interface TeamPresetCreate {
+  preset_name: string;
+  side_usage?: TeamPresetSideUsage;
+  source_type?: TeamPresetSourceType;
+  notes?: string | null;
+  slots: TeamPresetSlotInput[];
+}
+
+export interface TeamPresetSlotOut {
+  slot_id: string;
+  preset_id: string;
+  slot_index: number;
+  elf_id: string;
+  elf_name?: string | null;
+  avatar?: string | null;
+  element_types_json?: string | null;
+  build_id?: string | null;
+  build_name?: string | null;
+  notes?: string | null;
+}
+
+export interface TeamPresetOut {
+  preset_id: string;
+  preset_name: string;
+  side_usage: TeamPresetSideUsage;
+  source_type: TeamPresetSourceType;
+  notes?: string | null;
+  slots: TeamPresetSlotOut[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface BattleCreate {
   battle_name?: string | null;
   notes?: string | null;
@@ -268,6 +310,8 @@ export interface DamageEventCreate {
   combo_confidence?: number | null;
   hp_percent_before?: number | null;
   hp_percent_after?: number | null;
+  hp_value_before?: number | null;
+  hp_value_after?: number | null;
   enemy_hp_percent_damage?: number | null;
   notes?: string | null;
 }

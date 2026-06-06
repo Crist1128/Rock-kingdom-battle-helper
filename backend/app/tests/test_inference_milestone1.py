@@ -71,6 +71,7 @@ def _candidate(
     candidate_id: str,
     *,
     hp: int = 300,
+    physical_attack: int = 100,
     physical_defense: int = 100,
     speed: int = 100,
     possible_skill_ids: list[str] | None = None,
@@ -84,7 +85,7 @@ def _candidate(
         nature_id="nature_1",
         individual_talent_distribution_json=dumps_json({"speed": 10}),
         final_hp=hp,
-        final_physical_attack=100,
+        final_physical_attack=physical_attack,
         final_physical_defense=physical_defense,
         final_magic_attack=100,
         final_magic_defense=100,
@@ -373,6 +374,105 @@ def test_damage_observation_missing_formula_context_returns_fast_unknown(
     assert summary["unknown_count"] == 2
     assert loads_json(rows["candidate_a"].evidence_ids_json, []) == []
     assert loads_json(rows["candidate_b"].evidence_ids_json, []) == []
+
+
+def test_enemy_attacker_plain_damage_can_hard_exclude(db_session: Session) -> None:
+    """敌方作为攻击方时，普通伤害可用候选攻击面板做受保护硬排除。"""
+    db_session.add_all(
+        [
+            _candidate("candidate_match", physical_attack=200),
+            _candidate("candidate_mismatch", physical_attack=100),
+        ]
+    )
+    db_session.commit()
+
+    engine = InferenceEngine(db_session)
+    summary = engine.process_observation_event(
+        ObservationEventInput(
+            battle_id="battle_1",
+            enemy_elf_id="enemy_elf",
+            event_id="event_enemy_attack_damage",
+            observation_type=ObservationType.DAMAGE_VALUE,
+            observed_value=90,
+            payload={
+                "enemy_role": "attacker",
+                "skill_id": "skill_plain",
+                "skill_confirmed": True,
+                "damage_display_type": "single_damage",
+                "defender_panel_stats": {
+                    "hp": 300,
+                    "physical_attack": 100,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+                "skill_category": "physical",
+                "base_power": 50,
+                "response_attack_success": False,
+                "response_defense_success": False,
+                "response_status_success": False,
+                "damage_tolerance": 0,
+            },
+            allow_hard_exclude=True,
+        )
+    )
+
+    rows = {row.candidate_id: row for row in db_session.query(BuildCandidate).all()}
+    assert summary["matched_count"] == 1
+    assert summary["mismatched_count"] == 1
+    assert summary["hard_excluded_count"] == 1
+    assert rows["candidate_match"].is_excluded is False
+    assert rows["candidate_mismatch"].is_excluded is True
+    assert rows["candidate_mismatch"].excluded_reason == "damage_value_mismatched"
+
+
+def test_plain_damage_hard_exclude_requires_response_failure(db_session: Session) -> None:
+    """应对结果未知时，即使调用方传 allow_hard_exclude 也只能软评分。"""
+    db_session.add_all(
+        [
+            _candidate("candidate_match", physical_attack=200),
+            _candidate("candidate_mismatch", physical_attack=100),
+        ]
+    )
+    db_session.commit()
+
+    engine = InferenceEngine(db_session)
+    summary = engine.process_observation_event(
+        ObservationEventInput(
+            battle_id="battle_1",
+            enemy_elf_id="enemy_elf",
+            event_id="event_enemy_attack_damage_unknown_response",
+            observation_type=ObservationType.DAMAGE_VALUE,
+            observed_value=90,
+            payload={
+                "enemy_role": "attacker",
+                "skill_id": "skill_plain",
+                "skill_confirmed": True,
+                "damage_display_type": "single_damage",
+                "defender_panel_stats": {
+                    "hp": 300,
+                    "physical_attack": 100,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+                "skill_category": "physical",
+                "base_power": 50,
+                "response_attack_success": False,
+                "response_defense_success": None,
+                "response_status_success": False,
+                "damage_tolerance": 0,
+            },
+            allow_hard_exclude=True,
+        )
+    )
+
+    rows = {row.candidate_id: row for row in db_session.query(BuildCandidate).all()}
+    assert summary["mismatched_count"] == 1
+    assert summary["hard_excluded_count"] == 0
+    assert rows["candidate_mismatch"].is_excluded is False
 
 
 def test_inference_engine_updates_hp_percent_delta_soft_scores(db_session: Session) -> None:

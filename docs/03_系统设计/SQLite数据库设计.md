@@ -660,6 +660,103 @@ CREATE TABLE player_elf_build_skill (
 
 ---
 
+## 4.3 `team_preset` 配队预设表
+
+### 用途
+
+保存准备阶段可复用的 6 只精灵阵容模板。己方配队通常由已计算面板的
+`player_elf_build` 组成；敌方热门阵容可以只保存精灵种类，用于快速录入
+敌方阵容并触发候选生成。
+
+### 建表 SQL
+
+```sql
+CREATE TABLE team_preset (
+  preset_id TEXT PRIMARY KEY,
+  preset_name TEXT NOT NULL,
+  side_usage TEXT NOT NULL DEFAULT 'self',
+  source_type TEXT NOT NULL DEFAULT 'custom',
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+```
+
+### 字段说明
+
+| 字段 | 类型 | 必填 | 来源 | 作用 |
+|---|---|---:|---|---|
+| `preset_id` | TEXT | 是 | 系统生成 | 配队预设 ID。 |
+| `preset_name` | TEXT | 是 | 用户输入 | 配队名称。 |
+| `side_usage` | TEXT | 是 | 用户选择 | 使用侧：`self`、`enemy` 或 `both`。 |
+| `source_type` | TEXT | 是 | 用户选择 | 来源：`custom` 或 `popular`。 |
+| `notes` | TEXT | 否 | 用户输入 | 备注。 |
+| `created_at` | TEXT | 是 | 系统生成 | 创建时间。 |
+| `updated_at` | TEXT | 是 | 系统生成 | 更新时间。 |
+| `deleted_at` | TEXT | 否 | 系统生成 | 软删除时间。 |
+
+### 索引
+
+```sql
+CREATE INDEX idx_team_preset_name ON team_preset(preset_name);
+CREATE INDEX idx_team_preset_usage_source ON team_preset(side_usage, source_type);
+```
+
+---
+
+## 4.4 `team_preset_slot` 配队预设槽位表
+
+### 用途
+
+保存配队中的 0-5 号槽位。己方配队槽位必须引用 `build_id`；敌方热门阵容
+允许 `build_id` 为空，只保存 `elf_id`。
+
+### 建表 SQL
+
+```sql
+CREATE TABLE team_preset_slot (
+  slot_id TEXT PRIMARY KEY,
+  preset_id TEXT NOT NULL,
+  slot_index INTEGER NOT NULL,
+  elf_id TEXT NOT NULL,
+  build_id TEXT,
+  notes TEXT,
+
+  UNIQUE (preset_id, slot_index),
+  FOREIGN KEY (preset_id) REFERENCES team_preset(preset_id),
+  FOREIGN KEY (elf_id) REFERENCES elf_definition(elf_id),
+  FOREIGN KEY (build_id) REFERENCES player_elf_build(build_id)
+);
+```
+
+### 字段说明
+
+| 字段 | 类型 | 必填 | 来源 | 作用 |
+|---|---|---:|---|---|
+| `slot_id` | TEXT | 是 | 系统生成 | 配队槽位 ID。 |
+| `preset_id` | TEXT | 是 | 系统生成 | 所属配队预设。 |
+| `slot_index` | INTEGER | 是 | 用户输入 | 槽位序号，0-5。 |
+| `elf_id` | TEXT | 是 | 用户选择 | 精灵 ID。 |
+| `build_id` | TEXT | 否 | 用户选择 | 己方配置 ID；敌方热门阵容可为空。 |
+| `notes` | TEXT | 否 | 用户输入 | 槽位备注。 |
+
+### 索引
+
+```sql
+CREATE INDEX idx_team_preset_slot_preset ON team_preset_slot(preset_id);
+CREATE INDEX idx_team_preset_slot_elf ON team_preset_slot(elf_id);
+```
+
+### 一致性规则
+
+- 同一配队的 `slot_index` 不能重复。
+- `side_usage = self` 的配队槽位必须有 `build_id`。
+- 如果槽位保存了 `build_id`，该配置的 `elf_id` 必须与槽位 `elf_id` 一致。
+- 配队预设只用于准备阶段快速填充，不直接进入战斗事件日志。
+
+---
+
 ## 5. 战斗运行时表
 
 ## 5.1 `battle` 战斗主表
@@ -1611,16 +1708,18 @@ WHERE bei.is_active = 1;
 6. `type_effectiveness_rule`
 7. `player_elf_build`
 8. `player_elf_build_skill`
-9. `battle`
-10. `battle_elf_state`
-11. `battle_skill_slot`
-12. `build_candidate`
-13. `battle_effect_instance`
-14. `battle_effect_snapshot`
-15. `battle_event`
-16. `damage_event`
-17. `effect_change_event`
-18. `resource_change_event`
+9. `team_preset`
+10. `team_preset_slot`
+11. `battle`
+12. `battle_elf_state`
+13. `battle_skill_slot`
+14. `build_candidate`
+15. `battle_effect_instance`
+16. `battle_effect_snapshot`
+17. `battle_event`
+18. `damage_event`
+19. `effect_change_event`
+20. `resource_change_event`
 
 `calculation_cache` 可以第二阶段再加入。
 
@@ -1685,6 +1784,8 @@ WHERE bei.is_active = 1;
 elf_definition / nature_definition / skill_definition / effect_definition
   ↓
 player_elf_build / elf_learnable_skill
+  ↓
+team_preset / team_preset_slot
   ↓
 battle / battle_elf_state / battle_skill_slot / build_candidate
   ↓

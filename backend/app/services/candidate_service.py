@@ -54,6 +54,8 @@ class CandidateGenerationMode(StrEnum):
     """候选生成范围。"""
 
     STANDARD = "standard"
+    WIDE = "wide"
+    BALANCED = "balanced"
     FULL = "full"
 
 
@@ -74,10 +76,30 @@ class CandidateGenerator:
     """
     敌方候选配置种子生成器。
 
-    按需求枚举：
+    完整枚举：
     - 个体资质：1-3 个维度有值，每个有值维度为 7-10，其余为 0。
+    standard 模式会进一步收缩为常规培养空间：
+    - 恰好 3 个维度有值；
+    - 正面性格只考虑生命、物攻、魔攻、速度；
+    - 正面性格维度必定有资质，且资质固定为 10；
+    - 另外两个投入维度资质只取 9/10；
+    - 负面性格维度必定没有资质。
+    - 不考虑负面性格减少生命、物防、魔防的情况。
+    - 物攻资质和魔攻资质互斥。
     - 性格：由数据库 nature_definition 提供，通常为 30 种。
     """
+
+    POPULAR_POSITIVE_STATS = {
+        StatKey.HP.value,
+        StatKey.PHYSICAL_ATTACK.value,
+        StatKey.MAGIC_ATTACK.value,
+        StatKey.SPEED.value,
+    }
+    STANDARD_ALLOWED_NEGATIVE_STATS = {
+        StatKey.PHYSICAL_ATTACK.value,
+        StatKey.MAGIC_ATTACK.value,
+        StatKey.SPEED.value,
+    }
 
     def generate_individual_talent_distributions(self) -> list[IndividualTalentDistribution]:
         """生成所有可能的个体资质分布组合。"""
@@ -125,16 +147,76 @@ class CandidateGenerator:
 
         positive_key = nature.positive_stat.value
         negative_key = nature.negative_stat.value
-        return [
+        base_distributions = [
             distribution
             for distribution in distributions
             if getattr(distribution, positive_key) >= 8
             and getattr(distribution, negative_key) == 0
+            and self._non_zero_talent_count(distribution) == 3
+        ]
+        if mode == CandidateGenerationMode.BALANCED:
+            return [
+                distribution
+                for distribution in base_distributions
+                if all(
+                    getattr(distribution, stat_key.value) in {0, 8, 9, 10}
+                    for stat_key in STAT_KEYS
+                )
+                and self._attack_talents_are_mutually_exclusive(distribution)
+            ]
+
+        high_talent_distributions = [
+            distribution
+            for distribution in base_distributions
+            if getattr(distribution, positive_key) == 10
             and all(
-                getattr(distribution, stat_key.value) in {0, 8, 9, 10}
+                self._standard_talent_value_is_allowed(
+                    distribution,
+                    stat_key.value,
+                    positive_key,
+                )
                 for stat_key in STAT_KEYS
             )
+            and self._attack_talents_are_mutually_exclusive(distribution)
         ]
+        if mode == CandidateGenerationMode.WIDE:
+            return high_talent_distributions
+
+        if mode == CandidateGenerationMode.STANDARD:
+            if positive_key not in self.POPULAR_POSITIVE_STATS:
+                return []
+            if negative_key not in self.STANDARD_ALLOWED_NEGATIVE_STATS:
+                return []
+            return high_talent_distributions
+
+        raise ValueError(f"不支持的候选生成模式: {mode}")
+
+    @staticmethod
+    def _standard_talent_value_is_allowed(
+        distribution: IndividualTalentDistribution,
+        stat_key: str,
+        positive_key: str,
+    ) -> bool:
+        """判断主流高资质候选的资质值是否允许。"""
+        value = getattr(distribution, stat_key)
+        if stat_key == positive_key:
+            return value == 10
+        return value in {0, 9, 10}
+
+    @staticmethod
+    def _attack_talents_are_mutually_exclusive(
+        distribution: IndividualTalentDistribution,
+    ) -> bool:
+        """物攻资质和魔攻资质不同时投入。"""
+        return not (
+            distribution.physical_attack > 0
+            and distribution.magic_attack > 0
+        )
+
+    @staticmethod
+    def _non_zero_talent_count(distribution: IndividualTalentDistribution) -> int:
+        """统计候选个体资质中投入的维度数量。"""
+        return sum(1 for stat_key in STAT_KEYS if getattr(distribution, stat_key.value) > 0)
 
     def generate_candidate_count(
         self,

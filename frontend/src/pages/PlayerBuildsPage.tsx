@@ -10,7 +10,13 @@ import { AvatarImage } from "@/components/ui/avatar";
 import { ElfSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { StatGrid } from "@/components/StatGrid";
 import { compactId, elementTypeNames, elfElementTypes, parseElementTypes, safeJsonParse, statName } from "@/lib/utils";
-import type { IndividualTalentInput, PlayerElfBuildCreate } from "@/types/api";
+import type {
+  IndividualTalentInput,
+  PlayerElfBuildCreate,
+  PlayerElfBuildOut,
+  TeamPresetCreate,
+  TeamPresetOut,
+} from "@/types/api";
 
 const statKeys = ["hp", "physical_attack", "physical_defense", "magic_attack", "magic_defense", "speed"] as const;
 const emptyTalents: IndividualTalentInput = { hp: 0, physical_attack: 0, physical_defense: 0, magic_attack: 0, magic_defense: 0, speed: 0 };
@@ -286,6 +292,302 @@ export function PlayerBuildsPage() {
           </CardContent>
         </Card>
       </div>
+      <TeamPresetManager builds={builds.data ?? []} />
     </div>
   );
+}
+
+interface TeamPresetFormSlot {
+  build_id: string;
+  elf_id: string;
+}
+
+interface TeamPresetFormState {
+  preset_name: string;
+  side_usage: "self" | "enemy";
+  source_type: "custom" | "popular";
+  notes: string;
+  slots: TeamPresetFormSlot[];
+}
+
+const emptyTeamSlots = (): TeamPresetFormSlot[] =>
+  Array.from({ length: 6 }, () => ({ build_id: "", elf_id: "" }));
+
+function TeamPresetManager({ builds }: { builds: PlayerElfBuildOut[] }) {
+  const queryClient = useQueryClient();
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<TeamPresetFormState>({
+    preset_name: "",
+    side_usage: "self",
+    source_type: "custom",
+    notes: "",
+    slots: emptyTeamSlots(),
+  });
+
+  const teamPresets = useQuery({
+    queryKey: ["team-presets", "build-page"],
+    queryFn: () => api.teamPresets.list(),
+  });
+
+  const buildMap = useMemo(() => new Map(builds.map((build) => [build.build_id, build])), [builds]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload = buildTeamPresetPayload(form);
+      if (editingPresetId) return api.teamPresets.update(editingPresetId, payload);
+      return api.teamPresets.create(payload);
+    },
+    onMutate: () => setError(null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team-presets"] });
+      resetPresetForm();
+    },
+    onError: (mutationError) => {
+      setError(mutationError instanceof Error ? mutationError.message : "保存配队失败");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (presetId: string) => api.teamPresets.delete(presetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team-presets"] });
+      if (editingPresetId) resetPresetForm();
+    },
+  });
+
+  const resetPresetForm = () => {
+    setEditingPresetId(null);
+    setError(null);
+    setForm({
+      preset_name: "",
+      side_usage: "self",
+      source_type: "custom",
+      notes: "",
+      slots: emptyTeamSlots(),
+    });
+  };
+
+  const setSlot = (index: number, value: TeamPresetFormSlot) => {
+    const next = [...form.slots];
+    next[index] = value;
+    setForm({ ...form, slots: next });
+  };
+
+  const editPreset = (preset: TeamPresetOut) => {
+    const nextSlots = emptyTeamSlots();
+    preset.slots.forEach((slot) => {
+      if (slot.slot_index >= 0 && slot.slot_index < 6) {
+        nextSlots[slot.slot_index] = {
+          build_id: slot.build_id ?? "",
+          elf_id: slot.elf_id,
+        };
+      }
+    });
+    setEditingPresetId(preset.preset_id);
+    setError(null);
+    setForm({
+      preset_name: preset.preset_name,
+      side_usage: preset.side_usage === "enemy" ? "enemy" : "self",
+      source_type: preset.source_type,
+      notes: preset.notes ?? "",
+      slots: nextSlots,
+    });
+  };
+
+  const requestDeletePreset = (preset: TeamPresetOut) => {
+    if (!window.confirm(`确认删除配队「${preset.preset_name}」？`)) return;
+    deleteMutation.mutate(preset.preset_id);
+  };
+
+  const selfPresets = (teamPresets.data ?? []).filter((preset) => preset.side_usage !== "enemy");
+  const enemyPresets = (teamPresets.data ?? []).filter((preset) => preset.side_usage !== "self");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>配队预设</CardTitle>
+        <CardDescription>己方配队由已保存配置组成；敌方热门阵容可以只录入精灵种类，用于准备阶段快速填充。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
+        <div className="grid gap-6 lg:grid-cols-[1fr_520px]">
+          <div className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <PresetList
+                title="己方配队"
+                presets={selfPresets}
+                onEdit={editPreset}
+                onDelete={requestDeletePreset}
+              />
+              <PresetList
+                title="敌方热门阵容"
+                presets={enemyPresets}
+                onEdit={editPreset}
+                onDelete={requestDeletePreset}
+              />
+            </div>
+          </div>
+
+          <form
+            className="space-y-4 rounded-2xl border bg-white p-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveMutation.mutate();
+            }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-semibold">{editingPresetId ? "编辑配队" : "新建配队"}</div>
+              {editingPresetId ? <Badge variant="outline">{compactId(editingPresetId)}</Badge> : null}
+            </div>
+            <div>
+              <label className="text-sm font-medium">配队名称</label>
+              <Input
+                value={form.preset_name}
+                onChange={(event) => setForm({ ...form, preset_name: event.target.value })}
+                placeholder="例如：常用火神队 / 热门帕尔队"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">用途</label>
+                <Select
+                  value={form.side_usage}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      side_usage: event.target.value === "enemy" ? "enemy" : "self",
+                      slots: emptyTeamSlots(),
+                    })
+                  }
+                >
+                  <option value="self">己方配队</option>
+                  <option value="enemy">敌方热门阵容</option>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">来源</label>
+                <Select
+                  value={form.source_type}
+                  onChange={(event) =>
+                    setForm({ ...form, source_type: event.target.value === "popular" ? "popular" : "custom" })
+                  }
+                >
+                  <option value="custom">自定义</option>
+                  <option value="popular">热门队伍</option>
+                </Select>
+              </div>
+            </div>
+            <Textarea
+              value={form.notes}
+              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              placeholder="备注"
+            />
+            <div className="grid gap-3">
+              {form.slots.map((slot, index) => (
+                <div key={index} className="rounded-2xl border p-3">
+                  <div className="mb-2 text-sm font-medium">槽位 {index + 1}</div>
+                  {form.side_usage === "self" ? (
+                    <Select
+                      value={slot.build_id}
+                      onChange={(event) => {
+                        const build = buildMap.get(event.target.value);
+                        setSlot(index, {
+                          build_id: event.target.value,
+                          elf_id: build?.elf_id ?? "",
+                        });
+                      }}
+                    >
+                      <option value="">选择己方配置</option>
+                      {builds.map((build) => (
+                        <option key={build.build_id} value={build.build_id}>
+                          {build.build_name || build.elf_name || compactId(build.elf_id)}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <ElfSearchSelect
+                      label="敌方精灵"
+                      value={slot.elf_id}
+                      onChange={(id) => setSlot(index, { build_id: "", elf_id: id })}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1" type="submit" disabled={saveMutation.isPending || !form.preset_name.trim()}>
+                {saveMutation.isPending ? "保存中..." : "保存配队"}
+              </Button>
+              <Button variant="outline" type="button" onClick={resetPresetForm}>重置</Button>
+            </div>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PresetList({
+  title,
+  presets,
+  onEdit,
+  onDelete,
+}: {
+  title: string;
+  presets: TeamPresetOut[];
+  onEdit: (preset: TeamPresetOut) => void;
+  onDelete: (preset: TeamPresetOut) => void;
+}) {
+  return (
+    <div className="rounded-2xl border bg-white p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold">{title}</div>
+        <Badge variant="outline">{presets.length}</Badge>
+      </div>
+      {presets.length === 0 ? <div className="text-sm text-muted-foreground">暂无配队。</div> : null}
+      <div className="space-y-2">
+        {presets.map((preset) => (
+          <div key={preset.preset_id} className="rounded-xl border bg-slate-50 p-3 text-xs">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate font-medium">{preset.preset_name}</div>
+                <div className="mt-1 text-muted-foreground">
+                  {preset.source_type === "popular" ? "热门队伍" : "自定义"} · {preset.slots.length} 只
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button variant="outline" size="sm" type="button" onClick={() => onEdit(preset)}>编辑</Button>
+                <Button variant="destructive" size="sm" type="button" onClick={() => onDelete(preset)}>删除</Button>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {preset.slots.map((slot) => (
+                <Badge key={slot.slot_id} variant="secondary">
+                  {slot.slot_index + 1}. {slot.build_name || slot.elf_name || compactId(slot.elf_id)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function buildTeamPresetPayload(form: TeamPresetFormState): TeamPresetCreate {
+  return {
+    preset_name: form.preset_name.trim(),
+    side_usage: form.side_usage,
+    source_type: form.source_type,
+    notes: form.notes.trim() || null,
+    slots: form.slots
+      .map((slot, index) => ({ ...slot, slot_index: index }))
+      .filter((slot) => slot.elf_id)
+      .map((slot) => ({
+        slot_index: slot.slot_index,
+        elf_id: slot.elf_id,
+        build_id: slot.build_id || null,
+      })),
+  };
 }

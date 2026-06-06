@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ElfSearchSelect } from "@/components/EntitySearchSelect";
 import { compactId, elementTypeNames, parseElementTypes, phaseName } from "@/lib/utils";
-import type { LineupElfInput } from "@/types/api";
+import type { LineupElfInput, TeamPresetOut } from "@/types/api";
 
 interface SelfSlot { build_id: string; elf_id: string; active: boolean }
 interface EnemySlot { elf_id: string; active: boolean }
@@ -26,6 +26,14 @@ export function PreparationPage() {
   const battleId = currentBattleId;
   const battle = useQuery({ queryKey: ["battle", battleId], queryFn: () => api.battles.get(battleId!), enabled: Boolean(battleId) });
   const builds = useQuery({ queryKey: ["player-builds"], queryFn: () => api.playerBuilds.list() });
+  const selfTeamPresets = useQuery({
+    queryKey: ["team-presets", "preparation", "self"],
+    queryFn: () => api.teamPresets.list({ side_usage: "self" }),
+  });
+  const enemyTeamPresets = useQuery({
+    queryKey: ["team-presets", "preparation", "enemy"],
+    queryFn: () => api.teamPresets.list({ side_usage: "enemy" }),
+  });
 
   const setupLineup = useMutation({
     mutationFn: () => {
@@ -52,6 +60,37 @@ export function PreparationPage() {
 
   const canSubmit = useMemo(() => Boolean(battleId && selfSlots.some((item) => item.build_id && item.active) && enemySlots.some((item) => item.elf_id && item.active)), [battleId, selfSlots, enemySlots]);
 
+  const applySelfTeamPreset = (preset: TeamPresetOut) => {
+    const next = Array.from({ length: 6 }, (_, index) => {
+      const slot = preset.slots.find((item) => item.slot_index === index);
+      return {
+        build_id: slot?.build_id ?? "",
+        elf_id: slot?.elf_id ?? "",
+        active: index === 0 && Boolean(slot?.build_id),
+      };
+    });
+    if (!next.some((slot) => slot.active)) {
+      const firstFilledIndex = next.findIndex((slot) => slot.build_id && slot.elf_id);
+      if (firstFilledIndex >= 0) next[firstFilledIndex].active = true;
+    }
+    setSelfSlots(next);
+  };
+
+  const applyEnemyTeamPreset = (preset: TeamPresetOut) => {
+    const next = Array.from({ length: 6 }, (_, index) => {
+      const slot = preset.slots.find((item) => item.slot_index === index);
+      return {
+        elf_id: slot?.elf_id ?? "",
+        active: index === 0 && Boolean(slot?.elf_id),
+      };
+    });
+    if (!next.some((slot) => slot.active)) {
+      const firstFilledIndex = next.findIndex((slot) => slot.elf_id);
+      if (firstFilledIndex >= 0) next[firstFilledIndex].active = true;
+    }
+    setEnemySlots(next);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -69,6 +108,49 @@ export function PreparationPage() {
             <Input value={battleIdInput} onChange={(e) => setBattleIdInput(e.target.value)} placeholder="从首页创建，或手动输入 battle_id" />
           </div>
           <Button onClick={() => setCurrentBattleId(battleIdInput.trim())} disabled={!battleIdInput.trim()}>使用此战斗</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>配队快速填充</CardTitle>
+          <CardDescription>选择已保存的己方配队或敌方热门阵容，自动填入下面 6 个槽位。</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium">己方配队</label>
+            <Select
+              value=""
+              onChange={(event) => {
+                const preset = selfTeamPresets.data?.find((item) => item.preset_id === event.target.value);
+                if (preset) applySelfTeamPreset(preset);
+              }}
+            >
+              <option value="">选择后填充己方阵容</option>
+              {selfTeamPresets.data?.map((preset) => (
+                <option key={preset.preset_id} value={preset.preset_id}>
+                  {preset.preset_name} · {preset.slots.length} 只
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">敌方热门阵容</label>
+            <Select
+              value=""
+              onChange={(event) => {
+                const preset = enemyTeamPresets.data?.find((item) => item.preset_id === event.target.value);
+                if (preset) applyEnemyTeamPreset(preset);
+              }}
+            >
+              <option value="">选择后填充敌方阵容</option>
+              {enemyTeamPresets.data?.map((preset) => (
+                <option key={preset.preset_id} value={preset.preset_id}>
+                  {preset.preset_name} · {preset.slots.length} 只
+                </option>
+              ))}
+            </Select>
+          </div>
         </CardContent>
       </Card>
 

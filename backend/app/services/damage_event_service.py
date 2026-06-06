@@ -206,6 +206,13 @@ class DamageEventService:
         return round(payload.hp_percent_before - payload.hp_percent_after, 4)
 
     @staticmethod
+    def _resolve_value_damage_delta(payload: DamageEventCreate) -> int | None:
+        """根据前后精确生命值计算伤害值。"""
+        if payload.hp_value_before is None or payload.hp_value_after is None:
+            return None
+        return max(payload.hp_value_before - payload.hp_value_after, 0)
+
+    @staticmethod
     def _event_type_for(display_type: DamageDisplayType) -> str:
         """根据显示类型选择通用事件类型。"""
         if display_type == DamageDisplayType.COMBO_REPEATED_DAMAGE:
@@ -288,7 +295,22 @@ class DamageEventService:
         """
         if payload.defender_side is None or payload.defender_elf_id is None:
             return
-        if hp_percent_delta is not None:
+        defender_state = self._get_elf_state(
+            battle_id=battle_id,
+            side=payload.defender_side,
+            elf_id=payload.defender_elf_id,
+        )
+        value_damage_delta = self._resolve_value_damage_delta(payload)
+        if value_damage_delta is not None:
+            value_type = "value"
+            value = float(value_damage_delta)
+            before_value = (
+                float(payload.hp_value_before) if payload.hp_value_before is not None else None
+            )
+            after_value = (
+                float(payload.hp_value_after) if payload.hp_value_after is not None else None
+            )
+        elif hp_percent_delta is not None:
             value_type = "percent"
             value = hp_percent_delta
             before_value = payload.hp_percent_before
@@ -296,8 +318,16 @@ class DamageEventService:
         elif total_damage is not None:
             value_type = "value"
             value = float(total_damage)
-            before_value = None
-            after_value = None
+            before_value = (
+                float(defender_state.current_hp_value)
+                if defender_state is not None and defender_state.current_hp_value is not None
+                else None
+            )
+            after_value = (
+                max(before_value - float(total_damage), 0.0)
+                if before_value is not None
+                else None
+            )
         else:
             return
 
@@ -331,7 +361,7 @@ class DamageEventService:
         基于手动输入更新防御方生命状态。
 
         这里只更新观测事实：如果用户传了 hp_percent_after，则写入当前百分比；
-        如果当前生命值已知且传入了总伤害，则扣减当前生命值。
+        如果传入精确 hp_value_after，则直接写入；否则当前生命值已知且传入总伤害时扣减。
         """
         if payload.defender_side is None or payload.defender_elf_id is None:
             return
@@ -346,7 +376,17 @@ class DamageEventService:
             return
         if payload.hp_percent_after is not None:
             state.current_hp_percent = payload.hp_percent_after
-        if total_damage is not None and state.current_hp_value is not None:
+        if payload.hp_value_after is not None:
+            state.current_hp_value = max(payload.hp_value_after, 0)
+            panel_stats = self._panel_stats_from_state(state)
+            max_hp = panel_stats.hp if panel_stats is not None else None
+            if max_hp:
+                state.current_hp_percent = round(state.current_hp_value / max_hp * 100, 4)
+        elif total_damage is not None and state.current_hp_value is not None:
             state.current_hp_value = max(state.current_hp_value - total_damage, 0)
+            panel_stats = self._panel_stats_from_state(state)
+            max_hp = panel_stats.hp if panel_stats is not None else None
+            if max_hp:
+                state.current_hp_percent = round(state.current_hp_value / max_hp * 100, 4)
         if state.current_hp_value == 0 or state.current_hp_percent == 0:
             state.is_defeated = True

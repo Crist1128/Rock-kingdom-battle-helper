@@ -113,8 +113,9 @@ class InferenceEngine:
             else:
                 unknown_count += 1
 
-            # MVP 默认不硬排除；只有调用方显式允许，且 matcher 认为可硬排除时才执行。
-            if observation.allow_hard_exclude and match_result.can_hard_exclude:
+            # MVP 默认不硬排除；只有调用方显式允许、matcher 认为可排除，且当前观测
+            # 满足“单纯普通伤害”的保护条件时才执行。
+            if self._should_hard_exclude(observation, match_result):
                 candidate.is_excluded = True
                 candidate.excluded_reason = match_result.reason
                 hard_excluded_count += 1
@@ -236,7 +237,7 @@ class InferenceEngine:
 
             for candidate in rows:
                 self._apply_match_result(candidate, observation, match_result)
-                if observation.allow_hard_exclude and match_result.can_hard_exclude:
+                if self._should_hard_exclude(observation, match_result):
                     candidate.is_excluded = True
                     candidate.excluded_reason = match_result.reason
                     hard_excluded_count += 1
@@ -286,6 +287,54 @@ class InferenceEngine:
             tolerance=float(observation.payload.get("percent_tolerance", 1.0) or 1.0),
             event_weight=self.observation_matcher._event_weight(observation, 0.5),
         )
+
+    def _should_hard_exclude(
+        self,
+        observation: ObservationEventInput,
+        match_result: ObservationMatchResult,
+    ) -> bool:
+        """判断本次观测是否允许真正排除候选。
+
+        当前只开放“单纯普通伤害”的硬排除：单次整数伤害、攻击公式、技能已确认、
+        没有防御/减伤技能、三个应对均明确失败、无未知因素。其它情况仍保留软评分，
+        避免未覆盖规则污染候选池。
+        """
+        if not observation.allow_hard_exclude or not match_result.can_hard_exclude:
+            return False
+        if observation.observation_type != ObservationType.DAMAGE_VALUE:
+            return False
+        if match_result.matched is not False:
+            return False
+        payload = observation.payload
+        if str(payload.get("formula_type", "attack") or "attack") != "attack":
+            return False
+        damage_display_type = str(
+            payload.get("damage_display_type", "single_damage") or "single_damage"
+        )
+        if damage_display_type != "single_damage":
+            return False
+        if not self._payload_bool(payload, "skill_confirmed", False):
+            return False
+        if not payload.get("skill_id"):
+            return False
+        if payload.get("defense_skill_id"):
+            return False
+        if payload.get("damage_reductions") or payload.get("damage_reduction_sources"):
+            return False
+        if match_result.unknown_factors:
+            return False
+        if payload.get("unknown_factors"):
+            return False
+        if payload.get("unstable_multiplier") not in (None, "", 1, 1.0, "1", "1.0"):
+            return False
+        for key in (
+            "response_attack_success",
+            "response_defense_success",
+            "response_status_success",
+        ):
+            if self._optional_bool(payload.get(key)) is not False:
+                return False
+        return True
 
     def _empty_result(
         self,
@@ -448,6 +497,23 @@ class InferenceEngine:
                 float(item.match_score or 0.0),
             ),
         )
+
+    @staticmethod
+    def _optional_bool(value: Any) -> bool | None:
+        """宽松解析可空布尔值；缺失时保留 None。"""
+        if value is None or value == "":
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() not in {"0", "false", "no", "off"}
+        return bool(value)
+
+    @classmethod
+    def _payload_bool(cls, payload: dict[str, Any], key: str, default: bool) -> bool:
+        """读取 payload 布尔值。"""
+        parsed = cls._optional_bool(payload.get(key))
+        return default if parsed is None else parsed
 
     @staticmethod
     def _append_json_list(raw_json: str | None, item: Any) -> str:

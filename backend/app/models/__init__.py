@@ -28,6 +28,8 @@ from app.models.static import (
     PlayerElfBuild,
     PlayerElfBuildSkill,
     SkillDefinition,
+    TeamPreset,
+    TeamPresetSlot,
     TypeEffectivenessRule,
 )
 
@@ -60,5 +62,7 @@ __all__ = [
     "PlayerElfBuild",
     "PlayerElfBuildSkill",
     "SkillDefinition",
+    "TeamPreset",
+    "TeamPresetSlot",
     "TypeEffectivenessRule",
 ]

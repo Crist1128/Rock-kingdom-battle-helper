@@ -125,6 +125,7 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
   const [notes, setNotes] = useState("");
   const [syncObservation, setSyncObservation] = useState(true);
   const [resolveRules, setResolveRules] = useState(true);
+  const [allowHardExclude, setAllowHardExclude] = useState(false);
   const [damageTolerance, setDamageTolerance] = useState(0);
 
   const attackerElfId = attackerSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
@@ -134,13 +135,29 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
   const attackerPanelStats = toPanelStats(attackerElf?.panel_stats_json);
   const defenderPanelStats = toPanelStats(defenderElf?.panel_stats_json);
   useEffect(() => {
+    if (defenderSide === "self") {
+      setHpBefore("");
+      setHpAfter("");
+      return;
+    }
     setHpBefore(normalizeHpPercent(defenderElf?.current_hp_percent) ?? 100);
     setHpAfter("");
   }, [defenderSide, defenderElfId, defenderElf?.current_hp_percent]);
   const observedTotalDamage = damageDisplayType === "combo_repeated_damage" ? perHitDamage * hitCount : damageValue;
+  const hardExcludeAvailable = isPlainDamageHardExcludeAvailable({
+    damageDisplayType,
+    skillId,
+    defenseSkillId,
+    responseAttackSuccess,
+    responseDefenseSuccess,
+    responseStatusSuccess,
+  });
   const observationPayload = buildDamageObservationPayload({
     syncObservation,
     resolveRules,
+    allowHardExclude,
+    hardExcludeAvailable,
+    damageDisplayType,
     battleId,
     attackerSide,
     defenderSide,
@@ -157,6 +174,12 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
     damageTolerance,
     hitCount: damageDisplayType === "combo_repeated_damage" ? hitCount : 1,
   });
+
+  useEffect(() => {
+    if (allowHardExclude && !hardExcludeAvailable) {
+      setAllowHardExclude(false);
+    }
+  }, [allowHardExclude, hardExcludeAvailable]);
 
   const mutation = useMutation({ mutationFn: async () => {
     const damageEvent = await api.battles.createDamageEvent(battleId, {
@@ -176,8 +199,8 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
       final_total_damage_value: damageDisplayType === "visual_total_damage" ? damageValue : undefined,
       per_hit_damage_value: damageDisplayType === "combo_repeated_damage" ? perHitDamage : undefined,
       hit_count: damageDisplayType === "combo_repeated_damage" ? hitCount : undefined,
-      hp_percent_before: hpBefore === "" ? undefined : Number(hpBefore),
-      hp_percent_after: hpAfter === "" ? undefined : Number(hpAfter),
+      hp_percent_before: defenderSide === "enemy" && hpBefore !== "" ? Number(hpBefore) : undefined,
+      hp_percent_after: defenderSide === "enemy" && hpAfter !== "" ? Number(hpAfter) : undefined,
       notes,
     });
     const observationResult = observationPayload
@@ -226,10 +249,16 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
       {damageDisplayType === "combo_repeated_damage" ? (
         <div className="grid grid-cols-2 gap-3"><NumberField label="单段伤害" value={perHitDamage} onChange={setPerHitDamage} /><NumberField label="连击次数" value={hitCount} onChange={setHitCount} /></div>
       ) : null}
-      <div className="grid grid-cols-2 gap-3">
-        <NumberMaybeField label="受击前 HP%" value={hpBefore} onChange={setHpBefore} />
-        <NumberMaybeField label="受击后 HP%" value={hpAfter} onChange={setHpAfter} />
-      </div>
+      {defenderSide === "self" ? (
+        <div className="rounded-xl border bg-slate-50 p-3 text-xs text-slate-600">
+          我方受击会按当前 HP 扣减本次伤害值，不需要额外填写剩余血量。
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <NumberMaybeField label="受击前 HP%" value={hpBefore} onChange={setHpBefore} />
+          <NumberMaybeField label="受击后 HP%" value={hpAfter} onChange={setHpAfter} />
+        </div>
+      )}
       <div className="space-y-3 rounded-2xl border bg-slate-50 p-3 text-sm">
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={syncObservation} onChange={(e) => setSyncObservation(e.target.checked)} />
@@ -239,7 +268,21 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
           <input type="checkbox" checked={resolveRules} onChange={(e) => setResolveRules(e.target.checked)} disabled={!syncObservation} />
           <span>启用后端规则解析（技能、本系、克制、应对）</span>
         </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={allowHardExclude}
+            onChange={(e) => setAllowHardExclude(e.target.checked)}
+            disabled={!syncObservation || !hardExcludeAvailable}
+          />
+          <span>允许普通伤害硬排除</span>
+        </label>
         <NumberField label="伤害容差" value={damageTolerance} onChange={setDamageTolerance} />
+        {syncObservation && !hardExcludeAvailable ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-2 text-xs text-slate-600">
+            硬排除仅在单次伤害、技能已填、无防御技能且应对全失败时启用。
+          </div>
+        ) : null}
         {syncObservation && !observationPayload ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
             当前缺少可用于反推的技能、敌方目标、伤害值或面板信息，本次只会记录事件。
@@ -256,6 +299,9 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
 interface DamageObservationBuildInput {
   syncObservation: boolean;
   resolveRules: boolean;
+  allowHardExclude: boolean;
+  hardExcludeAvailable: boolean;
+  damageDisplayType: DamageDisplayType;
   battleId: string;
   attackerSide: Side;
   defenderSide: Side;
@@ -299,6 +345,8 @@ function buildDamageObservationPayload(input: DamageObservationBuildInput): Obse
       damageTolerance: input.damageTolerance,
       hitCount: input.hitCount,
     }),
+    skill_confirmed: Boolean(input.skillId),
+    damage_display_type: input.damageDisplayType,
   };
 
   if (enemyIsAttacker) {
@@ -312,6 +360,7 @@ function buildDamageObservationPayload(input: DamageObservationBuildInput): Obse
     observation_type: "damage_value",
     observed_value: input.observedTotalDamage,
     payload,
+    allow_hard_exclude: input.allowHardExclude && input.hardExcludeAvailable,
   };
 }
 
@@ -337,6 +386,24 @@ function normalizeHpPercent(value?: number | null): number | null {
   if (value === null || value === undefined) return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function isPlainDamageHardExcludeAvailable(input: {
+  damageDisplayType: DamageDisplayType;
+  skillId?: string | null;
+  defenseSkillId?: string | null;
+  responseAttackSuccess: OptionalBoolInput;
+  responseDefenseSuccess: OptionalBoolInput;
+  responseStatusSuccess: OptionalBoolInput;
+}): boolean {
+  return (
+    input.damageDisplayType === "single_damage"
+    && Boolean(input.skillId)
+    && !input.defenseSkillId
+    && input.responseAttackSuccess === "false"
+    && input.responseDefenseSuccess === "false"
+    && input.responseStatusSuccess === "false"
+  );
 }
 
 function ResourceForm({ battleId, state, defaultSide, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; onDone: () => void }) {
