@@ -158,3 +158,30 @@ def test_candidate_service_full_mode_still_available(db_session: Session) -> Non
     )
 
     assert generated == 3088
+
+
+def test_candidate_selection_options_only_use_active_candidates(db_session: Session) -> None:
+    """候选选择面板只应提供未排除候选中的性格和资质组合。"""
+    service = CandidateService(db_session)
+    service.generate_for_enemy_elf(
+        "battle_candidate",
+        "enemy_elf",
+        mode=CandidateGenerationMode.STANDARD,
+    )
+    for row in db_session.scalars(
+        select(BuildCandidate).where(
+            BuildCandidate.battle_id == "battle_candidate",
+            BuildCandidate.elf_id == "enemy_elf",
+            BuildCandidate.nature_id == "magic_attack_plus_physical_attack_minus",
+        )
+    ):
+        row.is_excluded = True
+        row.excluded_reason = "test_excluded"
+    db_session.commit()
+
+    options = service.get_selection_options("battle_candidate", "enemy_elf")
+
+    nature_ids = {item.nature_id for item in options.nature_options}
+    assert nature_ids == {"speed_plus_magic_attack_minus"}
+    assert options.panel_candidate is not None
+    assert options.panel_candidate.is_excluded is False

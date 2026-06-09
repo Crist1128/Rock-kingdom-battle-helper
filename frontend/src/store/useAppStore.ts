@@ -15,13 +15,13 @@ interface AppState {
   activeDrawer: DrawerMode;
   drawerSide: Side | null;
   selectedEventId: string | null;
-  candidatePanelElfId: string | null;
+  estimatePanelElfId: string | null;
   recentBattles: RecentBattle[];
   setCurrentBattleId: (battleId: string | null) => void;
   openDrawer: (mode: DrawerMode, side?: Side | null) => void;
   closeDrawer: () => void;
   setSelectedEventId: (eventId: string | null) => void;
-  setCandidatePanelElfId: (elfId: string | null) => void;
+  setEstimatePanelElfId: (elfId: string | null) => void;
   addRecentBattle: (battle: { battle_id: string; battle_name?: string | null; phase?: string | null }) => void;
   removeRecentBattle: (battleId: string) => void;
 }
@@ -45,7 +45,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeDrawer: null,
   drawerSide: null,
   selectedEventId: null,
-  candidatePanelElfId: null,
+  estimatePanelElfId: null,
   recentBattles: loadRecentBattles(),
   setCurrentBattleId: (battleId) => {
     if (battleId) localStorage.setItem("rock-pvp-helper.currentBattleId", battleId);
@@ -55,7 +55,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   openDrawer: (mode, side = null) => set({ activeDrawer: mode, drawerSide: side }),
   closeDrawer: () => set({ activeDrawer: null, drawerSide: null }),
   setSelectedEventId: (eventId) => set({ selectedEventId: eventId }),
-  setCandidatePanelElfId: (elfId) => set({ candidatePanelElfId: elfId }),
+  setEstimatePanelElfId: (elfId) => set({ estimatePanelElfId: elfId }),
   addRecentBattle: (battle) => {
     const next = [
       { ...battle, updated_at: new Date().toISOString() },

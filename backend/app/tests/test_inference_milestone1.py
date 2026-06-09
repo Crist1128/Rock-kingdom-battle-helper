@@ -514,3 +514,56 @@ def test_inference_engine_updates_hp_percent_delta_soft_scores(db_session: Sessi
     assert summary["mismatched_count"] == 1
     assert rows["candidate_300_hp"].match_score > rows["candidate_600_hp"].match_score
     assert rows["candidate_300_hp"].confidence > rows["candidate_600_hp"].confidence
+
+
+def test_hp_percent_delta_can_hard_exclude_display_impossible_hp(db_session: Session) -> None:
+    """敌方整数血条百分比可排除剩余百分比显示不可能的 HP 候选。"""
+    db_session.add_all(
+        [
+            _candidate("candidate_388_hp", hp=388, physical_defense=100),
+            _candidate("candidate_451_hp", hp=451, physical_defense=100),
+        ]
+    )
+    db_session.commit()
+
+    engine = InferenceEngine(db_session)
+    summary = engine.process_observation_event(
+        ObservationEventInput(
+            battle_id="battle_1",
+            enemy_elf_id="enemy_elf",
+            event_id="event_pct_hard_1",
+            observation_type=ObservationType.HP_PERCENT_DELTA,
+            observed_value=12.0,
+            payload={
+                "skill_id": "skill_plain",
+                "skill_confirmed": True,
+                "damage_display_type": "single_damage",
+                "attacker_panel_stats": {
+                    "hp": 300,
+                    "physical_attack": 200,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+                "skill_category": "physical",
+                "display_power": 24.4,
+                "observed_hp_percent_before": 100,
+                "observed_hp_percent_after": 88,
+                "percent_display_mode": "floor_remaining_percent",
+                "response_attack_success": False,
+                "response_defense_success": False,
+                "response_status_success": False,
+                "percent_tolerance": 0,
+            },
+            allow_hard_exclude=True,
+        )
+    )
+
+    rows = {row.candidate_id: row for row in db_session.query(BuildCandidate).all()}
+    assert summary["matched_count"] == 1
+    assert summary["mismatched_count"] == 1
+    assert summary["hard_excluded_count"] == 1
+    assert rows["candidate_388_hp"].is_excluded is False
+    assert rows["candidate_451_hp"].is_excluded is True
+    assert rows["candidate_451_hp"].excluded_reason == "hp_percent_delta_mismatched"

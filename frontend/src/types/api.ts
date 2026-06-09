@@ -132,6 +132,42 @@ export interface PlayerElfBuildOut {
   notes?: string | null;
 }
 
+export interface EnemyDefaultConfigInput {
+  preset?: string;
+  nature_id: string;
+  individual_talent_distribution: IndividualTalentInput;
+}
+
+export interface EnemyPanelEstimateOut {
+  estimate_id: string;
+  battle_id: string;
+  battle_elf_state_id: string;
+  elf_id: string;
+  default_config?: Record<string, unknown> | null;
+  default_panel?: Record<string, unknown> | null;
+  estimated_panel?: Record<string, unknown> | null;
+  stat_constraints: Record<string, unknown>;
+  confidence: Record<string, unknown>;
+  unknown_factors: string[];
+  confirmed_skill_ids: string[];
+  evidence_summary: Record<string, unknown>[];
+  updated_by_event_id?: string | null;
+}
+
+export interface EnemyPanelEstimateEvidenceOut {
+  evidence_id: string;
+  estimate_id: string;
+  battle_id: string;
+  source_event_id: string;
+  observation_type: string;
+  inferred_stats?: Record<string, unknown> | null;
+  constraint_delta?: Record<string, unknown> | null;
+  formula_context?: Record<string, unknown> | null;
+  unknown_factors: string[];
+  conflict?: Record<string, unknown> | null;
+  confidence?: string | null;
+}
+
 export type TeamPresetSideUsage = "self" | "enemy" | "both";
 export type TeamPresetSourceType = "custom" | "popular";
 
@@ -313,6 +349,10 @@ export interface DamageEventCreate {
   hp_value_before?: number | null;
   hp_value_after?: number | null;
   enemy_hp_percent_damage?: number | null;
+  sync_observation?: boolean;
+  allow_hard_exclude?: boolean;
+  damage_tolerance?: number;
+  percent_tolerance?: number;
   notes?: string | null;
 }
 
@@ -455,81 +495,11 @@ export interface ObservationProcessResult {
   enemy_elf_id: string;
   event_id: string;
   observation_type: string;
-  candidate_count: number;
-  matched_count: number;
-  mismatched_count: number;
-  unknown_count: number;
-  hard_excluded_count: number;
+  estimate_id?: string | null;
+  inferred_stat_count: number;
+  affected_stats: string[];
+  unknown_factor_count: number;
   hard_filter_applied: boolean;
-  top_candidate_id?: string | null;
-  top_confidence?: number | null;
-}
-
-export interface CandidateSummaryOut {
-  battle_id: string;
-  elf_id: string;
-  total_count: number;
-  active_count: number;
-  excluded_count: number;
-  min_speed?: number | null;
-  max_speed?: number | null;
-  top_confidence?: number | null;
-  formula_status: string;
-}
-
-export interface CandidateOut {
-  candidate_id: string;
-  battle_id: string;
-  side: Side;
-  elf_id: string;
-  nature_id: string;
-  individual_talent_distribution_json: string;
-  final_hp: number;
-  final_physical_attack: number;
-  final_physical_defense: number;
-  final_magic_attack: number;
-  final_magic_defense: number;
-  final_speed: number;
-  possible_skill_ids_json?: string | null;
-  confirmed_skill_ids_json?: string | null;
-  match_score: number;
-  confidence: number;
-  is_excluded: boolean;
-  excluded_reason?: string | null;
-}
-
-export interface CandidateNatureDistributionItem {
-  nature_id: string;
-  count: number;
-  ratio: number;
-}
-
-export interface CandidateTalentDistributionItem {
-  stat_key: string;
-  non_zero_count: number;
-  zero_count: number;
-  value_counts: Record<string, number>;
-}
-
-export interface CandidatePatternDistributionItem {
-  pattern: string;
-  count: number;
-  ratio: number;
-}
-
-export interface CandidateSpeedBucketItem {
-  min_speed: number;
-  max_speed: number;
-  count: number;
-  ratio: number;
-}
-
-export interface CandidateDetailOut {
-  summary: CandidateSummaryOut;
-  speed_buckets: CandidateSpeedBucketItem[];
-  nature_distribution: CandidateNatureDistributionItem[];
-  talent_distribution: CandidateTalentDistributionItem[];
-  pattern_distribution: CandidatePatternDistributionItem[];
 }
 
 export interface BattleEventOut {
@@ -649,14 +619,6 @@ export interface BattleEffectSnapshotOut {
   turn_effect_ids_json?: string | null;
   full_snapshot_json?: string | null;
   source_event_id?: string | null;
-}
-
-export interface CandidateEvidenceOut {
-  battle_id: string;
-  elf_id: string;
-  formula_status: string;
-  evidence_items: Record<string, unknown>[];
-  message: string;
 }
 
 export interface BattlePurgePlanOut {

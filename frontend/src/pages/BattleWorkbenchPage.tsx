@@ -7,17 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ElfCard } from "@/components/ElfCard";
 import { StatGrid } from "@/components/StatGrid";
-import { CandidatePanel } from "@/components/CandidatePanel";
+import { EstimatePanel, type EstimatePanelSelection } from "@/components/EstimatePanel";
 import { EventTimeline } from "@/components/EventTimeline";
 import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
 import { phaseName, sideName } from "@/lib/utils";
-import type { CandidateOut, EndTurnResult, StatBlock } from "@/types/api";
+import type { EndTurnResult, StatBlock } from "@/types/api";
 
 export function BattleWorkbenchPage() {
   const queryClient = useQueryClient();
-  const { currentBattleId, openDrawer, setCandidatePanelElfId, candidatePanelElfId } = useAppStore();
+  const { currentBattleId, openDrawer, setEstimatePanelElfId, estimatePanelElfId } = useAppStore();
   const [lastEndTurnResult, setLastEndTurnResult] = useState<EndTurnResult | null>(null);
+  const [enemyEstimateSelection, setEnemyEstimateSelection] = useState<EstimatePanelSelection | null>(null);
   const stateQuery = useQuery({
     queryKey: ["battle-state", currentBattleId],
     queryFn: () => api.battles.state(currentBattleId!),
@@ -29,14 +30,11 @@ export function BattleWorkbenchPage() {
   const enemyElves = state?.elves.filter((elf) => elf.side === "enemy") ?? [];
   const selfActive = selfElves.find((elf) => elf.elf_id === state?.battle.self_active_elf_id);
   const enemyActive = enemyElves.find((elf) => elf.elf_id === state?.battle.enemy_active_elf_id);
-  const candidateElfId = candidatePanelElfId ?? state?.battle.enemy_active_elf_id;
+  const estimateElfId = estimatePanelElfId ?? state?.battle.enemy_active_elf_id;
   const canEndTurn = Boolean(currentBattleId && state && state.battle.phase === "battle");
-  const topEnemyCandidateQuery = useQuery({
-    queryKey: ["candidate-list", currentBattleId, state?.battle.enemy_active_elf_id, "matchup-top"],
-    queryFn: () => api.candidates.list(currentBattleId!, state!.battle.enemy_active_elf_id!, { limit: 1, offset: 0 }),
-    enabled: Boolean(currentBattleId && state?.battle.enemy_active_elf_id),
-  });
-  const enemyEstimatedStats = candidateToStats(topEnemyCandidateQuery.data?.[0]);
+  const activeEnemyEstimate =
+    enemyEstimateSelection?.elfId === state?.battle.enemy_active_elf_id ? enemyEstimateSelection : null;
+  const enemyEstimatedStats = activeEnemyEstimate?.stats ?? null;
 
   const finishBattle = useMutation({
     mutationFn: () => api.battles.finish(currentBattleId!),
@@ -52,10 +50,8 @@ export function BattleWorkbenchPage() {
       setLastEndTurnResult(result);
       queryClient.invalidateQueries({ queryKey: ["battle-state", currentBattleId] });
       queryClient.invalidateQueries({ queryKey: ["timeline", currentBattleId] });
-      queryClient.invalidateQueries({ queryKey: ["candidate-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["candidate-detail"] });
-      queryClient.invalidateQueries({ queryKey: ["candidate-list"] });
-      queryClient.invalidateQueries({ queryKey: ["candidate-evidence"] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate-evidence"] });
       queryClient.invalidateQueries({ queryKey: ["battles"] });
     },
   });
@@ -68,7 +64,7 @@ export function BattleWorkbenchPage() {
 
   const requestFinishBattle = () => {
     if (!currentBattleId) return;
-    if (!window.confirm("确认结束当前战斗？结束后仍可查看事件和候选记录。")) return;
+    if (!window.confirm("确认结束当前战斗？结束后仍可查看事件和实时估计记录。")) return;
     finishBattle.mutate();
   };
 
@@ -82,7 +78,7 @@ export function BattleWorkbenchPage() {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge variant="outline">{phaseName(state?.battle.phase)}</Badge>
           <Badge variant="secondary">回合 {state?.battle.turn_number ?? "--"}</Badge>
-          <Badge variant="success">soft scoring</Badge>
+          <Badge variant="success">realtime estimate</Badge>
           <Button
             variant="outline"
             size="sm"
@@ -108,8 +104,8 @@ export function BattleWorkbenchPage() {
       {state ? (
         <div className="grid grid-cols-[280px_1fr_360px] gap-6">
           <div className="space-y-4">
-            <TeamPanel title="我方队伍" elves={selfElves} activeElfId={state.battle.self_active_elf_id} onSwitch={(elfId) => { setCandidatePanelElfId(null); openDrawer("switch", "self"); }} />
-            <TeamPanel title="敌方队伍" elves={enemyElves} activeElfId={state.battle.enemy_active_elf_id} onSwitch={() => openDrawer("switch", "enemy")} onSelectCandidate={setCandidatePanelElfId} />
+            <TeamPanel title="我方队伍" elves={selfElves} activeElfId={state.battle.self_active_elf_id} onSwitch={() => { setEstimatePanelElfId(null); openDrawer("switch", "self"); }} />
+            <TeamPanel title="敌方队伍" elves={enemyElves} activeElfId={state.battle.enemy_active_elf_id} onSwitch={() => openDrawer("switch", "enemy")} onSelectEstimate={setEstimatePanelElfId} />
           </div>
 
           <div className="space-y-4">
@@ -119,7 +115,14 @@ export function BattleWorkbenchPage() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
                 <ActiveSide title="我方上场" elf={selfActive} />
-                <ActiveSide title="敌方上场" elf={enemyActive} estimatedStats={enemyEstimatedStats} />
+                <ActiveSide
+                  title="敌方上场"
+                  elf={enemyActive}
+                  estimatedStats={enemyEstimatedStats}
+                  estimateSource={activeEnemyEstimate?.source ?? "unknown"}
+                  estimateMatchedCount={activeEnemyEstimate?.matchedCount ?? 0}
+                  estimateNatureName={activeEnemyEstimate?.natureName}
+                />
               </CardContent>
             </Card>
 
@@ -161,15 +164,19 @@ export function BattleWorkbenchPage() {
           </div>
 
           <div className="space-y-4">
-            <CandidatePanel battleId={currentBattleId} elfId={candidateElfId} />
+            <EstimatePanel
+              battleId={currentBattleId}
+              elfId={estimateElfId}
+              onEstimateChange={setEnemyEstimateSelection}
+            />
             <Card>
               <CardHeader><CardTitle>测试能力</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <Capability label="普通攻击" value="最小公式可测" />
                 <Capability label="状态/星陨" value="自动结算可测" />
                 <Capability label="应对/防御" value="减伤上下文可测" />
-                <Capability label="候选推理" value="软评分与 evidence" />
-                <Capability label="硬排除" value="默认关闭" muted />
+                <Capability label="面板反推" value="实时估计" />
+                <Capability label="旧候选空间" value="已下线" muted />
               </CardContent>
             </Card>
           </div>
@@ -245,8 +252,10 @@ function SettlementEventItem({ item }: { item: Record<string, unknown> }) {
       </div>
       {observationResult ? (
         <div className="mt-2 text-xs text-muted-foreground">
-          候选反馈：匹配 {String(observationResult.matched_count ?? "--")}，冲突{" "}
-          {String(observationResult.mismatched_count ?? "--")}，未知 {String(observationResult.unknown_count ?? "--")}
+          实时估计反馈：推导 {String(observationResult.inferred_stat_count ?? "--")} 项，影响{" "}
+          {Array.isArray(observationResult.affected_stats)
+            ? observationResult.affected_stats.join("、") || "--"
+            : "--"}
         </div>
       ) : null}
     </div>
@@ -271,18 +280,32 @@ function Capability({ label, value, muted = false }: { label: string; value: str
   );
 }
 
-function TeamPanel({ title, elves, activeElfId, onSwitch, onSelectCandidate }: { title: string; elves: Array<any>; activeElfId?: string | null; onSwitch: (elfId: string) => void; onSelectCandidate?: (elfId: string) => void }) {
+function TeamPanel({ title, elves, activeElfId, onSwitch, onSelectEstimate }: { title: string; elves: Array<any>; activeElfId?: string | null; onSwitch: (elfId: string) => void; onSelectEstimate?: (elfId: string) => void }) {
   return (
     <Card>
       <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        {elves.map((elf) => <ElfCard key={elf.elf_id} elf={elf} active={elf.elf_id === activeElfId} onSwitch={() => onSwitch(elf.elf_id)} onSelectCandidate={onSelectCandidate ? () => onSelectCandidate(elf.elf_id) : undefined} />)}
+        {elves.map((elf) => <ElfCard key={elf.elf_id} elf={elf} active={elf.elf_id === activeElfId} onSwitch={() => onSwitch(elf.elf_id)} onSelectEstimate={onSelectEstimate ? () => onSelectEstimate(elf.elf_id) : undefined} />)}
       </CardContent>
     </Card>
   );
 }
 
-function ActiveSide({ title, elf, estimatedStats }: { title: string; elf?: any; estimatedStats?: StatBlock | null }) {
+function ActiveSide({
+  title,
+  elf,
+  estimatedStats,
+  estimateSource = "unknown",
+  estimateMatchedCount = 0,
+  estimateNatureName,
+}: {
+  title: string;
+  elf?: any;
+  estimatedStats?: StatBlock | null;
+  estimateSource?: "default_config" | "expanded_config" | "base_talent" | "unknown";
+  estimateMatchedCount?: number;
+  estimateNatureName?: string | null;
+}) {
   const hasRuntimeStats = hasPanelStats(elf?.panel_stats_json);
   return (
     <div className="rounded-2xl border bg-white p-4">
@@ -291,29 +314,30 @@ function ActiveSide({ title, elf, estimatedStats }: { title: string; elf?: any; 
         <div className="space-y-3">
           <div className="text-lg font-semibold">{elf.elf_name ?? elf.elf_id}</div>
           <div className="text-sm text-muted-foreground">HP {elf.current_hp_percent ?? "--"}% · 能量 {elf.energy ?? 0}</div>
+          {!hasRuntimeStats && estimateNatureName ? (
+            <div className="rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
+              当前选择性格：<span className="font-medium text-slate-900">{estimateNatureName}</span>
+            </div>
+          ) : null}
           <StatGrid statsJson={hasRuntimeStats ? elf.panel_stats_json : undefined} stats={!hasRuntimeStats ? estimatedStats : undefined} />
           {!hasRuntimeStats && estimatedStats ? (
-            <div className="text-xs text-amber-700">显示候选 Top 1 估计面板，敌方真实六维尚未确认。</div>
+            <div className="text-xs text-amber-700">
+              {estimateSource === "expanded_config"
+                ? `显示你选择的实时展开配置，命中 ${estimateMatchedCount} 项约束。`
+                : estimateSource === "default_config"
+                  ? "显示玩家默认配置面板，敌方真实六维尚未确认。"
+                  : estimateSource === "base_talent"
+                    ? "显示种族值占位面板，等待观测或默认配置。"
+                    : "显示实时估计面板，敌方真实六维尚未确认。"}
+            </div>
           ) : null}
           {!hasRuntimeStats && !estimatedStats ? (
-            <div className="text-xs text-muted-foreground">敌方真实六维未知，候选生成后可显示估计面板。</div>
+            <div className="text-xs text-muted-foreground">敌方真实六维未知，设置默认配置后可显示估计面板；后端会按当前推导约束校验保存。</div>
           ) : null}
         </div>
       ) : <div className="text-sm text-muted-foreground">未选择上场精灵。</div>}
     </div>
   );
-}
-
-function candidateToStats(candidate?: CandidateOut): StatBlock | null {
-  if (!candidate) return null;
-  return {
-    hp: candidate.final_hp,
-    physical_attack: candidate.final_physical_attack,
-    physical_defense: candidate.final_physical_defense,
-    magic_attack: candidate.final_magic_attack,
-    magic_defense: candidate.final_magic_defense,
-    speed: candidate.final_speed,
-  };
 }
 
 function hasPanelStats(rawJson?: string | null): boolean {

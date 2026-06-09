@@ -134,8 +134,20 @@ class ObservationMatcher:
             observed_pct=self._optional_float(observed),
             result=result,
             max_hp=max_hp,
-            tolerance=float(observation.payload.get("percent_tolerance", 1.0) or 1.0),
+            tolerance=self._optional_float_with_default(
+                observation.payload.get("percent_tolerance"),
+                1.0,
+            ),
             event_weight=self._event_weight(observation, 0.5),
+            observed_before_pct=self._optional_float(
+                observation.payload.get("observed_hp_percent_before")
+            ),
+            observed_after_pct=self._optional_float(
+                observation.payload.get("observed_hp_percent_after")
+            ),
+            percent_display_mode=self._optional_str(
+                observation.payload.get("percent_display_mode")
+            ),
         )
 
     def _build_damage_context(
@@ -282,6 +294,11 @@ class ObservationMatcher:
         if value is None or value == "":
             return None
         return float(value)
+
+    @classmethod
+    def _optional_float_with_default(cls, value: Any, default: float) -> float:
+        parsed = cls._optional_float(value)
+        return default if parsed is None else parsed
 
     @staticmethod
     def _optional_str(value: Any) -> str | None:

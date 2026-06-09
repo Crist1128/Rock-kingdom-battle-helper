@@ -1,8 +1,10 @@
 """伤害观测匹配器。
 
-DamageMatcher 不负责计算伤害，只负责把玩家观测值与 DamageCalculator 的结果进行比较。
-若公式不可用或存在关键未知因素，则返回 unknown，避免误扣分或误排除。
+DamageMatcher 不负责计算伤害，只负责把玩家观测值与 DamageCalculator 的结果比较。
+当公式不可用或存在关键未知因素时返回 unknown，避免误扣分或误排除。
 """
+
+from math import floor
 
 from app.calculation.formula_context import CalculationPlaceholderResult
 from app.inference.match_result import ObservationMatchResult
@@ -84,8 +86,22 @@ class DamageMatcher:
         max_hp: int | None,
         tolerance: float = 1.0,
         event_weight: float = 0.5,
+        observed_before_pct: float | None = None,
+        observed_after_pct: float | None = None,
+        percent_display_mode: str | None = None,
     ) -> ObservationMatchResult:
-        """比较玩家录入的扣血百分比。"""
+        """比较扣血百分比观测。
+
+        敌方血条通常只能读到整数剩余百分比。当前仅在调用方显式传入
+        ``percent_display_mode=floor_remaining_percent`` 时，按“理论剩余百分比向下取整”
+        与玩家读到的剩余百分比比较；否则沿用百分比差值容差比较。
+        """
+        if (
+            observed_pct is None
+            and observed_before_pct is not None
+            and observed_after_pct is not None
+        ):
+            observed_pct = observed_before_pct - observed_after_pct
         if observed_pct is None:
             return ObservationMatchResult.unknown_result(
                 reason="observed_hp_percent_delta_missing",
@@ -113,20 +129,44 @@ class DamageMatcher:
             )
 
         predicted_pct = result.damage_value / max_hp * 100
-        matched = abs(observed_pct - predicted_pct) <= tolerance
+        predicted_after_pct = (
+            observed_before_pct - predicted_pct if observed_before_pct is not None else None
+        )
+        evidence = {
+            **result.explanation,
+            "max_hp": max_hp,
+            "tolerance": tolerance,
+            "predicted_hp_percent_delta": predicted_pct,
+            "observed_hp_percent_before": observed_before_pct,
+            "observed_hp_percent_after": observed_after_pct,
+            "predicted_hp_percent_after": predicted_after_pct,
+            "percent_display_mode": percent_display_mode,
+        }
+
+        if (
+            percent_display_mode == "floor_remaining_percent"
+            and observed_after_pct is not None
+            and predicted_after_pct is not None
+        ):
+            displayed_after = max(min(floor(predicted_after_pct), 100), 0)
+            matched = displayed_after == int(observed_after_pct)
+            evidence["predicted_display_hp_percent_after"] = displayed_after
+        else:
+            matched = abs(observed_pct - predicted_pct) <= tolerance
+
         if matched:
             return ObservationMatchResult.matched_result(
                 reason="hp_percent_delta_matched",
                 score_delta=event_weight,
                 observed_value=observed_pct,
                 predicted_value=predicted_pct,
-                evidence={**result.explanation, "max_hp": max_hp, "tolerance": tolerance},
+                evidence=evidence,
             )
         return ObservationMatchResult.mismatched_result(
             reason="hp_percent_delta_mismatched",
             score_delta=-event_weight,
             observed_value=observed_pct,
             predicted_value=predicted_pct,
-            can_hard_exclude=False,
-            evidence={**result.explanation, "max_hp": max_hp, "tolerance": tolerance},
+            can_hard_exclude=True,
+            evidence=evidence,
         )

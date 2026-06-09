@@ -112,7 +112,8 @@ class DamageEventCreate(BaseModel):
     - visual_total_damage：必须传 final_total_damage_value；服务层会同步为 damage_value。
     - combo_repeated_damage：必须传 per_hit_damage_value 和 hit_count；服务层计算总伤害。
 
-    伤害公式尚未确认，本请求不会触发候选排除，只会创建事件、快照和公式占位结果。
+    伤害公式尚未完全确认，本请求不会触发旧候选排除；开启 sync_observation 时只会更新
+    敌方实时面板估计。
     """
 
     turn_number: int | None = Field(default=None, description="发生回合，默认使用战斗当前回合")
@@ -168,6 +169,16 @@ class DamageEventCreate(BaseModel):
         le=100,
         description="扣血百分比",
     )
+    sync_observation: bool = Field(
+        default=True,
+        description="是否由伤害事件服务同步写入实时面板估计观测",
+    )
+    allow_hard_exclude: bool = Field(
+        default=False,
+        description="废弃字段；实时反推主流程不再写旧候选硬排除",
+    )
+    damage_tolerance: int = Field(default=0, ge=0, description="整数伤害匹配容差")
+    percent_tolerance: float = Field(default=1.0, ge=0, description="扣血百分比匹配容差")
     notes: str | None = Field(default=None, description="备注")
 
     @model_validator(mode="after")
@@ -215,7 +226,7 @@ class DamageEventCreateResult(BaseModel):
     """
     创建伤害事件后的组合响应。
 
-    包含通用事件、伤害详情、快照 ID 和推算占位结果，方便前端一次调用后
+    包含通用事件、伤害详情、快照 ID 和实时估计处理结果，方便前端一次调用后
     立即更新战斗状态与提示信息。
     """
 

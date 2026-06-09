@@ -1,8 +1,9 @@
 """
-候选配置相关 Schema。
+旧候选配置相关 Schema。
 
-这些 Schema 用于查询敌方候选配置生成结果。第一阶段只提供候选数量、
-速度范围和置信度摘要，不暴露大量候选明细，避免一次性返回数万行数据。
+已废弃：项目主流程已经切换到 `EnemyPanelEstimate` 实时属性约束和默认展示配置。
+本模块仅为旧 `build_candidate` 表和遗留测试保留，后续删除旧表时同步移除。
+新接口和前端类型不得继续引用这里的 Candidate* 输出。
 """
 
 from pydantic import BaseModel, Field
@@ -10,7 +11,7 @@ from pydantic import BaseModel, Field
 
 class CandidateSummaryOut(BaseModel):
     """
-    敌方候选配置摘要。
+    已废弃的敌方候选配置摘要。
 
     Attributes:
         battle_id: 战斗 ID。
@@ -21,7 +22,7 @@ class CandidateSummaryOut(BaseModel):
         min_speed: 尚未排除候选中的最低速度。
         max_speed: 尚未排除候选中的最高速度。
         top_confidence: 当前最高置信度。
-        formula_status: 公式与候选评分状态；当前为 soft_scoring。
+        formula_status: 旧公式与候选评分状态；主流程不再读取。
     """
 
     battle_id: str
@@ -32,15 +33,14 @@ class CandidateSummaryOut(BaseModel):
     min_speed: int | None = None
     max_speed: int | None = None
     top_confidence: float | None = None
-    formula_status: str = "soft_scoring"
+    formula_status: str = "legacy_candidate_space_disabled"
 
 
 class CandidateOut(BaseModel):
     """
-    候选配置输出。
+    已废弃的候选配置输出。
 
-    仅用于分页查看少量候选。完整候选集可能非常大，前端默认应优先使用
-    CandidateSummaryOut。
+    保留给旧表迁移前的兼容代码。前端主流程应使用 `EnemyPanelEstimateOut`。
     """
 
     candidate_id: str
@@ -116,7 +116,7 @@ class CandidateDetailOut(BaseModel):
     候选配置详情页数据。
 
     该响应用于前端详情页展示速度范围、速度分布、性格分布和个体资质分布。
-    伤害公式未确认时，这些分布只反映准备阶段生成的候选池，不代表推算结论。
+    这些分布只反映旧候选池，不代表实时反推结论。
     """
 
     summary: CandidateSummaryOut
@@ -126,11 +126,49 @@ class CandidateDetailOut(BaseModel):
     pattern_distribution: list[CandidatePatternDistributionItem] = Field(default_factory=list)
 
 
-class CandidateEvidenceOut(BaseModel):
-    """候选证据链占位输出。"""
+class CandidateNatureOptionOut(BaseModel):
+    """有效候选中的可选性格。"""
+
+    nature_id: str
+    count: int
+    ratio: float
+    top_confidence: float
+
+
+class CandidateTalentPatternOptionOut(BaseModel):
+    """有效候选中的可选完整个体资质组合。"""
+
+    pattern_key: str
+    talent_values: dict[str, int] = Field(default_factory=dict)
+    count: int
+    ratio: float
+    top_confidence: float
+
+
+class CandidateSelectionOptionsOut(BaseModel):
+    """
+    候选选择面板数据。
+
+    已废弃。实时方案使用 `/estimates/{battle_id}/{elf_id}` 读取估计档案，
+    使用 `/default-config` 保存玩家选择的默认展示配置，不读取 `is_excluded`。
+    """
 
     battle_id: str
     elf_id: str
-    formula_status: str = "soft_scoring"
+    active_count: int
+    nature_options: list[CandidateNatureOptionOut] = Field(default_factory=list)
+    talent_pattern_options: list[CandidateTalentPatternOptionOut] = Field(default_factory=list)
+    selected_nature_id: str | None = None
+    selected_talent_pattern: str | None = None
+    matched_count: int = 0
+    panel_candidate: CandidateOut | None = None
+
+
+class CandidateEvidenceOut(BaseModel):
+    """已废弃的候选证据链占位输出。"""
+
+    battle_id: str
+    elf_id: str
+    formula_status: str = "legacy_candidate_space_disabled"
     evidence_items: list[dict] = Field(default_factory=list)
-    message: str = "伤害公式尚未确认，暂不生成候选保留/排除证据。"
+    message: str = "旧候选空间已下线；请使用实时面板估计 evidence。"

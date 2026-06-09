@@ -6,6 +6,8 @@
 > 后端技术栈：Python + FastAPI + SQLite  
 > 说明：本文件只描述系统架构、模块、流程、接口、部署和阶段计划；详细数据库表结构另见《SQLite 数据库设计文档 v0.4.1-local》。
 
+> 当前落地状态：本文件早期版本以“准备阶段生成候选空间 + 逐候选筛选”为核心。该路线已废弃，当前主线改为 `EnemyPanelEstimate` 实时面板反推、默认配置校验和事件 evidence。旧 `BuildCandidate` 表仅作为遗留数据等待后续迁移删除，新的状态、天气、速度和伤害反推不得回到旧候选空间落库筛选方案。
+
 ---
 
 ## 1. 修订说明
@@ -31,12 +33,12 @@
 
 1. 记录准备阶段双方六只精灵。
 2. 读取己方完整配置。
-3. 根据敌方 `elf_id` 生成敌方候选配置集合。
+3. 根据敌方 `elf_id` 初始化敌方面板估计档案，并按种族值启发式给出默认展示配置。
 4. 记录技能、伤害、生命变化、能量变化、状态图标、天气、印记、异常、连击、切换等事实。
 5. 基于面板属性、技能规则、属性克制、状态快照和伤害公式计算理论伤害。
-6. 用实际伤害和扣血百分比过滤敌方候选配置。
-7. 实时展示伤害区间、连击总伤害、速度先手关系、击杀判断和敌方配置置信度。
-8. 提供可解释的证据链，让用户知道某个候选为什么保留或排除。
+6. 用实际伤害、扣血百分比、攻击方/防御方角色和快照上下文反推敌方 HP、攻防、速度等属性约束。
+7. 实时展示伤害区间、连击总伤害、速度先手关系、击杀判断、默认配置和当前估计面板。
+8. 提供可解释的证据链，让用户知道某个属性范围为什么被收窄、哪些因素仍未知。
 
 ### 2.2 第一阶段范围
 
@@ -47,12 +49,12 @@
 - 本地启动后端服务和 Web 前端。
 - 手动录入双方阵容。
 - 手动录入己方完整配置。
-- 基于数据库生成敌方候选配置。
+- 初始化敌方 `EnemyPanelEstimate`，保存默认性格/资质、默认面板、实时约束和 evidence。
 - 手动录入技能使用、伤害、扣血百分比、连击单段伤害、连击次数、状态变化、天气、印记、切换。
 - 统一维护 `BattleEffectInstance`。
 - 伤害、治疗、能量变化、切换事件均绑定 `BattleEffectSnapshot`。
-- 使用 `DamageFormulaContext` 进行伤害计算和敌方候选过滤。
-- 展示双方技能伤害、生命百分比、速度先手概率、候选配置收敛结果。
+- 使用 `DamageFormulaContext` 进行伤害计算和敌方面板实时反推。
+- 展示双方技能伤害、生命百分比、速度先手概率、当前估计面板和按需展开的可能配置。
 - 支持历史事件修正，并从修正点重放重算。
 
 第一阶段暂不实现：
@@ -105,7 +107,7 @@ ORM：SQLAlchemy 2.x
 
 - API 层只负责请求、响应和基础校验。
 - 业务逻辑放在 service 层。
-- 伤害公式、速度判断、候选过滤放在 domain 层。
+- 伤害公式、速度判断、实时反推约束放在 calculation/inference 层。
 - SQLite 访问统一经过 repository 层。
 - 计算缓存放在进程内，第一阶段不引入 Redis。
 
@@ -137,7 +139,7 @@ PRAGMA busy_timeout = 5000;
 - 本地单用户场景不需要独立缓存服务。
 - Redis 会增加安装、启动、打包和故障排查成本。
 - MySQL 会显著增加本地部署复杂度。
-- 第一阶段瓶颈主要在规则正确性、状态建模、候选过滤和 UI 输入效率，而不是数据库服务能力。
+- 第一阶段瓶颈主要在规则正确性、状态建模、实时反推上下文完整性和 UI 输入效率。旧候选空间曾带来大量生成、读写和逐候选计算压力，已不再作为主流程。
 
 后续可以保留扩展边界：
 
@@ -183,7 +185,7 @@ Frontend Web UI
   ├─ 战斗面板页面
   ├─ 手动事件录入页面
   ├─ 状态编辑器
-  ├─ 候选配置页面
+  ├─ 实时估计面板
   └─ 事件日志与回放页面
 
 FastAPI API Layer
@@ -193,14 +195,14 @@ FastAPI API Layer
   ├─ effect_router
   ├─ event_router
   ├─ calculation_router
-  └─ candidate_router
+  └─ estimate_router
 
 Application Service Layer
   ├─ BattleSessionService
   ├─ ManualInputService
   ├─ EventReplayService
   ├─ RuleDataService
-  ├─ CandidateService
+  ├─ EstimateService
   ├─ CalculationService
   └─ CorrectionService
 
@@ -210,8 +212,7 @@ Domain Layer
   ├─ ComboEngine
   ├─ SpeedJudgeEngine
   ├─ BattleEffectEngine
-  ├─ CandidateGenerator
-  ├─ InferenceEngine
+  ├─ ObservationMatcher
   └─ ExplanationEngine
 
 Repository Layer
@@ -243,7 +244,7 @@ SQLite Database
   ↓
 己方生成确定面板属性
   ↓
-敌方生成 BuildCandidate 集合
+敌方初始化 EnemyPanelEstimate
   ↓
 进入战斗阶段
   ↓
@@ -257,7 +258,7 @@ SnapshotService 生成 BattleEffectSnapshot
   ↓
 DamageFormulaEngine 形成 DamageFormulaContext 并计算理论伤害
   ↓
-InferenceEngine 更新候选配置 match_score / confidence / is_excluded
+EstimateService 合并属性约束、unknown factors 和 evidence
   ↓
 SpeedJudgeEngine 更新速度区间和先手概率
   ↓
@@ -306,7 +307,8 @@ SpeedJudgeEngine 更新速度区间和先手概率
 - `Battle`：战斗主状态、当前回合、双方当前在场精灵。
 - `BattleElfState`：本场战斗中每只精灵的当前生命、能量、技能、状态关联等。
 - `BattleEffectInstance`：当前存在的状态实例。
-- `BuildCandidate`：敌方候选配置集合。
+- `EnemyPanelEstimate`：敌方实时面板估计档案，保存默认配置、估计面板、属性约束、unknown factors 和 evidence 摘要。
+- `BuildCandidate`：已废弃旧候选空间表，仅保留到后续数据库迁移清理。
 
 ### 5.4 事件日志数据
 
@@ -335,7 +337,7 @@ SpeedJudgeEngine 更新速度区间和先手概率
 - 创建战斗。
 - 录入双方六只精灵。
 - 绑定己方配置。
-- 初始化敌方候选配置。
+- 初始化敌方面板估计档案。
 - 维护当前回合。
 - 维护当前上场精灵。
 - 查询当前战斗完整状态。
@@ -441,7 +443,7 @@ owner_scope = side / field 的状态不受普通切换影响
 快照用途：
 
 - 伤害计算。
-- 候选过滤。
+- 实时反推约束解释。
 - 事件回放。
 - 纠错后重算。
 - UI 解释“当时为什么是这个伤害”。
@@ -471,7 +473,7 @@ PVP 固定参数：
 
 注意：
 
-- 候选配置只保存面板属性。
+- 实时估计档案保存默认面板、当前估计面板和属性约束。
 - 不保存经过状态修正后的“战斗有效属性”。
 - 状态修正在 `DamageFormulaContext` 或 `SpeedContext` 中即时应用。
 
@@ -528,7 +530,7 @@ DamageFormulaContext = {
 - 动画多段使用最终显示总伤害，按一次伤害事件处理。
 - 连击记录 `per_hit_damage_value` 和 `hit_count`。
 - 连击总伤害由系统计算：`computed_total_damage_value = per_hit_damage_value * hit_count`。
-- 候选过滤优先使用连击单段伤害。
+- 实时反推优先使用连击单段伤害约束攻防属性；总伤害用于生命扣减和击杀判断。
 - 击杀判断使用连击总伤害。
 
 第一阶段连击次数优先级暂定：
@@ -562,40 +564,14 @@ else:
 敌方速度未知时：
 
 ```text
-遍历敌方未排除候选配置
-按候选权重计算 self_first_probability / enemy_first_probability
-输出敌方速度区间、是否存在同速候选和综合先手概率
+读取实时估计中的速度约束和优先级/先制上下文
+先生成 self_first / enemy_first / speed_tie 等不等式证据
+在无优先级或状态未知因素时收窄敌方速度范围；存在先制、天气或状态影响时记录 unknown factors
 ```
 
-### 6.10 CandidateGenerator 候选生成器
+### 6.10 EstimateService 敌方实时面板反推服务
 
-职责：准备阶段为敌方每只精灵生成候选配置集合。
-
-生成维度：
-
-- 性格：六维中选一个正面维度、一个不同的负面维度。
-- 个体资质维度：1 到 3 个维度存在个体资质。
-- 个体资质数值：7 到 10，保存为界面显示值；参与面板计算时转换为有效个体资质 `显示值 × 6`。
-- 技能：初始可能技能来自 `ElfDefinition.learnable_skill_ids`。
-
-候选生成范围：
-
-- 默认 `standard` 模式只生成主流极速候选：恰好 3 个维度投入个体资质，正面性格只考虑生命、物攻、魔攻、速度，正面资质固定 10，另外两个投入维度只取 9 或 10，不考虑负面性格减少生命、物防、魔防的情况，负面性格维度必须为 0，物攻资质和魔攻资质互斥；单只敌方约 188 个候选。
-- `wide` 模式约 576 个候选，放开正面性格为六维任意正面；`balanced` 模式约 3888 个候选，放宽正面资质为 8/9/10；`full` 模式保留完整 46320 候选空间，用于后台补全、手动全量重建或排查非主流配置。
-- `standard` 模式是性能优化和优先级策略，不代表非主流配置被规则层永久排除。
-
-常见技能组、常见性格、常见个体资质分布只影响候选初始权重，不直接排除冷门配置。
-
-优化策略：
-
-- 候选生成后缓存六维面板属性。
-- 对相同面板属性的候选可做聚合。
-- 当前上场敌方精灵优先全量计算。
-- 后备敌方精灵可延迟计算或只生成摘要。
-
-### 6.11 InferenceEngine 敌方配置推算引擎
-
-职责：根据伤害事件和状态快照更新敌方候选配置。
+职责：根据 Observation、伤害事件、状态快照和规则解析结果更新敌方面板估计。
 
 流程：
 
@@ -608,23 +584,21 @@ else:
   ↓
 形成 DamageFormulaContext
   ↓
-枚举候选配置或 技能 × 候选配置
+根据敌方角色选择受约束属性：受击约束 HP/物防/魔防，攻击约束物攻/魔攻，先后手约束速度
   ↓
-计算理论伤害
+把公式可解释的部分转成整数区间或不等式约束
   ↓
-与实际伤害、扣血百分比对比
+合并到 EnemyPanelEstimate.stat_constraints，取交集并记录冲突
   ↓
-更新 BuildCandidate.match_score / confidence / is_excluded
-  ↓
-记录证据与解释
+写入 EnemyPanelEstimateEvidence
 ```
 
-排除策略：
+约束策略：
 
-- 高置信手动事件可以强过滤。
-- 低置信识别事件只调低分数，不立即排除。
-- 公式待确认、状态不完整、特殊规则未实现时不强排除。
-- 伤害值与扣血百分比明显矛盾时，事件自身标记为低置信。
+- 公式完整时写入低/中/高置信整数范围。
+- 同一属性多次观测取约束交集；交集为空时记录 conflict，不回退旧候选硬排除。
+- 状态、天气、应对、防御或特殊公式未知时写入 unknown factors。
+- 玩家默认配置必须满足当前约束；不满足的性格/资质不可选。
 
 ### 6.12 EventReplayService 事件回放服务
 
@@ -642,7 +616,7 @@ else:
 - 原始事件尽量不物理删除。
 - 纠错记录为新事件或修订记录。
 - 从修正点开始重放后续事件。
-- 重放后刷新 BattleElfState、BattleEffectInstance、BuildCandidate 和计算缓存。
+- 重放后刷新 BattleElfState、BattleEffectInstance、EnemyPanelEstimate 和计算缓存。
 
 ### 6.13 ExplanationEngine 解释引擎
 
@@ -676,7 +650,7 @@ else:
   ↓
 读取 ElfDefinition / SkillDefinition / NatureDefinition
   ↓
-为敌方每只 elf 生成 BuildCandidate
+为敌方每只 elf 初始化 EnemyPanelEstimate
   ↓
 选择双方当前首发 elf
   ↓
@@ -700,7 +674,7 @@ else:
   ↓
 更新 BattleElfState 生命百分比
   ↓
-调用 InferenceEngine 更新候选
+调用 EstimateService 更新实时约束和 evidence
   ↓
 刷新 DamageResult / SpeedContext / UI
 ```
@@ -741,7 +715,7 @@ side / field 状态不受普通切换影响
   ↓
 生成 BattleEffectSnapshot
   ↓
-刷新速度、伤害、候选展示
+刷新速度、伤害和实时估计展示
 ```
 
 ### 7.5 手动纠错流程
@@ -755,7 +729,7 @@ side / field 状态不受普通切换影响
   ↓
 从修正事件开始回放后续事件
   ↓
-重建运行时状态、状态实例、快照和候选配置
+重建运行时状态、状态实例、快照和实时估计档案
   ↓
 刷新 UI 并提示哪些结果发生变化
 ```
@@ -775,7 +749,7 @@ side / field 状态不受普通切换影响
 5. 战斗实时面板。
 6. 手动事件录入面板。
 7. 状态编辑器。
-8. 候选配置与推算解释页。
+8. 实时估计与反推解释页。
 9. 事件日志与回放页。
 10. 设置与数据导入导出页。
 
@@ -792,7 +766,7 @@ side / field 状态不受普通切换影响
 - 我方技能对敌方的伤害区间和击杀判断。
 - 敌方已知 / 可能技能对我方的伤害区间和击杀判断。
 - 连击单段伤害、连击次数、连击总伤害。
-- 敌方配置置信度。
+- 敌方实时估计置信度、属性范围和 unknown factors。
 - 未实现规则提示。
 
 ### 8.3 手动输入效率设计
@@ -810,20 +784,20 @@ side / field 状态不受普通切换影响
 - 连击单段伤害和次数快捷录入。
 - 一键修正上一条事件。
 
-### 8.4 候选配置展示
+### 8.4 实时估计展示
 
 每只敌方精灵展示：
 
-- 候选数量。
-- 配置状态：未知、低置信度、中置信度、高置信度、已基本确认。
-- 可能性格。
-- 可能个体资质分布。
+- 当前估计状态：未知、低置信度、中置信度、高置信度、存在冲突。
+- 玩家默认性格/资质与默认面板。
+- 当前推导出的 HP、物攻、物防、魔攻、魔防、速度范围。
+- 按需展开得到的可能性格和个体资质分布。
 - 面板属性区间。
 - 速度区间。
 - 可能技能和已确认技能。
 - 证据数量。
 - 最近一次更新原因。
-- 已排除候选及排除原因。
+- unknown factors 和公式/状态/天气未覆盖原因。
 
 ---
 
@@ -895,9 +869,9 @@ POST   /api/battles/{battle_id}/replay
 GET    /api/battles/{battle_id}/damage-preview
 POST   /api/battles/{battle_id}/calculate-damage
 GET    /api/battles/{battle_id}/speed-judge
-GET    /api/battles/{battle_id}/candidates
-GET    /api/battles/{battle_id}/candidates/{candidate_id}
-GET    /api/battles/{battle_id}/candidates/{candidate_id}/explanation
+GET    /api/estimates/{battle_id}/{elf_id}
+PUT    /api/estimates/{battle_id}/{elf_id}/default-config
+GET    /api/estimates/{battle_id}/{elf_id}/evidence
 POST   /api/battles/{battle_id}/recalculate
 ```
 
@@ -932,7 +906,7 @@ backend/
         battle_router.py
         event_router.py
         calculation_router.py
-        candidate_router.py
+        estimate_router.py
     schemas/
       elf_schema.py
       skill_schema.py
@@ -940,20 +914,20 @@ backend/
       battle_schema.py
       event_schema.py
       calculation_schema.py
-      candidate_schema.py
+      estimate_schema.py
     models/
       static_models.py
       player_models.py
       battle_models.py
       event_models.py
-      candidate_models.py
+      estimate_models.py
     repositories/
       elf_repository.py
       skill_repository.py
       effect_repository.py
       battle_repository.py
       event_repository.py
-      candidate_repository.py
+      estimate_repository.py
       snapshot_repository.py
     services/
       battle_session_service.py
@@ -968,8 +942,8 @@ backend/
       combo_engine.py
       speed_judge_engine.py
       battle_effect_engine.py
-      candidate_generator.py
-      inference_engine.py
+      estimate_expansion.py
+      observation_matcher.py
       explanation_engine.py
     migrations/
       env.py
@@ -986,22 +960,21 @@ backend/
 
 ### 11.1 主要性能压力
 
-- 单只敌方精灵候选量较大。
-- 敌方技能未知时需要枚举 `possible_skill × candidate`。
-- 每次事件后可能触发伤害、速度和候选展示刷新。
+- 单次观测需要解析伤害公式、状态快照和天气/应对上下文。
+- 用户主动按需展开 `full` 配置时，内存枚举仍可能较慢。
+- 每次事件后可能触发伤害、速度和实时估计展示刷新。
 - 快照和事件日志持续增长。
 
 ### 11.2 优化策略
 
-1. 候选生成后缓存六维面板属性。
-2. 对相同面板属性的候选做聚合。
-3. 已排除候选默认不参与实时伤害展示，但保留证据。
-4. 只对当前上场敌方精灵做高频实时计算。
-5. 伤害计算结果按 `skill_id + attacker_stats_hash + defender_stats_hash + snapshot_hash` 做进程内缓存。
-6. 快照生成 `snapshot_hash`，状态未变时复用结果。
-7. SQLite 开启 WAL 模式。
-8. UI 对候选列表分页，只展示摘要和 Top-K。
-9. 重放重算时可显示进度，不阻塞主 UI。
+1. Observation 默认只更新一条 `EnemyPanelEstimate` 和少量 evidence，不逐候选写库。
+2. 按需展开只在用户打开面板或切换模式时执行，结果不落库。
+3. 只对当前上场敌方精灵做高频实时计算。
+4. 伤害计算结果按 `skill_id + attacker_stats_hash + defender_stats_hash + snapshot_hash` 做进程内缓存。
+5. 快照生成 `snapshot_hash`，状态未变时复用结果。
+6. SQLite 开启 WAL 模式。
+7. UI 对展开结果分页或限制数量，只展示可解释摘要。
+8. 重放重算时可显示进度，不阻塞主 UI。
 
 ---
 
@@ -1016,20 +989,20 @@ backend/
 - `manual_override`。
 - `notes`。
 
-### 12.2 候选排除可解释
+### 12.2 实时反推可解释
 
-候选被排除时必须记录：
+每次估计变化必须记录：
 
-- 触发排除的事件。
-- 实际伤害。
-- 理论伤害或理论区间。
-- 误差。
+- 触发推导的事件。
+- 观测事实，例如实际伤害、扣血比例、先后手或技能出现。
+- 推导出的属性范围或不等式。
+- 公式上下文和关键倍率。
 - 快照 ID。
-- 排除原因。
+- unknown factors 或冲突原因。
 
 ### 12.3 低置信事件处理
 
-低置信事件不应强排除候选，只降低候选分数。
+低置信事件不应收窄硬约束；只记录 evidence、unknown factors 或低置信范围。
 
 低置信来源包括：
 
@@ -1109,12 +1082,13 @@ LOG_LEVEL=INFO
 - 印记和天气作为状态实例。
 - 状态编辑器。
 
-### M4：候选生成与推算
+### M4：实时估计与反推
 
-- 敌方候选配置生成。
-- 我方攻击敌方过滤防御侧候选。
-- 敌方攻击我方过滤攻击侧候选。
-- 技能未知时 `skill × candidate` 联合枚举。
+- 敌方面板估计档案初始化。
+- 我方攻击敌方时反推敌方 HP / 物防 / 魔防。
+- 敌方攻击我方时反推敌方物攻 / 魔攻。
+- 技能、状态或天气未知时记录 unknown factors，不落库生成候选空间。
+- 按需展开可能配置，仅用于展示可选性格/资质。
 
 ### M5：伤害、连击与速度展示
 
@@ -1128,7 +1102,7 @@ LOG_LEVEL=INFO
 
 - 历史事件修正。
 - 从修正点重放。
-- 候选排除原因。
+- 实时估计变化原因。
 - 伤害公式解释。
 - 低置信事件提示。
 
@@ -1139,14 +1113,14 @@ LOG_LEVEL=INFO
 1. 能本地启动 FastAPI 后端和 Web 前端。
 2. 能创建战斗并录入双方六只精灵。
 3. 能录入己方完整配置并正确计算面板属性。
-4. 能为敌方精灵生成候选配置集合。
+4. 能为敌方精灵初始化实时面板估计档案和默认展示配置。
 5. 能手动录入单次伤害、动画多段最终总伤害、连击单段伤害和连击次数。
 6. 能统一维护普通状态、异常、印记、天气、技能槽修正、行动规则状态。
 7. 能按 `clear_on_switch` 正确处理切换清除和保留。
 8. 能为伤害、治疗、能量变化、切换事件保存状态快照。
 9. 能使用 `DamageFormulaContext` 计算理论伤害。
-10. 能根据伤害事件过滤敌方候选配置。
+10. 能根据伤害事件更新敌方面板属性约束和 evidence。
 11. 能展示伤害区间、生命百分比、连击总伤害、速度先手概率。
-12. 能展示候选配置置信度和排除原因。
+12. 能展示实时估计置信度、属性范围、unknown factors 和冲突原因。
 13. 能修改历史事件并触发重放重算。
 14. 系统设计和数据库设计中所有精灵相关英文命名均使用 `elf`。

@@ -8,12 +8,12 @@ export function ElfCard({
   elf,
   active,
   onSwitch,
-  onSelectCandidate,
+  onSelectEstimate,
 }: {
   elf: BattleElfStateDict;
   active?: boolean;
   onSwitch?: () => void;
-  onSelectCandidate?: () => void;
+  onSelectEstimate?: () => void;
 }) {
   const name = elf.elf_name ?? elf.elf_id;
   return (
@@ -32,7 +32,7 @@ export function ElfCard({
       </div>
       <div className="mt-3 flex gap-2">
         {onSwitch ? <Button className="flex-1" variant="outline" size="sm" onClick={onSwitch}>切换上场</Button> : null}
-        {onSelectCandidate ? <Button className="flex-1" variant="ghost" size="sm" onClick={onSelectCandidate}>候选</Button> : null}
+        {onSelectEstimate ? <Button className="flex-1" variant="ghost" size="sm" onClick={onSelectEstimate}>估计</Button> : null}
       </div>
     </div>
   );

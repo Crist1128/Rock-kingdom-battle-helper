@@ -16,11 +16,13 @@ from app.db.session import get_db
 from app.models import battle as _battle_models  # noqa: F401
 from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
+from app.models import estimate as _estimate_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.battle import Battle
 from app.models.candidate import BuildCandidate
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
+from app.models.estimate import EnemyPanelEstimate
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import EffectDefinition, ElfDefinition, NatureDefinition, SkillDefinition
 from app.utils.json import dumps_json, loads_json
@@ -234,7 +236,7 @@ def test_end_turn_settles_burn_damage_and_layer_change(
 def test_damage_event_triggers_starfall_and_candidate_observation(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
-    """攻击后星陨会生成额外伤害事件，并把伤害写入候选软评分。"""
+    """攻击后星陨会生成额外伤害事件，并把伤害写入实时估计。"""
     client, session_factory = api_client
     with session_factory() as session:
         _seed_two_active_elves(session, battle_id="battle_starfall", enemy_hp=500)
@@ -304,7 +306,7 @@ def test_damage_event_triggers_starfall_and_candidate_observation(
     assert body["post_settlement_events"][0]["effect_id"] == "effect_starfall_mark"
     assert body["post_settlement_events"][0]["damage_value"] == 50
     assert body["post_settlement_events"][0]["layers_after"] == 0
-    assert body["post_settlement_events"][0]["observation_result"]["candidate_count"] == 1
+    assert body["post_settlement_events"][0]["observation_result"]["status"] == "estimate_updated"
 
     with session_factory() as session:
         damage_events = list(
@@ -333,10 +335,16 @@ def test_damage_event_triggers_starfall_and_candidate_observation(
 
         candidate = session.get(BuildCandidate, "candidate_battle_starfall")
         assert candidate is not None
-        evidence = loads_json(candidate.evidence_ids_json, [])
-        assert evidence
-        assert evidence[-1]["observation_type"] == "damage_value"
-        assert evidence[-1]["predicted_value"] == 50
+        assert candidate.evidence_ids_json is None
+        estimate = session.scalar(
+            select(EnemyPanelEstimate).where(
+                EnemyPanelEstimate.battle_id == "battle_starfall",
+                EnemyPanelEstimate.elf_id == "elf_enemy",
+            )
+        )
+        assert estimate is not None
+        summary = loads_json(estimate.evidence_summary_json, [])
+        assert summary[-1]["observation_type"] == "damage_value"
 
 
 def test_damage_event_records_defense_skill_context(

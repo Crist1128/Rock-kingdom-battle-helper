@@ -91,7 +91,8 @@ def setup_lineup(
     """
     录入双方阵容。
 
-    己方精灵必须带 build_id，敌方只需要 elf_id。提交后会自动生成敌方候选配置。
+    己方精灵必须带 build_id，敌方只需要 elf_id。提交后会初始化敌方面板估计档案；
+    旧候选配置不再默认生成。
     """
     try:
         return BattleService(db).setup_lineup(battle_id, payload)
@@ -137,7 +138,7 @@ def switch_elf(
 
 @router.post("/{battle_id}/finish", response_model=BattleOut)
 def finish_battle(battle_id: str, db: Session = Depends(get_db)) -> Battle:
-    """结束战斗，保留事件和候选数据。"""
+    """结束战斗，保留事件、快照和实时估计数据。"""
     try:
         return BattleService(db).finish_battle(battle_id)
     except LookupError as exc:
@@ -242,7 +243,7 @@ def create_damage_event(
     创建伤害事件。
 
     记录手动伤害事实；阶段 C 起会在伤害后尝试结算星陨等 post_attack 触发效果。
-    候选推算仍默认只做软评分，不硬排除。
+    若同步观测开启，会更新敌方实时面板估计；旧候选空间不会被写入。
     """
     try:
         return DamageEventService(db).create_damage_event(battle_id, payload)

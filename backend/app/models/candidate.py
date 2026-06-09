@@ -1,11 +1,9 @@
 """
-候选配置模型模块。
+旧候选配置模型模块。
 
-本模块定义敌方配置推算相关的数据模型，包括：
-- BuildCandidate: 敌方候选配置，记录敌方精灵可能的配置组合
-- CalculationCache: 计算缓存，用于缓存伤害计算等昂贵操作的结果
-
-候选配置是敌方配置推算的核心，系统通过伤害事件不断过滤和收敛候选集合。
+`build_candidate` 已从主流程废弃：实时反推现在使用 `enemy_panel_estimate`
+维护属性约束和默认展示配置，不再依赖候选空间落库和逐候选评分。本模块暂时保留给
+历史迁移、归档清理和后续数据库删除前的兼容读取。
 """
 
 from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, Text
@@ -16,7 +14,7 @@ from app.db.base import Base, TimestampMixin
 
 class BuildCandidate(TimestampMixin, Base):
     """
-    敌方候选配置模型。
+    已废弃的敌方候选配置模型。
 
     记录敌方精灵可能的配置组合，包括：
     - 性格选择
@@ -26,8 +24,8 @@ class BuildCandidate(TimestampMixin, Base):
     - 匹配评分和置信度
     - 排除状态和原因
 
-    候选配置在准备阶段生成，在战斗过程中通过伤害事件不断被过滤。
-    只保存面板属性，不保存经过状态修正后的临时属性。
+    新实时反推主流程不再创建、更新或查询该表。不要在新功能中依赖它；
+    后续确认无存量兼容需求后再通过 Alembic 删除。
 
     Attributes:
         candidate_id: 候选配置唯一标识（主键）

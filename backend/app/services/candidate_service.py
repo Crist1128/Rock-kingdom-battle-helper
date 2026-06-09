@@ -1,9 +1,9 @@
 """
-候选配置生成服务模块。
+旧候选配置服务模块。
 
-本模块负责敌方候选配置的枚举、落库和摘要查询。第一阶段只生成：
-性格 × 个体资质分布 × 面板属性。技能组不做笛卡尔展开，只把可学习技能池
-保存到 possible_skill_ids_json，后续通过战斗事件逐步确认。
+该模块已从实时反推主流程下线，只保留给历史测试、迁移前兼容和后续清理参考。
+新功能不要调用 `CandidateService`；实时反推主流程应使用 `EstimateService`
+直接维护属性约束和默认展示配置。
 """
 
 from dataclasses import dataclass
@@ -32,10 +32,14 @@ from app.schemas.candidate import (
     CandidateDetailOut,
     CandidateEvidenceOut,
     CandidateNatureDistributionItem,
+    CandidateNatureOptionOut,
+    CandidateOut,
     CandidatePatternDistributionItem,
+    CandidateSelectionOptionsOut,
     CandidateSpeedBucketItem,
     CandidateSummaryOut,
     CandidateTalentDistributionItem,
+    CandidateTalentPatternOptionOut,
 )
 from app.utils.json import dumps_json, loads_json
 
@@ -236,10 +240,10 @@ class CandidateGenerator:
 
 class CandidateService:
     """
-    敌方候选配置服务。
+    已废弃的敌方候选配置服务。
 
-    该服务是准备阶段与推算阶段的桥梁。准备阶段根据敌方 elf_id 生成候选，
-    推算阶段会读取并更新这些候选的 match_score、confidence 和 is_excluded。
+    新实时反推主流程不再调用该服务。`build_candidate` 表暂不删除，但只作为
+    待清理遗留结构保留。
     """
 
     def __init__(self, db: Session) -> None:
@@ -386,7 +390,6 @@ class CandidateService:
             formula_status="soft_scoring",
         )
 
-
     def get_detail(
         self,
         battle_id: str,
@@ -418,6 +421,72 @@ class CandidateService:
             nature_distribution=self._build_nature_distribution(rows),
             talent_distribution=self._build_talent_distribution(rows),
             pattern_distribution=self._build_pattern_distribution(rows),
+        )
+
+    def get_selection_options(
+        self,
+        battle_id: str,
+        elf_id: str,
+        *,
+        nature_id: str | None = None,
+        talent_pattern: str | None = None,
+    ) -> CandidateSelectionOptionsOut:
+        """
+        获取候选选择面板数据。
+
+        该接口只读取未排除候选，前端可在返回的性格和完整资质组合中选择。
+        未完成有效选择时，面板候选回退为当前有效 Top1；性格和资质组合都
+        有效时，面板候选取当前选择交集里置信度最高、评分最高的候选。
+        """
+        rows = self._load_candidates_for_detail(
+            battle_id,
+            elf_id,
+            include_excluded=False,
+        )
+        active_count = len(rows)
+        if active_count == 0:
+            return CandidateSelectionOptionsOut(
+                battle_id=battle_id,
+                elf_id=elf_id,
+                active_count=0,
+            )
+
+        nature_options = self._build_nature_options(rows)
+        valid_nature_ids = {option.nature_id for option in nature_options}
+        selected_nature_id = nature_id if nature_id in valid_nature_ids else None
+        nature_rows = (
+            [row for row in rows if row.nature_id == selected_nature_id]
+            if selected_nature_id is not None
+            else []
+        )
+
+        pattern_options = self._build_talent_pattern_options(nature_rows)
+        valid_patterns = {option.pattern_key for option in pattern_options}
+        selected_pattern = talent_pattern if talent_pattern in valid_patterns else None
+
+        matched_rows = [
+            row
+            for row in nature_rows
+            if selected_pattern is not None
+            and self._talent_pattern_key(row.individual_talent_distribution_json)
+            == selected_pattern
+        ]
+        panel_candidate = self._pick_panel_candidate(matched_rows) or self._pick_panel_candidate(
+            rows
+        )
+
+        return CandidateSelectionOptionsOut(
+            battle_id=battle_id,
+            elf_id=elf_id,
+            active_count=active_count,
+            nature_options=nature_options,
+            talent_pattern_options=pattern_options,
+            selected_nature_id=selected_nature_id,
+            selected_talent_pattern=selected_pattern,
+            matched_count=len(matched_rows),
+            panel_candidate=CandidateOut.model_validate(panel_candidate)
+            if panel_candidate is not None
+            else None,
         )
 
     def list_candidates(
@@ -473,11 +542,13 @@ class CandidateService:
         return CandidateEvidenceOut(
             battle_id=battle_id,
             elf_id=elf_id,
-            formula_status="soft_scoring",
+            formula_status="legacy_candidate_space_disabled",
             evidence_items=evidence_items[-limit:],
-            message="候选 evidence 来自 Observation 软评分；当前默认不硬排除。",
+            message=(
+                "旧候选空间已下线；实时反推 evidence "
+                "请查询 /estimates/{battle_id}/{elf_id}/evidence。"
+            ),
         )
-
 
     def _load_candidates_for_detail(
         self,
@@ -589,6 +660,92 @@ class CandidateService:
             CandidatePatternDistributionItem(pattern=pattern, count=count, ratio=count / total)
             for pattern, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:20]
         ]
+
+    @staticmethod
+    def _build_nature_options(rows: list[BuildCandidate]) -> list[CandidateNatureOptionOut]:
+        """统计未排除候选中的可选性格。"""
+        total = len(rows)
+        grouped: dict[str, dict[str, float | int]] = {}
+        for row in rows:
+            item = grouped.setdefault(row.nature_id, {"count": 0, "top_confidence": 0.0})
+            item["count"] = int(item["count"]) + 1
+            item["top_confidence"] = max(float(item["top_confidence"]), row.confidence)
+        return [
+            CandidateNatureOptionOut(
+                nature_id=nature_id,
+                count=int(item["count"]),
+                ratio=int(item["count"]) / total,
+                top_confidence=float(item["top_confidence"]),
+            )
+            for nature_id, item in sorted(
+                grouped.items(),
+                key=lambda entry: (
+                    -int(entry[1]["count"]),
+                    -float(entry[1]["top_confidence"]),
+                    entry[0],
+                ),
+            )
+        ]
+
+    @classmethod
+    def _build_talent_pattern_options(
+        cls,
+        rows: list[BuildCandidate],
+    ) -> list[CandidateTalentPatternOptionOut]:
+        """统计未排除候选中的可选完整资质组合。"""
+        total = len(rows)
+        grouped: dict[str, dict[str, object]] = {}
+        for row in rows:
+            talent_values = cls._talent_values(row.individual_talent_distribution_json)
+            pattern_key = cls._talent_pattern_key_from_values(talent_values)
+            item = grouped.setdefault(
+                pattern_key,
+                {"count": 0, "top_confidence": 0.0, "talent_values": talent_values},
+            )
+            item["count"] = int(item["count"]) + 1
+            item["top_confidence"] = max(float(item["top_confidence"]), row.confidence)
+        return [
+            CandidateTalentPatternOptionOut(
+                pattern_key=pattern_key,
+                talent_values=dict(item["talent_values"]),
+                count=int(item["count"]),
+                ratio=int(item["count"]) / total,
+                top_confidence=float(item["top_confidence"]),
+            )
+            for pattern_key, item in sorted(
+                grouped.items(),
+                key=lambda entry: (
+                    -int(entry[1]["count"]),
+                    -float(entry[1]["top_confidence"]),
+                    entry[0],
+                ),
+            )
+        ]
+
+    @staticmethod
+    def _pick_panel_candidate(rows: list[BuildCandidate]) -> BuildCandidate | None:
+        """从当前选择命中的候选中挑选置信度最高的估计面板。"""
+        if not rows:
+            return None
+        return max(rows, key=lambda row: (row.confidence, row.match_score, -row.final_speed))
+
+    @classmethod
+    def _talent_pattern_key(cls, raw_json: str) -> str:
+        """生成完整六维资质组合 key。"""
+        return cls._talent_pattern_key_from_values(cls._talent_values(raw_json))
+
+    @staticmethod
+    def _talent_pattern_key_from_values(values: dict[str, int]) -> str:
+        """按固定六维顺序序列化资质组合。"""
+        return "|".join(f"{key}:{values.get(key, 0)}" for key in [stat.value for stat in STAT_KEYS])
+
+    @staticmethod
+    def _talent_values(raw_json: str) -> dict[str, int]:
+        """解析候选保存的个体资质 JSON。"""
+        data = loads_json(raw_json, {})
+        if not isinstance(data, dict):
+            data = {}
+        return {stat.value: int(data.get(stat.value, 0) or 0) for stat in STAT_KEYS}
 
     def _load_nature_rules(self) -> list[NatureRule]:
         """

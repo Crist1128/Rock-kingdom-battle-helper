@@ -96,7 +96,7 @@ export function PreparationPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">准备阶段</h1>
-          <p className="mt-1 text-muted-foreground">录入我方配置和敌方精灵种类，生成敌方候选配置，然后进入战斗。</p>
+          <p className="mt-1 text-muted-foreground">录入我方配置和敌方精灵种类，初始化敌方面板估计，然后进入战斗。</p>
         </div>
         <Badge variant={battle.data?.phase === "preparation" ? "warning" : "outline"}>{phaseName(battle.data?.phase)}</Badge>
       </div>
@@ -209,10 +209,10 @@ export function PreparationPage() {
       <Card>
         <CardContent className="flex items-center justify-between pt-5">
           <div className="text-sm text-muted-foreground">
-            阵容提交后，后端会自动生成敌方候选。战斗开始后后端不允许直接重录阵容，应走后续纠错流程。
+            阵容提交后，后端会初始化敌方面板估计档案。战斗开始后后端不允许直接重录阵容，应走后续纠错流程。
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" disabled={!canSubmit || setupLineup.isPending} onClick={() => setupLineup.mutate()}>{setupLineup.isPending ? "提交中..." : "提交阵容并生成候选"}</Button>
+            <Button variant="outline" disabled={!canSubmit || setupLineup.isPending} onClick={() => setupLineup.mutate()}>{setupLineup.isPending ? "提交中..." : "提交阵容并初始化估计"}</Button>
             <Button disabled={!canSubmit || startBattle.isPending} onClick={() => startBattle.mutate()}>{startBattle.isPending ? "进入中..." : "进入战斗"}</Button>
           </div>
         </CardContent>

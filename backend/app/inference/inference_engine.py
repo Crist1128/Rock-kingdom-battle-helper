@@ -27,6 +27,7 @@ from app.inference.observation_payload import normalize_observation_payload
 from app.inference.observation_types import ObservationType
 from app.models.candidate import BuildCandidate
 from app.models.event import DamageEvent
+from app.services.estimate_service import EstimateService
 from app.utils.json import dumps_json, loads_json
 
 
@@ -121,6 +122,19 @@ class InferenceEngine:
                 hard_excluded_count += 1
 
         self._refresh_confidence_for_candidates(candidates)
+        top_candidate = self._top_candidate_from_rows(candidates)
+        self._sync_estimate_observation(
+            observation,
+            self._build_process_result(
+                observation=observation,
+                candidate_count=len(candidates),
+                matched_count=matched_count,
+                mismatched_count=mismatched_count,
+                unknown_count=unknown_count,
+                hard_excluded_count=hard_excluded_count,
+                top_candidate=top_candidate,
+            ),
+        )
         if commit:
             self.db.commit()
 
@@ -243,6 +257,19 @@ class InferenceEngine:
                     hard_excluded_count += 1
 
         self._refresh_confidence_for_candidates(candidates)
+        top_candidate = self._top_candidate_from_rows(candidates)
+        self._sync_estimate_observation(
+            observation,
+            self._build_process_result(
+                observation=observation,
+                candidate_count=len(candidates),
+                matched_count=matched_count,
+                mismatched_count=mismatched_count,
+                unknown_count=unknown_count,
+                hard_excluded_count=hard_excluded_count,
+                top_candidate=top_candidate,
+            ),
+        )
         if commit:
             self.db.commit()
 
@@ -284,8 +311,20 @@ class InferenceEngine:
             observed_pct=self.observation_matcher._optional_float(observed),
             result=result,
             max_hp=max_hp,
-            tolerance=float(observation.payload.get("percent_tolerance", 1.0) or 1.0),
+            tolerance=self.observation_matcher._optional_float_with_default(
+                observation.payload.get("percent_tolerance"),
+                1.0,
+            ),
             event_weight=self.observation_matcher._event_weight(observation, 0.5),
+            observed_before_pct=self.observation_matcher._optional_float(
+                observation.payload.get("observed_hp_percent_before")
+            ),
+            observed_after_pct=self.observation_matcher._optional_float(
+                observation.payload.get("observed_hp_percent_after")
+            ),
+            percent_display_mode=self.observation_matcher._optional_str(
+                observation.payload.get("percent_display_mode")
+            ),
         )
 
     def _should_hard_exclude(
@@ -301,7 +340,10 @@ class InferenceEngine:
         """
         if not observation.allow_hard_exclude or not match_result.can_hard_exclude:
             return False
-        if observation.observation_type != ObservationType.DAMAGE_VALUE:
+        if observation.observation_type not in {
+            ObservationType.DAMAGE_VALUE,
+            ObservationType.HP_PERCENT_DELTA,
+        }:
             return False
         if match_result.matched is not False:
             return False
@@ -343,6 +385,18 @@ class InferenceEngine:
         commit: bool,
     ) -> dict[str, Any]:
         """返回空候选池的稳定处理结果。"""
+        self._sync_estimate_observation(
+            observation,
+            self._build_process_result(
+                observation=observation,
+                candidate_count=0,
+                matched_count=0,
+                mismatched_count=0,
+                unknown_count=0,
+                hard_excluded_count=0,
+                top_candidate=None,
+            ),
+        )
         if commit:
             self.db.commit()
         return {
@@ -370,6 +424,18 @@ class InferenceEngine:
         commit: bool,
     ) -> dict[str, Any]:
         """公式关键上下文缺失时直接返回 unknown 摘要，避免全候选无意义写入。"""
+        top_candidate = self._top_candidate_from_rows(candidates)
+        result = self._build_process_result(
+            observation=observation,
+            candidate_count=len(candidates),
+            matched_count=0,
+            mismatched_count=0,
+            unknown_count=len(candidates),
+            hard_excluded_count=0,
+            top_candidate=top_candidate,
+        )
+        result["unknown_factors"] = missing_parts
+        self._sync_estimate_observation(observation, result)
         if commit:
             self.db.commit()
         top_candidate = self._top_candidate_from_rows(candidates)
@@ -402,6 +468,46 @@ class InferenceEngine:
             .order_by(BuildCandidate.candidate_id)
         )
         return list(self.db.scalars(stmt).all())
+
+    @staticmethod
+    def _build_process_result(
+        *,
+        observation: ObservationEventInput,
+        candidate_count: int,
+        matched_count: int,
+        mismatched_count: int,
+        unknown_count: int,
+        hard_excluded_count: int,
+        top_candidate: BuildCandidate | None,
+    ) -> dict[str, Any]:
+        """构造 Observation 处理摘要。"""
+        return {
+            "status": "processed",
+            "battle_id": observation.battle_id,
+            "enemy_elf_id": observation.enemy_elf_id,
+            "event_id": observation.event_id,
+            "observation_type": observation.observation_type.value,
+            "candidate_count": candidate_count,
+            "matched_count": matched_count,
+            "mismatched_count": mismatched_count,
+            "unknown_count": unknown_count,
+            "hard_excluded_count": hard_excluded_count,
+            "hard_filter_applied": observation.allow_hard_exclude,
+            "top_candidate_id": top_candidate.candidate_id if top_candidate else None,
+            "top_confidence": top_candidate.confidence if top_candidate else None,
+        }
+
+    def _sync_estimate_observation(
+        self,
+        observation: ObservationEventInput,
+        result: dict[str, Any],
+    ) -> None:
+        """迁移期同步写入实时面板估计证据。"""
+        EstimateService(self.db).record_observation(
+            observation,
+            inference_result=result,
+            commit=False,
+        )
 
     def _load_top_candidate(self, battle_id: str, elf_id: str) -> BuildCandidate | None:
         """读取当前置信度最高的候选，用于处理结果摘要。"""

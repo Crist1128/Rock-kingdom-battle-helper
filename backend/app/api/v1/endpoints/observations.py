@@ -1,9 +1,4 @@
-"""观察事件处理端点。
-
-该模块是第三里程碑的 API 接入层：前端把玩家手动录入的伤害、扣血比例、
-技能出现、先后手等观察事实提交到这里，后端再复用 InferenceEngine 更新敌方候选配置的
-软评分、置信度和证据链。
-"""
+"""观察事件处理端点。"""
 
 from uuid import uuid4
 
@@ -11,10 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.inference.inference_engine import InferenceEngine
 from app.inference.observation_matcher import ObservationEventInput
 from app.schemas.observation import ObservationCreate, ObservationProcessResult
 from app.services.battle_service import BattleService
+from app.services.estimate_service import EstimateService
 
 router = APIRouter()
 
@@ -25,32 +20,34 @@ def process_observation(
     payload: ObservationCreate,
     db: Session = Depends(get_db),
 ) -> ObservationProcessResult:
-    """处理一条玩家观察事件，并更新指定敌方精灵的候选池评分。
-
-    当前端调用示例：
-    ``POST /api/v1/observations/{battle_id}``
-
-    处理流程：
-    1. 先校验战斗是否存在，避免把观察写入无效战斗；
-    2. 为未显式指定 ID 的观察事件生成稳定前缀的 event_id，方便后续证据链追踪；
-    3. 将 API Schema 转换为推理层的 ``ObservationEventInput``；
-    4. 调用 ``InferenceEngine.process_observation_event`` 完成候选软评分更新；
-    5. 返回本次处理摘要，详细候选分布由 candidates 接口继续查询。
-    """
+    """处理一条玩家观察事件，并更新敌方实时面板估计。"""
     try:
         BattleService(db).require_battle(battle_id)
+        event_id = payload.event_id or f"observation_{uuid4().hex}"
         observation = ObservationEventInput(
             battle_id=battle_id,
             enemy_elf_id=payload.enemy_elf_id,
-            event_id=payload.event_id or f"observation_{uuid4().hex}",
+            event_id=event_id,
             observation_type=payload.observation_type,
             observed_value=payload.observed_value,
             payload=payload.payload,
             event_weight=payload.event_weight,
-            allow_hard_exclude=payload.allow_hard_exclude,
+            allow_hard_exclude=False,
         )
-        result = InferenceEngine(db).process_observation_event(observation)
-        return ObservationProcessResult(**result)
+        estimate = EstimateService(db).record_observation(observation, commit=True)
+        inferred_stats = estimate.evidence_summary[-1].get("affected_stats", []) if estimate else []
+        return ObservationProcessResult(
+            status="estimate_updated" if estimate is not None else "ignored",
+            battle_id=battle_id,
+            enemy_elf_id=payload.enemy_elf_id,
+            event_id=event_id,
+            observation_type=payload.observation_type.value,
+            estimate_id=estimate.estimate_id if estimate is not None else None,
+            inferred_stat_count=len(inferred_stats),
+            affected_stats=[str(item) for item in inferred_stats],
+            unknown_factor_count=len(estimate.unknown_factors) if estimate is not None else 0,
+            hard_filter_applied=False,
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

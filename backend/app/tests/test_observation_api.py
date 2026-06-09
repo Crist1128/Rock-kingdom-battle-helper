@@ -1,11 +1,6 @@
-"""观察事件 API 测试。
-
-第三里程碑要求确认：前端通过 HTTP 提交观察事件后，后端会真正调用推理引擎，
-并把候选的匹配分数、置信度和证据链写回数据库。
-"""
+"""观察事件 API 测试。"""
 
 from collections.abc import Iterator
-from decimal import Decimal
 
 import pytest
 from fastapi import FastAPI
@@ -21,11 +16,13 @@ from app.db.session import get_db
 from app.models import battle as _battle_models  # noqa: F401
 from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
+from app.models import estimate as _estimate_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
-from app.models.battle import Battle
+from app.models.battle import Battle, BattleElfState
 from app.models.candidate import BuildCandidate
-from app.models.static import ElfDefinition, NatureDefinition, TypeEffectivenessRule
+from app.models.estimate import EnemyPanelEstimate, EnemyPanelEstimateEvidence
+from app.models.static import ElfDefinition, NatureDefinition
 from app.utils.json import dumps_json, loads_json
 
 
@@ -97,6 +94,27 @@ def _seed_base_data(session: Session) -> None:
             ),
         ]
     )
+    session.flush()
+    session.add(
+        BattleElfState(
+            state_id="state_enemy_elf",
+            battle_id="battle_1",
+            side="enemy",
+            elf_id="enemy_elf",
+            elf_name="测试敌方精灵",
+            avatar="",
+            panel_stats_json=dumps_json({}),
+            current_hp_value=None,
+            current_hp_percent=100.0,
+            energy=10,
+            skill_ids_json=dumps_json([]),
+            confirmed_skill_ids_json=dumps_json([]),
+            active_effect_instance_ids_json=dumps_json([]),
+            is_active_elf=True,
+            is_defeated=False,
+            manual_override=True,
+        )
+    )
     session.commit()
 
 
@@ -123,10 +141,10 @@ def _candidate(candidate_id: str, *, physical_defense: int) -> BuildCandidate:
     )
 
 
-def test_process_damage_observation_updates_candidate_scores(
+def test_process_damage_observation_updates_estimate_constraints(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
-    """提交伤害数字观察后，应按普通攻击公式更新候选评分与证据链。"""
+    """提交伤害数字观察后，应更新实时估计约束，不再写旧候选评分。"""
     client, session_factory = api_client
     with session_factory() as session:
         session.add_all(
@@ -162,43 +180,54 @@ def test_process_damage_observation_updates_candidate_scores(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "processed"
+    assert body["status"] == "estimate_updated"
     assert body["battle_id"] == "battle_1"
     assert body["enemy_elf_id"] == "enemy_elf"
     assert body["event_id"] == "event_damage_api_1"
     assert body["observation_type"] == "damage_value"
-    assert body["candidate_count"] == 2
-    assert body["matched_count"] == 1
-    assert body["mismatched_count"] == 1
-    assert body["unknown_count"] == 0
-    assert body["hard_excluded_count"] == 0
+    assert body["inferred_stat_count"] >= 1
+    assert "physical_defense" in body["affected_stats"]
     assert body["hard_filter_applied"] is False
-    assert body["top_candidate_id"] == "candidate_low_defense"
-    assert body["top_confidence"] > 0.5
 
     with session_factory() as session:
         rows = {
             row.candidate_id: row
             for row in session.scalars(select(BuildCandidate)).all()
         }
-    assert rows["candidate_low_defense"].match_score > rows["candidate_high_defense"].match_score
-    assert rows["candidate_low_defense"].confidence > rows["candidate_high_defense"].confidence
+    assert rows["candidate_low_defense"].match_score == 0
+    assert rows["candidate_high_defense"].match_score == 0
+    assert rows["candidate_low_defense"].confidence == 0
+    assert rows["candidate_high_defense"].confidence == 0
     assert rows["candidate_high_defense"].is_excluded is False
+    assert rows["candidate_low_defense"].evidence_ids_json is None
 
-    evidence = loads_json(rows["candidate_low_defense"].evidence_ids_json, [])
-    assert evidence[0]["event_id"] == "event_damage_api_1"
-    assert evidence[0]["reason"] == "damage_value_matched"
-    assert evidence[0]["predicted_value"] == 90
+    with session_factory() as session:
+        estimate = session.scalar(
+            select(EnemyPanelEstimate).where(
+                EnemyPanelEstimate.battle_id == "battle_1",
+                EnemyPanelEstimate.elf_id == "enemy_elf",
+            )
+        )
+        estimate_evidence = session.scalar(
+            select(EnemyPanelEstimateEvidence).where(
+                EnemyPanelEstimateEvidence.source_event_id == "event_damage_api_1"
+            )
+        )
+    assert estimate is not None
+    assert estimate_evidence is not None
+    assert estimate_evidence.observation_type == "damage_value"
+    stat_constraints = loads_json(estimate.stat_constraints_json, {})
+    assert stat_constraints["physical_defense"]["status"] == "formula_constraint_derived"
+    assert stat_constraints["physical_defense"]["integer_min"] == 100
+    assert stat_constraints["physical_defense"]["integer_max"] == 100
 
-    evidence_response = client.get("/api/v1/candidates/battle_1/enemy_elf/evidence")
-    assert evidence_response.status_code == 200
-    evidence_body = evidence_response.json()
-    assert evidence_body["formula_status"] == "soft_scoring"
-    assert any(
-        item["event_id"] == "event_damage_api_1"
-        and item["candidate_id"] == "candidate_low_defense"
-        for item in evidence_body["evidence_items"]
-    )
+    estimate_evidence_response = client.get("/api/v1/estimates/battle_1/enemy_elf/evidence")
+    assert estimate_evidence_response.status_code == 200
+    estimate_evidence_body = estimate_evidence_response.json()
+    assert estimate_evidence_body[0]["source_event_id"] == "event_damage_api_1"
+    assert estimate_evidence_body[0]["constraint_delta"]["status"] == "formula_constraint_derived"
+    assert estimate_evidence_body[0]["inferred_stats"]["physical_defense"]["integer_min"] == 100
+    assert estimate_evidence_body[0]["inferred_stats"]["physical_defense"]["integer_max"] == 100
 
 
 def test_process_observation_returns_404_for_missing_battle(
@@ -222,16 +251,11 @@ def test_process_observation_returns_404_for_missing_battle(
 def test_process_damage_observation_can_resolve_basic_rules(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
-    """?? resolve_rules ??API ????????????????????"""
+    """观察接口使用已解析的公式上下文更新实时估计。"""
     client, session_factory = api_client
     with session_factory() as session:
         session.add_all(
             [
-                TypeEffectivenessRule(
-                    attack_element_type="fire",
-                    defense_element_type="grass",
-                    multiplier=2.0,
-                ),
                 _candidate("candidate_low_defense_rule", physical_defense=100),
                 _candidate("candidate_high_defense_rule", physical_defense=200),
             ]
@@ -246,7 +270,6 @@ def test_process_damage_observation_can_resolve_basic_rules(
             "observation_type": "damage_value",
             "observed_value": 225,
             "payload": {
-                "resolve_rules": True,
                 "attacker_panel_stats": {
                     "hp": 300,
                     "physical_attack": 200,
@@ -256,10 +279,9 @@ def test_process_damage_observation_can_resolve_basic_rules(
                     "speed": 100,
                 },
                 "skill_category": "physical",
-                "skill_element_type": "fire",
-                "attacker_element_types": ["fire"],
-                "defender_element_types": ["grass"],
                 "base_power": 50,
+                "type_multiplier": 2,
+                "stab_multiplier": 1.25,
                 "damage_tolerance": 0,
             },
         },
@@ -267,27 +289,25 @@ def test_process_damage_observation_can_resolve_basic_rules(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["matched_count"] == 1
-    assert body["mismatched_count"] == 1
-    assert body["unknown_count"] == 0
-    assert body["top_candidate_id"] == "candidate_low_defense_rule"
+    assert body["status"] == "estimate_updated"
+    assert "physical_defense" in body["affected_stats"]
 
     with session_factory() as session:
-        rows = {
-            row.candidate_id: row
-            for row in session.scalars(select(BuildCandidate)).all()
-        }
-    evidence = loads_json(rows["candidate_low_defense_rule"].evidence_ids_json, [])
-    details = evidence[0]["details"]
-    assert Decimal(details["display_power"]) == Decimal("125")
-    assert details["rule_resolution_enabled"] is True
-    assert details["rule_resolution_details"]["type_multiplier"]["value"] == "2.0"
+        estimate = session.scalar(
+            select(EnemyPanelEstimate).where(
+                EnemyPanelEstimate.battle_id == "battle_1",
+                EnemyPanelEstimate.elf_id == "enemy_elf",
+            )
+        )
+    assert estimate is not None
+    constraints = loads_json(estimate.stat_constraints_json, {})
+    assert constraints["physical_defense"]["status"] == "formula_constraint_derived"
 
 
 def test_process_damage_observation_accepts_v1_payload(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
-    """v1 嵌套 Observation payload 应被归一化后进入现有伤害 matcher。"""
+    """v1 嵌套 Observation payload 应被归一化后进入实时估计。"""
     client, session_factory = api_client
     with session_factory() as session:
         session.add_all(
@@ -329,6 +349,16 @@ def test_process_damage_observation_accepts_v1_payload(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["matched_count"] == 1
-    assert body["mismatched_count"] == 1
-    assert body["top_candidate_id"] == "candidate_v1_low_defense"
+    assert body["status"] == "estimate_updated"
+    assert "physical_defense" in body["affected_stats"]
+    with session_factory() as session:
+        estimate = session.scalar(
+            select(EnemyPanelEstimate).where(
+                EnemyPanelEstimate.battle_id == "battle_1",
+                EnemyPanelEstimate.elf_id == "enemy_elf",
+            )
+        )
+    assert estimate is not None
+    constraints = loads_json(estimate.stat_constraints_json, {})
+    assert constraints["physical_defense"]["integer_min"] == 100
+    assert constraints["physical_defense"]["integer_max"] == 100

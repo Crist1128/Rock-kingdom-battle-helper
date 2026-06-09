@@ -10,7 +10,6 @@ from app.calculation.damage_calculator import DamageCalculator
 from app.calculation.formula_context import DamageFormulaContext, PanelStats
 from app.calculation.rule_resolver import RuleResolver
 from app.core.enums import BattleEventType, DamageDisplayType, EventSource
-from app.inference.inference_engine import InferenceEngine
 from app.inference.observation_matcher import ObservationEventInput
 from app.inference.observation_payload import build_damage_observation_payload
 from app.inference.observation_types import ObservationType
@@ -18,6 +17,7 @@ from app.models.battle import Battle, BattleElfState
 from app.models.effect import BattleEffectInstance
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import EffectDefinition, SkillDefinition
+from app.services.estimate_service import EstimateService
 from app.services.snapshot_service import SnapshotService
 from app.utils.json import dumps_json, loads_json
 
@@ -1091,7 +1091,7 @@ class TurnSettlementService:
         observed_damage: int,
         payload: dict,
     ) -> dict | None:
-        """把自动结算伤害写入候选软评分；只有敌方作为受击方时才有候选池。"""
+        """把自动结算伤害写入敌方实时面板估计。"""
         if target.side != "enemy":
             return None
         observation = ObservationEventInput(
@@ -1103,7 +1103,22 @@ class TurnSettlementService:
             payload=payload,
             allow_hard_exclude=False,
         )
-        return InferenceEngine(self.db).process_observation_event(observation, commit=False)
+        estimate = EstimateService(self.db).record_observation(observation, commit=False)
+        if estimate is None:
+            return None
+        summary = estimate.evidence_summary[-1] if estimate.evidence_summary else {}
+        affected_stats = summary.get("affected_stats", [])
+        return {
+            "status": "estimate_updated",
+            "battle_id": battle_id,
+            "enemy_elf_id": target.elf_id,
+            "event_id": event_id,
+            "observation_type": ObservationType.DAMAGE_VALUE.value,
+            "estimate_id": estimate.estimate_id,
+            "affected_stats": affected_stats,
+            "inferred_stat_count": len(affected_stats),
+            "hard_filter_applied": False,
+        }
 
     def _apply_after_settlement(
         self,

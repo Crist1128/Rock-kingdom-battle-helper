@@ -1,8 +1,8 @@
 """
 伤害事件服务。
 
-第一阶段只负责事实记录、快照绑定和公式占位返回。伤害公式尚未确认，
-因此不会根据伤害事件排除任何候选配置。
+第一阶段只负责事实记录、快照绑定和公式占位返回。伤害观测会同步写入
+敌方实时面板估计，不再写旧候选空间。
 """
 
 from uuid import uuid4
@@ -10,14 +10,17 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.calculation.damage_calculator import DamageCalculator
 from app.calculation.formula_context import DamageFormulaContext, PanelStats
 from app.calculation.rule_resolver import RuleResolver
 from app.core.enums import BattleEventType, DamageDisplayType, EventSource
-from app.inference.inference_engine import InferenceEngine
+from app.inference.observation_matcher import ObservationEventInput
+from app.inference.observation_types import ObservationType
 from app.models.battle import Battle, BattleElfState
 from app.models.event import BattleEvent, DamageEvent, ResourceChangeEvent
 from app.schemas.event import DamageEventCreate, DamageEventCreateResult
 from app.services.battle_service import BattleService
+from app.services.estimate_service import EstimateService
 from app.services.snapshot_service import SnapshotService
 from app.services.turn_settlement_service import TurnSettlementService
 from app.utils.json import dumps_json, loads_json
@@ -35,14 +38,14 @@ class DamageEventService:
         payload: DamageEventCreate,
     ) -> DamageEventCreateResult:
         """
-        创建伤害事件、状态快照并调用推算占位引擎。
+        创建伤害事件、状态快照并更新实时面板估计。
 
         处理顺序：
         1. 创建 BattleEvent；
         2. 创建事件发生瞬间的 BattleEffectSnapshot；
         3. 创建 DamageEvent；
         4. 构造 DamageFormulaContext；
-        5. 调用 InferenceEngine，返回 formula_unavailable；
+        5. 调用伤害计算器，返回公式计算结果或占位状态；
         6. 可选更新防御方生命百分比。
         """
         battle = BattleService(self.db).require_battle(battle_id)
@@ -144,10 +147,30 @@ class DamageEventService:
         )
         context = RuleResolver(self.db).resolve_damage_context(context, rule_payload)
         damage_event.formula_context_json = dumps_json(context)
-        inference_result = InferenceEngine(self.db).process_damage_event(
+        damage_result = DamageCalculator().calculate(context)
+        damage_event.calculation_confidence = damage_result.confidence
+        estimate_observation_results = self._process_estimate_observations(
             damage_event=damage_event,
+            payload=payload,
             context=context,
+            total_damage=total_damage,
+            hp_percent_delta=hp_percent_delta,
         )
+        inference_result = {
+            "status": damage_result.status,
+            "damage_event_id": damage_event.event_id,
+            "estimate_updated": bool(estimate_observation_results),
+            "legacy_candidate_filter_applied": False,
+            "legacy_excluded_candidate_count": 0,
+            "confidence": damage_result.confidence,
+            "missing_parts": damage_result.missing_parts,
+            "message": damage_result.message,
+        }
+        if estimate_observation_results:
+            inference_result = {
+                **inference_result,
+                "estimate_observation_results": estimate_observation_results,
+            }
         self._create_resource_change_for_damage(
             battle_id=battle_id,
             battle_event_id=battle_event.event_id,
@@ -221,7 +244,7 @@ class DamageEventService:
 
     @staticmethod
     def _should_resolve_rules(payload: dict) -> bool:
-        """有技能或应对/防御上下文时启用规则解析，但不改变候选硬排除策略。"""
+        """有技能或应对/防御上下文时启用规则解析，结果只进入实时估计上下文。"""
         return any(
             payload.get(key) is not None
             for key in (
@@ -390,3 +413,124 @@ class DamageEventService:
                 state.current_hp_percent = round(state.current_hp_value / max_hp * 100, 4)
         if state.current_hp_value == 0 or state.current_hp_percent == 0:
             state.is_defeated = True
+
+    def _process_estimate_observations(
+        self,
+        *,
+        damage_event: DamageEvent,
+        payload: DamageEventCreate,
+        context: DamageFormulaContext,
+        total_damage: int | None,
+        hp_percent_delta: float | None,
+    ) -> list[dict]:
+        """把已确认的伤害事件同步转成实时面板估计观测。"""
+        if not payload.sync_observation or total_damage is None or not payload.skill_id:
+            return []
+        enemy_role, enemy_elf_id = self._resolve_enemy_observation_target(payload)
+        if enemy_role is None or enemy_elf_id is None:
+            return []
+        if enemy_role == "defender" and context.attacker_panel_stats is None:
+            return []
+        if enemy_role == "attacker" and context.defender_panel_stats is None:
+            return []
+
+        base_payload = context.model_dump(mode="json")
+        base_payload.update(
+            {
+                "enemy_role": enemy_role,
+                "skill_confirmed": payload.skill_confirmed,
+                "damage_display_type": payload.damage_display_type.value,
+                "damage_tolerance": payload.damage_tolerance,
+                "percent_tolerance": payload.percent_tolerance,
+                "source_damage_event_id": damage_event.event_id,
+                "source_battle_event_id": damage_event.battle_event_id,
+            }
+        )
+        estimate_service = EstimateService(self.db)
+        results: list[dict] = []
+        damage_observation = ObservationEventInput(
+            battle_id=damage_event.battle_id,
+            enemy_elf_id=enemy_elf_id,
+            event_id=f"observation_{uuid4().hex}",
+            observation_type=ObservationType.DAMAGE_VALUE,
+            observed_value=total_damage,
+            payload=base_payload,
+            allow_hard_exclude=False,
+        )
+        estimate = estimate_service.record_observation(damage_observation, commit=False)
+        if estimate is not None:
+            results.append(self._estimate_observation_result(estimate, damage_observation))
+
+        if enemy_role == "defender" and hp_percent_delta is not None:
+            percent_payload = {
+                **base_payload,
+                "observed_hp_percent_before": payload.hp_percent_before,
+                "observed_hp_percent_after": payload.hp_percent_after,
+                "percent_display_mode": (
+                    "floor_remaining_percent"
+                    if self._is_integer_percent_pair(
+                        payload.hp_percent_before,
+                        payload.hp_percent_after,
+                    )
+                    else None
+                ),
+                "percent_tolerance": (
+                    0
+                    if self._is_integer_percent_pair(
+                        payload.hp_percent_before,
+                        payload.hp_percent_after,
+                    )
+                    else payload.percent_tolerance
+                ),
+            }
+            percent_observation = ObservationEventInput(
+                battle_id=damage_event.battle_id,
+                enemy_elf_id=enemy_elf_id,
+                event_id=f"observation_{uuid4().hex}",
+                observation_type=ObservationType.HP_PERCENT_DELTA,
+                observed_value=hp_percent_delta,
+                payload=percent_payload,
+                allow_hard_exclude=False,
+            )
+            estimate = estimate_service.record_observation(percent_observation, commit=False)
+            if estimate is not None:
+                results.append(self._estimate_observation_result(estimate, percent_observation))
+        return results
+
+    @staticmethod
+    def _estimate_observation_result(estimate: object, observation: ObservationEventInput) -> dict:
+        """构造伤害事件返回中的实时估计摘要。"""
+        summary = getattr(estimate, "evidence_summary", []) or []
+        affected_stats = summary[-1].get("affected_stats", []) if summary else []
+        return {
+            "status": "estimate_updated",
+            "battle_id": observation.battle_id,
+            "enemy_elf_id": observation.enemy_elf_id,
+            "event_id": observation.event_id,
+            "observation_type": observation.observation_type.value,
+            "estimate_id": getattr(estimate, "estimate_id", None),
+            "affected_stats": affected_stats,
+            "inferred_stat_count": len(affected_stats),
+            "hard_filter_applied": False,
+        }
+
+    @staticmethod
+    def _resolve_enemy_observation_target(
+        payload: DamageEventCreate,
+    ) -> tuple[str | None, str | None]:
+        """判断本次伤害里敌方精灵扮演攻击方还是防御方。"""
+        if payload.attacker_side == "enemy" and payload.attacker_elf_id:
+            return "attacker", payload.attacker_elf_id
+        if payload.defender_side == "enemy" and payload.defender_elf_id:
+            return "defender", payload.defender_elf_id
+        return None, None
+
+    @staticmethod
+    def _is_integer_percent_pair(
+        before: float | None,
+        after: float | None,
+    ) -> bool:
+        """敌方血条是整数百分比读数时，按显示剩余百分比取整匹配。"""
+        if before is None or after is None:
+            return False
+        return float(before).is_integer() and float(after).is_integer()

@@ -16,6 +16,9 @@ from app.models.candidate import BuildCandidate, CalculationCache
 # 状态效果模型
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
 
+# 实时估计模型
+from app.models.estimate import EnemyPanelEstimate, EnemyPanelEstimateEvidence
+
 # 战斗事件模型
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
 
@@ -47,6 +50,10 @@ __all__ = [
     # 状态效果相关模型
     "BattleEffectInstance",
     "BattleEffectSnapshot",
+
+    # 实时估计相关模型
+    "EnemyPanelEstimate",
+    "EnemyPanelEstimateEvidence",
 
     # 事件相关模型
     "BattleEvent",

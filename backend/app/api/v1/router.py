@@ -9,10 +9,10 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     admin_battles,
     battles,
-    candidates,
     data_updates,
     effects,
     elves,
+    estimates,
     health,
     natures,
     observations,
@@ -31,7 +31,7 @@ router.include_router(effects.router, prefix="/effects", tags=["effects"])
 router.include_router(player_builds.router, prefix="/player-builds", tags=["player-builds"])
 router.include_router(team_presets.router, prefix="/team-presets", tags=["team-presets"])
 router.include_router(battles.router, prefix="/battles", tags=["battles"])
-router.include_router(candidates.router, prefix="/candidates", tags=["candidates"])
+router.include_router(estimates.router, prefix="/estimates", tags=["estimates"])
 router.include_router(observations.router, prefix="/observations", tags=["observations"])
 router.include_router(
     data_updates.router, prefix="/admin/data-updates", tags=["admin-data-updates"]

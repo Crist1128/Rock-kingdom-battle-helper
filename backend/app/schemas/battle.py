@@ -168,8 +168,8 @@ class LineupOut(BaseModel):
     """
     阵容录入响应。
 
-    返回本次生成的战斗精灵状态数量和敌方候选数量，便于前端确认准备
-    阶段是否完成。
+    返回本次生成的战斗精灵状态数量。`generated_candidate_count` 为历史兼容字段；
+    实时反推主流程不再默认生成旧候选配置。
     """
 
     battle_id: str

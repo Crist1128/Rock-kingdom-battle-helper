@@ -11,14 +11,13 @@ import type {
   BattleReplayResult,
   BattleStateOut,
   BattleTimelineTurnOut,
-  CandidateDetailOut,
-  CandidateEvidenceOut,
-  CandidateOut,
-  CandidateSummaryOut,
   DamageEventCreate,
   DamageEventCreateResult,
   EffectApplyInput,
   EffectDefinitionOut,
+  EnemyDefaultConfigInput,
+  EnemyPanelEstimateEvidenceOut,
+  EnemyPanelEstimateOut,
   EndTurnInput,
   EndTurnResult,
   ElfDefinitionOut,
@@ -216,21 +215,22 @@ export const api = {
       }),
   },
 
-  candidates: {
-    summary: (battleId: string, elfId: string) =>
-      request<CandidateSummaryOut>(`/candidates/${battleId}/${elfId}/summary`),
-    detail: (battleId: string, elfId: string, includeExcluded = false) =>
-      request<CandidateDetailOut>(`/candidates/${battleId}/${elfId}/detail${qs({ include_excluded: includeExcluded })}`),
-    evidence: (battleId: string, elfId: string) =>
-      request<CandidateEvidenceOut>(`/candidates/${battleId}/${elfId}/evidence`),
-    list: (battleId: string, elfId: string, params: { limit?: number; offset?: number; include_excluded?: boolean } = {}) =>
-      request<CandidateOut[]>(`/candidates/${battleId}/${elfId}${qs({ limit: 50, offset: 0, ...params })}`),
-    generate: (
+  estimates: {
+    get: (battleId: string, elfId: string) =>
+      request<EnemyPanelEstimateOut>(`/estimates/${battleId}/${elfId}`),
+    updateDefaultConfig: (
       battleId: string,
       elfId: string,
-      mode: "standard" | "wide" | "balanced" | "full" = "standard",
+      payload: EnemyDefaultConfigInput,
     ) =>
-      request<CandidateSummaryOut>(`/candidates/${battleId}/${elfId}/generate${qs({ mode })}`, { method: "POST" }),
+      request<EnemyPanelEstimateOut>(`/estimates/${battleId}/${elfId}/default-config`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }),
+    evidence: (battleId: string, elfId: string, limit = 50) =>
+      request<EnemyPanelEstimateEvidenceOut[]>(
+        `/estimates/${battleId}/${elfId}/evidence${qs({ limit })}`,
+      ),
   },
 
   adminBattles: {

@@ -975,11 +975,11 @@ CREATE INDEX idx_battle_skill_slot_skill ON battle_skill_slot(battle_id, skill_i
 
 ---
 
-## 5.4 `build_candidate` 敌方候选配置表
+## 5.4 `build_candidate` 敌方候选配置表（已废弃，待迁移删除）
 
 ### 用途
 
-记录敌方精灵候选培养配置。候选只保存面板属性，不保存状态修正后的临时属性。
+历史方案中用于记录敌方精灵候选培养配置。当前实时反推主流程已经不再生成、查询或更新该表；Observation、手动伤害事件和自动结算伤害只写 `enemy_panel_estimate` / `enemy_panel_estimate_evidence`。本表暂不删除，原因是需要保留迁移窗口和归档清理兼容；确认无存量兼容需求后，应通过 Alembic 删除本表和相关索引。
 
 ### 建表 SQL
 
@@ -1059,7 +1059,7 @@ CREATE TABLE build_candidate (
 | `created_at` | TEXT | 是 | 系统生成 | 创建时间。 |
 | `updated_at` | TEXT | 是 | 系统生成 | 更新时间。 |
 
-说明：候选表的 `individual_*` 同样保存显示个体资质。候选生成计算 `final_*` 时统一走 `StatCalculator`，由计算层转换为 `有效个体资质 = 显示个体资质 × 6`，避免数据库字段混用两套单位。
+说明：以下字段只描述历史表结构，不再作为新业务设计依据。新实时反推使用 `default_config_json`、`stat_constraints_json` 和 evidence。
 
 ### 索引
 
@@ -1070,11 +1070,11 @@ CREATE INDEX idx_build_candidate_speed ON build_candidate(battle_id, elf_id, fin
 CREATE INDEX idx_build_candidate_confidence ON build_candidate(battle_id, elf_id, confidence);
 ```
 
-### 开发注释
+### 废弃说明
 
-- 不保存战斗有效属性。
-- 如果候选量过大，可增加 `candidate_group_hash` 聚合同面板属性候选。
-- `possible_skill_ids_json` 会随技能证据更新。
+- 不要在新功能中依赖 `build_candidate`。
+- 不再规划 `candidate_group_hash` 或候选 evidence 扩展。
+- 后续删除前需要确认归档清理、测试夹具和旧文档已同步移除。
 
 ---
 
@@ -1931,11 +1931,106 @@ battle_event / damage_event / effect_change_event / resource_change_event
 
 按面板属性哈希聚合多个候选，减少伤害计算重复量。
 
+### 13.4 实时面板估计表
+
+候选推算主流程已经切换为“实时面板估计 + 默认配置校验”。完整方案见：
+
+```text
+docs/03_系统设计/实时面板估计与候选按需展开迁移方案.md
+```
+
+以下表用于保存敌方估计档案和估计 evidence。`build_candidate` 不再作为默认主推算状态，也不再作为按需展开缓存；它只是待删除遗留表。
+
+#### `enemy_panel_estimate`
+
+用途：保存每只敌方精灵当前估计档案，包括玩家默认配置、当前估计面板、属性约束、unknown factors 和最近 evidence 摘要。
+
+```sql
+CREATE TABLE enemy_panel_estimate (
+  estimate_id TEXT PRIMARY KEY,
+  battle_id TEXT NOT NULL,
+  battle_elf_state_id TEXT NOT NULL,
+  elf_id TEXT NOT NULL,
+  default_config_json TEXT,
+  default_panel_json TEXT,
+  estimated_panel_json TEXT,
+  stat_constraints_json TEXT,
+  confidence_json TEXT,
+  unknown_factors_json TEXT,
+  confirmed_skill_ids_json TEXT,
+  evidence_summary_json TEXT,
+  updated_by_event_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (battle_id) REFERENCES battle(battle_id),
+  FOREIGN KEY (battle_elf_state_id) REFERENCES battle_elf_state(battle_elf_state_id),
+  FOREIGN KEY (elf_id) REFERENCES elf_definition(elf_id)
+);
+
+CREATE INDEX idx_enemy_panel_estimate_battle_elf
+ON enemy_panel_estimate(battle_id, elf_id);
+
+CREATE INDEX idx_enemy_panel_estimate_state
+ON enemy_panel_estimate(battle_elf_state_id);
+```
+
+字段说明：
+
+| 字段 | 说明 |
+| --- | --- |
+| `default_config_json` | 玩家选择的默认配置方案，只用于未知面板时的临时展示。 |
+| `default_panel_json` | 按默认配置计算出的六维面板。 |
+| `estimated_panel_json` | 当前展示用估计面板，可包含具体值或范围。 |
+| `stat_constraints_json` | HP/物防/魔防/物攻/魔攻/速度等推导范围或不等式；普通攻击最小公式上下文完整时会写入低置信范围。 |
+| `confidence_json` | 各属性置信状态，不代表严格概率。 |
+| `unknown_factors_json` | 影响推导但尚未确认的减伤、应对、状态、天气、先制等因素。上下文不足时保留具体缺失原因。 |
+| `confirmed_skill_ids_json` | 已观测到的敌方技能。 |
+| `evidence_summary_json` | 最近推导摘要，完整明细建议拆到 evidence 表。 |
+
+#### `enemy_panel_estimate_evidence`
+
+用途：保存估计档案每次变化的事件级解释链，避免将长 evidence 反复追加到估计主表。
+
+```sql
+CREATE TABLE enemy_panel_estimate_evidence (
+  evidence_id TEXT PRIMARY KEY,
+  estimate_id TEXT NOT NULL,
+  battle_id TEXT NOT NULL,
+  source_event_id TEXT NOT NULL,
+  observation_type TEXT NOT NULL,
+  inferred_stats_json TEXT,
+  constraint_delta_json TEXT,
+  formula_context_json TEXT,
+  unknown_factors_json TEXT,
+  conflict_json TEXT,
+  confidence TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (estimate_id) REFERENCES enemy_panel_estimate(estimate_id),
+  FOREIGN KEY (battle_id) REFERENCES battle(battle_id)
+);
+
+CREATE INDEX idx_enemy_panel_estimate_evidence_estimate
+ON enemy_panel_estimate_evidence(estimate_id, created_at);
+
+CREATE INDEX idx_enemy_panel_estimate_evidence_event
+ON enemy_panel_estimate_evidence(source_event_id);
+```
+
+说明：`source_event_id` 是来源引用，不强制外键到 `battle_event`。Observation API 允许使用 `observation_<uuid>` 形式的轻量观测 ID，未必对应一条通用战斗事件。
+
+一致性规则：
+
+- 默认配置不得作为硬排除依据。
+- Observation 更新估计档案时必须保留 unknown factors；只有普通攻击最小公式上下文完整时，才写入低置信反向属性范围。
+- 新约束与旧约束冲突时，不直接覆盖为“确认失败”，应写入 `conflict_json` 并等待修正或重放。
+- 事件作废、修正和重放完成后，估计档案应可从事件流重算。
+- 默认配置保存时只校验当前实时约束，不写 `build_candidate`。
+
 ---
 
 ## 14. 总结
 
-本数据库设计采用 SQLite 本地文件数据库，围绕 `elf` 命名规范、统一状态系统、事件日志、状态快照和敌方候选配置推算组织。
+本数据库设计采用 SQLite 本地文件数据库，围绕 `elf` 命名规范、统一状态系统、事件日志、状态快照和敌方实时面板估计组织。
 
 关键点：
 

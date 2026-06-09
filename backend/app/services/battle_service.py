@@ -2,7 +2,7 @@
 战斗服务模块。
 
 本模块提供战斗生命周期和手动输入 MVP 的核心业务流程：
-创建战斗、录入阵容、生成敌方候选、切换精灵、记录通用事件和查询状态。
+创建战斗、录入阵容、初始化敌方面板估计、切换精灵、记录通用事件和查询状态。
 """
 
 from uuid import uuid4
@@ -19,6 +19,7 @@ from app.core.enums import BattleEventType, BattlePhase, EventSource, Side
 from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.candidate import BuildCandidate
 from app.models.effect import BattleEffectInstance
+from app.models.estimate import EnemyPanelEstimate, EnemyPanelEstimateEvidence
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import (
     ElfDefinition,
@@ -44,9 +45,9 @@ from app.schemas.event import (
     BattleTimelineEventOut,
     BattleTimelineTurnOut,
 )
-from app.services.candidate_service import CandidateService
 from app.services.effect_operation_executor import EffectOperationExecutor
 from app.services.effect_service import BattleEffectService
+from app.services.estimate_service import EstimateService
 from app.services.snapshot_service import SnapshotService
 from app.services.turn_settlement_service import TurnSettlementService
 from app.utils.json import dumps_json, loads_json, model_to_dict
@@ -181,13 +182,13 @@ class BattleService:
 
     def setup_lineup(self, battle_id: str, payload: LineupInput) -> LineupOut:
         """
-        录入双方阵容并生成敌方候选配置。
+        录入双方阵容并初始化敌方面板估计档案。
 
         处理步骤：
-        1. 清理该战斗旧的精灵状态、技能槽和候选配置；
+        1. 清理该战斗旧的运行时数据、估计档案和兼容候选配置；
         2. 己方从 PlayerElfBuild 复制确定面板属性与技能槽；
         3. 敌方只根据 elf_id 创建未知面板运行时状态；
-        4. 为每只敌方精灵生成 BuildCandidate；
+        4. 为每只敌方精灵创建实时面板估计档案；
         5. 生成准备阶段快照。
         """
         battle = self.require_battle(battle_id)
@@ -211,16 +212,17 @@ class BattleService:
                 state = self._create_self_elf_state(battle_id, item, elf)
             elif item.side == Side.ENEMY.value:
                 state = self._create_enemy_elf_state(battle_id, item, elf)
-                generated_candidate_count += CandidateService(self.db).generate_for_enemy_elf(
-                    battle_id,
-                    item.elf_id,
-                    replace_existing=True,
-                    commit=False,
-                )
             else:
                 raise ValueError(f"未知阵营：{item.side}")
 
             self.db.add(state)
+            if item.side == Side.ENEMY.value:
+                EstimateService(self.db).create_for_enemy_state(
+                    battle_id,
+                    state,
+                    replace_existing=True,
+                    commit=False,
+                )
             created_count += 1
             if item.is_active_elf and item.side == Side.SELF.value:
                 self_active_elf_id = item.elf_id
@@ -643,8 +645,14 @@ class BattleService:
     def _clear_runtime_data(self, battle_id: str) -> None:
         """重录阵容前清理第一阶段运行时数据。"""
         self.db.execute(delete(BattleSkillSlot).where(BattleSkillSlot.battle_id == battle_id))
-        self.db.execute(delete(BattleElfState).where(BattleElfState.battle_id == battle_id))
+        self.db.execute(
+            delete(EnemyPanelEstimateEvidence).where(
+                EnemyPanelEstimateEvidence.battle_id == battle_id
+            )
+        )
+        self.db.execute(delete(EnemyPanelEstimate).where(EnemyPanelEstimate.battle_id == battle_id))
         self.db.execute(delete(BuildCandidate).where(BuildCandidate.battle_id == battle_id))
+        self.db.execute(delete(BattleElfState).where(BattleElfState.battle_id == battle_id))
 
     def _create_self_elf_state(self, battle_id: str, item, elf: ElfDefinition) -> BattleElfState:
         """根据己方配置创建 BattleElfState 和技能槽。"""
