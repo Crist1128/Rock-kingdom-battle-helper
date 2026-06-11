@@ -8,9 +8,27 @@ import { Sheet } from "@/components/ui/sheet";
 import { EffectSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { useAppStore } from "@/store/useAppStore";
 import { buildDamageObservationPayloadV1 } from "@/lib/observationPayload";
-import type { BattleElfStateDict, DamageDisplayType, ObservationCreate, PanelStatsInput, Side } from "@/types/api";
+import type { BattleElfStateDict, BattleEventOut, DamageDisplayType, DamageEventCreateResult, ObservationCreate, PanelStatsInput, Side } from "@/types/api";
 
-export function ManualEventDrawer({ battleId, state }: { battleId?: string | null; state?: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } } }) {
+interface PlannedActionPrefill {
+  kind?: string;
+  skillId?: string | null;
+  switchElfId?: string | null;
+}
+
+export function ManualEventDrawer({
+  battleId,
+  state,
+  onSkillEventResult,
+  onDamageEventResult,
+  plannedActionBySide,
+}: {
+  battleId?: string | null;
+  state?: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } };
+  onSkillEventResult?: (event: BattleEventOut) => void;
+  onDamageEventResult?: (result: DamageEventCreateResult) => void;
+  plannedActionBySide?: Partial<Record<Side, PlannedActionPrefill>>;
+}) {
   const queryClient = useQueryClient();
   const { activeDrawer, drawerSide, closeDrawer } = useAppStore();
   const active = activeDrawer !== null;
@@ -28,24 +46,50 @@ export function ManualEventDrawer({ battleId, state }: { battleId?: string | nul
 
   return (
     <Sheet open={active} title={title} description="MVP 手动输入：只记录事实，不执行真实公式。" onClose={closeDrawer}>
-      {battleId && state && activeDrawer === "skill" ? <SkillUseForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
-      {battleId && state && activeDrawer === "damage" ? <DamageForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
+      {battleId && state && activeDrawer === "skill" ? (
+        <SkillUseForm
+          battleId={battleId}
+          state={state}
+          defaultSide={drawerSide}
+          plannedAction={drawerSide ? plannedActionBySide?.[drawerSide] : undefined}
+          onDone={(event) => {
+            onSkillEventResult?.(event);
+            invalidate();
+            closeDrawer();
+          }}
+        />
+      ) : null}
+      {battleId && state && activeDrawer === "damage" ? (
+        <DamageForm
+          battleId={battleId}
+          state={state}
+          defaultSide={drawerSide}
+          plannedAction={drawerSide ? plannedActionBySide?.[drawerSide] : undefined}
+          onDone={(result) => {
+            onDamageEventResult?.(result);
+            invalidate();
+            closeDrawer();
+          }}
+        />
+      ) : null}
       {battleId && state && activeDrawer === "resource" ? <ResourceForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {battleId && state && activeDrawer === "effect" ? <EffectForm battleId={battleId} state={state} defaultSide={drawerSide} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
-      {battleId && state && activeDrawer === "switch" ? <SwitchForm battleId={battleId} state={state} defaultSide={drawerSide ?? "self"} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
+      {battleId && state && activeDrawer === "switch" ? <SwitchForm battleId={battleId} state={state} defaultSide={drawerSide ?? "self"} plannedAction={drawerSide ? plannedActionBySide?.[drawerSide] : undefined} onDone={() => { invalidate(); closeDrawer(); }} /> : null}
       {!battleId || !state ? <div className="text-sm text-muted-foreground">请先选择战斗并进入工作台。</div> : null}
     </Sheet>
   );
 }
 
-function SkillUseForm({ battleId, state, defaultSide, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; onDone: () => void }) {
+function SkillUseForm({ battleId, state, defaultSide, plannedAction, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; plannedAction?: PlannedActionPrefill; onDone: (event: BattleEventOut) => void }) {
   const activeIds = useActiveElfIds(state, defaultSide);
   const [actorSide, setActorSide] = useState<Side>(activeIds.attackerSide as Side);
-  const [targetSide, setTargetSide] = useState<Side>(activeIds.defenderSide as Side);
-  const [skillId, setSkillId] = useState<string | null>(null);
-  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("false");
-  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("false");
-  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("false");
+  const [targetSide, setTargetSide] = useState<Side>(
+    plannedAction?.kind === "defense_skill" ? activeIds.attackerSide as Side : activeIds.defenderSide as Side,
+  );
+  const [skillId, setSkillId] = useState<string | null>(plannedAction?.skillId ?? null);
+  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("");
+  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("");
+  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("");
   const [notes, setNotes] = useState("");
   const actorElfId = actorSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
   const targetElfId = targetSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
@@ -83,6 +127,9 @@ function SkillUseForm({ battleId, state, defaultSide, onDone }: { battleId: stri
       <div className="rounded-2xl border bg-emerald-50 p-3 text-sm text-emerald-900">
         技能使用会记录 `skill_use` 事件；若该技能已入库结构化操作，后端会自动执行可确定的状态、天气或资源操作。
       </div>
+      <div className="rounded-2xl border bg-blue-50 p-3 text-sm text-blue-900">
+        若这里记录的是防御/应对类技能，同回合下一次该精灵受击时，伤害事件可自动继承这条防御上下文。
+      </div>
       {mutation.error ? <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">提交失败：{String((mutation.error as Error).message)}</div> : null}
       <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="备注" />
       <SubmitButton loading={mutation.isPending} disabled={!skillId} />
@@ -101,16 +148,16 @@ function useActiveElfIds(state: { battle: { self_active_elf_id?: string | null; 
   };
 }
 
-function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; onDone: () => void }) {
+function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; plannedAction?: PlannedActionPrefill; onDone: (result: DamageEventCreateResult) => void }) {
   const activeIds = useActiveElfIds(state, defaultSide);
   const [damageDisplayType, setDamageDisplayType] = useState<DamageDisplayType>("single_damage");
   const [attackerSide, setAttackerSide] = useState<Side>(activeIds.attackerSide as Side);
   const [defenderSide, setDefenderSide] = useState<Side>(activeIds.defenderSide as Side);
-  const [skillId, setSkillId] = useState<string | null>(null);
+  const [skillId, setSkillId] = useState<string | null>(plannedAction?.skillId ?? null);
   const [defenseSkillId, setDefenseSkillId] = useState<string | null>(null);
-  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("false");
-  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("false");
-  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("false");
+  const [responseAttackSuccess, setResponseAttackSuccess] = useState<OptionalBoolInput>("");
+  const [responseDefenseSuccess, setResponseDefenseSuccess] = useState<OptionalBoolInput>("");
+  const [responseStatusSuccess, setResponseStatusSuccess] = useState<OptionalBoolInput>("");
   const [damageValue, setDamageValue] = useState(0);
   const [perHitDamage, setPerHitDamage] = useState(0);
   const [hitCount, setHitCount] = useState(2);
@@ -160,8 +207,8 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
     hitCount: damageDisplayType === "combo_repeated_damage" ? hitCount : 1,
   });
 
-  const mutation = useMutation({ mutationFn: async () => {
-    const damageEvent = await api.battles.createDamageEvent(battleId, {
+  const mutation = useMutation({ mutationFn: () => (
+    api.battles.createDamageEvent(battleId, {
       turn_number: state.battle.turn_number,
       attacker_side: attackerSide,
       attacker_elf_id: attackerElfId,
@@ -184,38 +231,60 @@ function DamageForm({ battleId, state, defaultSide, onDone }: { battleId: string
       damage_tolerance: damageTolerance,
       percent_tolerance: 1,
       notes,
-    });
-    return { damageEvent };
-  }, onSuccess: onDone });
+    })
+  ), onSuccess: onDone });
 
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
       <SideSelect label="攻击方" value={attackerSide} onChange={setAttackerSide} />
       <SideSelect label="防御方" value={defenderSide} onChange={setDefenderSide} />
       <SkillSearchSelect label="技能" value={skillId} onChange={(id) => setSkillId(id)} />
-      <SkillSearchSelect
-        label="防御/应对技能"
-        value={defenseSkillId}
-        onChange={(id) => setDefenseSkillId(id)}
-        elfId={defenderElfId}
-      />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <ResponseResultSelect
-          label="应对攻击"
-          value={responseAttackSuccess}
-          onChange={setResponseAttackSuccess}
-        />
-        <ResponseResultSelect
-          label="应对防御"
-          value={responseDefenseSuccess}
-          onChange={setResponseDefenseSuccess}
-        />
-        <ResponseResultSelect
-          label="应对状态"
-          value={responseStatusSuccess}
-          onChange={setResponseStatusSuccess}
-        />
-      </div>
+      <details className="rounded-2xl border bg-slate-50 p-3 text-sm">
+        <summary className="cursor-pointer font-medium text-slate-800">
+          高级覆盖：手动指定防御 / 应对上下文
+        </summary>
+        <div className="mt-3 space-y-3">
+          <div className="rounded-xl border bg-white p-3 text-xs text-muted-foreground">
+            正常回合流程下先在“结算本回合”记录防御动作，这里保持空白即可。只有补录旧事件、自动继承失败或调试后端应对字段时，才需要手动覆盖。
+          </div>
+          <SkillSearchSelect
+            label="防御/应对技能"
+            value={defenseSkillId}
+            onChange={(id) => setDefenseSkillId(id)}
+            elfId={defenderElfId}
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <ResponseResultSelect
+              label="应对攻击"
+              value={responseAttackSuccess}
+              onChange={setResponseAttackSuccess}
+            />
+            <ResponseResultSelect
+              label="应对防御"
+              value={responseDefenseSuccess}
+              onChange={setResponseDefenseSuccess}
+            />
+            <ResponseResultSelect
+              label="应对状态"
+              value={responseStatusSuccess}
+              onChange={setResponseStatusSuccess}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setDefenseSkillId(null);
+              setResponseAttackSuccess("");
+              setResponseDefenseSuccess("");
+              setResponseStatusSuccess("");
+            }}
+          >
+            清空高级覆盖
+          </Button>
+        </div>
+      </details>
       <div>
         <label className="text-sm font-medium">伤害显示类型</label>
         <Select value={damageDisplayType} onChange={(e) => setDamageDisplayType(e.target.value as DamageDisplayType)}>
@@ -451,9 +520,9 @@ function EffectForm({ battleId, state, defaultSide, onDone }: { battleId: string
   );
 }
 
-function SwitchForm({ battleId, state, defaultSide, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number } }; defaultSide: Side; onDone: () => void }) {
+function SwitchForm({ battleId, state, defaultSide, plannedAction, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number } }; defaultSide: Side; plannedAction?: PlannedActionPrefill; onDone: () => void }) {
   const [side, setSide] = useState<Side>(defaultSide);
-  const [elfId, setElfId] = useState("");
+  const [elfId, setElfId] = useState(plannedAction?.switchElfId ?? "");
   const candidates = useMemo(() => state.elves.filter((elf) => elf.side === side), [state.elves, side]);
   useEffect(() => { if (!elfId && candidates[0]) setElfId(candidates[0].elf_id); }, [candidates, elfId]);
   const mutation = useMutation({ mutationFn: () => api.battles.switchElf(battleId, { side, elf_id: elfId, turn_number: state.battle.turn_number }), onSuccess: onDone });
@@ -483,6 +552,7 @@ function ResponseResultSelect({ label, value, onChange }: { label: string; value
     <div>
       <label className="text-sm font-medium">{label}</label>
       <Select value={value} onChange={(e) => onChange(e.target.value as OptionalBoolInput)}>
+        <option value="">未指定</option>
         <option value="false">失败</option>
         <option value="true">成功</option>
       </Select>
