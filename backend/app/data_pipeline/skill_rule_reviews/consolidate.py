@@ -28,6 +28,7 @@ from typing import Any
 DEFAULT_EFFECTS_OUT = "manual_skill_effect_definitions_all_20260612.json"
 DEFAULT_REVIEWS_OUT = "manual_skill_rule_reviews_all_20260612.json"
 DEFAULT_REPORT_OUT = "manual_skill_rules_consolidation_report_20260612.json"
+ARCHIVE_SOURCE_SUBDIR = Path("archive/manual_reviews_20260612")
 
 MOJIBAKE_MARKERS = (
     "????",
@@ -60,12 +61,23 @@ def write_json(path: Path, rows: list[dict[str, Any]] | dict[str, Any]) -> None:
 
 
 def source_files(seed_dir: Path, prefix: str) -> list[Path]:
-    """返回需要参与整合的历史种子文件，排除已生成的总文件和报告。"""
-    return [
-        path
-        for path in sorted(seed_dir.glob(f"{prefix}*.json"))
-        if "_all_" not in path.name and "consolidation_report" not in path.name
-    ]
+    """??????????????
+
+    ??????? seed ????? ``*_all_20260612.json``???????
+    ????? ``archive/manual_reviews_20260612``????????????
+    ???????????????????????
+    """
+    search_dirs = [seed_dir, seed_dir / ARCHIVE_SOURCE_SUBDIR]
+    files: list[Path] = []
+    for base_dir in search_dirs:
+        if not base_dir.exists():
+            continue
+        files.extend(
+            path
+            for path in sorted(base_dir.glob(f"{prefix}*.json"))
+            if "_all_" not in path.name and "consolidation_report" not in path.name
+        )
+    return files
 
 
 def repair_known_corruption(rows: list[dict[str, Any]], kind: str) -> list[str]:
