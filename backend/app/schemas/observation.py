@@ -26,11 +26,7 @@ class ObservationCreate(BaseModel):
     )
     event_weight: float | None = Field(
         default=None,
-        description="本事件的评分权重；不传时由 matcher 使用默认权重",
-    )
-    allow_hard_exclude: bool = Field(
-        default=False,
-        description="废弃字段；实时反推主流程不会写旧候选或硬排除",
+        description="本事件的估计权重；不传时由实时估计服务使用默认权重",
     )
 
 
@@ -46,4 +42,3 @@ class ObservationProcessResult(BaseModel):
     inferred_stat_count: int = 0
     affected_stats: list[str] = Field(default_factory=list)
     unknown_factor_count: int = 0
-    hard_filter_applied: bool

@@ -47,7 +47,12 @@ export function EventTimeline({
                 <Badge variant="outline">{turn.events.length} 事件</Badge>
               </div>
               <div className="space-y-2">
-                {turn.events.map((item) => (
+                {turn.events.map((item) => {
+                  const payload = parsePayload(item.event.payload_json);
+                  const ruleConflicts = Array.isArray(payload.rule_conflicts)
+                    ? payload.rule_conflicts.filter(isRecord)
+                    : [];
+                  return (
                   <div
                     key={item.event.event_id}
                     className={selectedEventId === item.event.event_id ? "rounded-2xl border border-primary bg-white p-3" : "rounded-2xl border bg-white p-3"}
@@ -63,6 +68,14 @@ export function EventTimeline({
                       <span>技能：{compactId(item.event.skill_id)}</span>
                       <span>快照：{compactId(item.event.snapshot_id)}</span>
                     </div>
+                    {ruleConflicts.length > 0 ? (
+                      <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                        规则冲突：
+                        {ruleConflicts
+                          .map((conflict) => String(conflict.message ?? conflict.conflict_type ?? "未知冲突"))
+                          .join("；")}
+                      </div>
+                    ) : null}
                     {!compact ? (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {onSelectEvent ? (
@@ -84,7 +97,8 @@ export function EventTimeline({
                       </pre>
                     ) : null}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -138,4 +152,18 @@ function formatJsonText(value: string) {
   } catch {
     return value;
   }
+}
+
+function parsePayload(value?: string | null): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

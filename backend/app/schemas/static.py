@@ -11,6 +11,8 @@
 所有输出 Schema 都继承 ORMBase，支持直接从 ORM 模型转换。
 """
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMBase
@@ -101,6 +103,90 @@ class SkillDefinitionOut(ORMBase):
     damage_rule_json: str | None = None
     hit_rule_json: str | None = None
     effect_operations_json: str | None = None
+
+
+class SkillRuleReviewOut(SkillDefinitionOut):
+    """技能规则审阅列表输出。"""
+
+    review_status: str = Field(..., description="人工审阅状态")
+    review_notes: str | None = Field(default=None, description="人工审阅备注")
+    has_damage_rule: bool = Field(..., description="是否已有伤害/防御规则 JSON")
+    has_hit_rule: bool = Field(..., description="是否已有命中/连击规则 JSON")
+    has_effect_operations: bool = Field(..., description="是否已有结构化效果操作")
+    rule_source: str = Field(..., description="规则来源摘要")
+
+
+class SkillRuleCapabilityItem(BaseModel):
+    """技能机制能力审计条目。"""
+
+    key: str = Field(..., description="机制或规则键")
+    label: str = Field(..., description="中文说明")
+    implemented: bool = Field(..., description="当前代码是否有执行链")
+    tested: bool = Field(default=False, description="是否已有自动化测试覆盖")
+    count: int = Field(default=0, description="规则库中出现次数")
+    examples: list[str] = Field(default_factory=list, description="示例技能或规则")
+    notes: str | None = Field(default=None, description="风险或剩余说明")
+
+
+class SkillRuleCapabilityAuditOut(BaseModel):
+    """技能规则执行能力审计输出。"""
+
+    total_skills: int = Field(..., description="技能总数")
+    review_status_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="审阅状态统计",
+    )
+    executable_operation_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="已支持 effect operation 类型统计",
+    )
+    unsupported_operation_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="尚未支持 effect operation 类型统计",
+    )
+    future_hook_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="future_hooks 类型统计",
+    )
+    supported_future_hook_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="已有执行链或最小状态机的 future_hooks 统计",
+    )
+    reserved_future_hook_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="仍保留为接口/未执行的 future_hooks 统计",
+    )
+    implemented_capabilities: list[SkillRuleCapabilityItem] = Field(
+        default_factory=list,
+        description="已实现能力清单",
+    )
+    pending_capabilities: list[SkillRuleCapabilityItem] = Field(
+        default_factory=list,
+        description="未实现或仅部分实现机制清单",
+    )
+    risk_notes: list[str] = Field(default_factory=list, description="审计风险提示")
+
+
+class SkillRuleManualUpdate(BaseModel):
+    """手动维护技能规则请求。
+
+    字段未传表示保持原值；显式传 null 表示清空对应 JSON 字段。
+    """
+
+    damage_rule: dict[str, Any] | None = Field(
+        default=None,
+        description="伤害、防御、应对等规则对象；不确定时不要填写伪规则",
+    )
+    hit_rule: dict[str, Any] | None = Field(default=None, description="命中/连击规则对象")
+    effect_operations: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="技能结构化效果操作数组",
+    )
+    review_status: str = Field(
+        default="structured",
+        description="审阅状态：structured/partial/needs_review/ambiguous/unreviewed",
+    )
+    review_notes: str | None = Field(default=None, description="人工备注或待确认原因")
 
 
 class EffectDefinitionOut(ORMBase):

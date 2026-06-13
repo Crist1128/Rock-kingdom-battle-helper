@@ -12,7 +12,9 @@
     "attach_target_type": "elf",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["灼烧"],
+    "recognition_alias_json": [
+      "灼烧"
+    ],
     "default_layers": 1,
     "max_layers": null,
     "stack_rule": "add_layers",
@@ -33,7 +35,9 @@
     "can_be_doubled": true,
     "conflict_group": null,
     "conflict_policy": null,
-    "formula_hooks_json": ["end_turn_status_damage"],
+    "formula_hooks_json": [
+      "end_turn_status_damage"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -46,7 +50,9 @@
       "element_type": "火",
       "uses_type_effectiveness": true,
       "affected_by_reduction": false,
-      "after_settlement": {"layer_change": "halve_floor"}
+      "after_settlement": {
+        "layer_change": "halve_floor"
+      }
     },
     "special_rule_id": null,
     "developer_notes": "火系精灵免疫获得灼烧；充分燃烧的即时结算走技能 special_rule。",
@@ -65,7 +71,9 @@
     "attach_target_type": "elf",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["中毒"],
+    "recognition_alias_json": [
+      "中毒"
+    ],
     "default_layers": 1,
     "max_layers": null,
     "stack_rule": "add_layers",
@@ -86,7 +94,9 @@
     "can_be_doubled": false,
     "conflict_group": null,
     "conflict_policy": null,
-    "formula_hooks_json": ["end_turn_status_damage"],
+    "formula_hooks_json": [
+      "end_turn_status_damage"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -99,7 +109,9 @@
       "element_type": "毒",
       "uses_type_effectiveness": true,
       "affected_by_reduction": false,
-      "after_settlement": {"layer_change": "unchanged"}
+      "after_settlement": {
+        "layer_change": "unchanged"
+      }
     },
     "special_rule_id": null,
     "developer_notes": "毒系精灵免疫获得中毒状态；中毒印记先于中毒状态结算。",
@@ -118,7 +130,9 @@
     "attach_target_type": "elf",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["寄生"],
+    "recognition_alias_json": [
+      "寄生"
+    ],
     "default_layers": 1,
     "max_layers": 1,
     "stack_rule": "replace",
@@ -139,7 +153,10 @@
     "can_be_doubled": false,
     "conflict_group": null,
     "conflict_policy": null,
-    "formula_hooks_json": ["end_turn_status_damage", "heal_source_by_damage"],
+    "formula_hooks_json": [
+      "end_turn_status_damage",
+      "heal_source_by_damage"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -153,7 +170,9 @@
       "uses_type_effectiveness": false,
       "affected_by_reduction": false,
       "heal_opponent_by_damage": true,
-      "after_settlement": {"layer_change": "unchanged"}
+      "after_settlement": {
+        "layer_change": "unchanged"
+      }
     },
     "special_rule_id": null,
     "developer_notes": "草系精灵免疫获得寄生；造成伤害后对方按伤害量回复。",
@@ -172,7 +191,9 @@
     "attach_target_type": "elf",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["冻结"],
+    "recognition_alias_json": [
+      "冻结"
+    ],
     "default_layers": 1,
     "max_layers": null,
     "stack_rule": "add_layers",
@@ -193,7 +214,9 @@
     "can_be_doubled": true,
     "conflict_group": null,
     "conflict_policy": null,
-    "formula_hooks_json": ["freeze_threshold_check"],
+    "formula_hooks_json": [
+      "freeze_threshold_check"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -221,7 +244,10 @@
     "attach_target_type": "side",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["棘刺", "棘刺印记"],
+    "recognition_alias_json": [
+      "棘刺",
+      "棘刺印记"
+    ],
     "default_layers": 1,
     "max_layers": null,
     "stack_rule": "add_layers",
@@ -242,7 +268,9 @@
     "can_be_doubled": false,
     "conflict_group": null,
     "conflict_policy": null,
-    "formula_hooks_json": ["switch_in_status_damage"],
+    "formula_hooks_json": [
+      "switch_in_status_damage"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -255,7 +283,9 @@
       "element_type": null,
       "uses_type_effectiveness": false,
       "affected_by_reduction": false,
-      "after_settlement": {"layer_change": "unchanged"}
+      "after_settlement": {
+        "layer_change": "unchanged"
+      }
     },
     "special_rule_id": null,
     "developer_notes": "队伍侧印记，UI 与状态同栏展示；精灵入场时每层失去 6% 最大生命。",
@@ -274,7 +304,9 @@
     "attach_target_type": "side",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["中毒印记"],
+    "recognition_alias_json": [
+      "中毒印记"
+    ],
     "default_layers": 1,
     "max_layers": null,
     "stack_rule": "add_layers",
@@ -295,7 +327,9 @@
     "can_be_doubled": false,
     "conflict_group": null,
     "conflict_policy": null,
-    "formula_hooks_json": ["end_turn_status_damage"],
+    "formula_hooks_json": [
+      "end_turn_status_damage"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -308,7 +342,9 @@
       "element_type": "毒",
       "uses_type_effectiveness": true,
       "affected_by_reduction": false,
-      "after_settlement": {"layer_change": "unchanged"}
+      "after_settlement": {
+        "layer_change": "unchanged"
+      }
     },
     "special_rule_id": null,
     "developer_notes": "队伍侧印记，UI 与状态同栏展示；毒系精灵仍受中毒印记伤害。",
@@ -327,7 +363,10 @@
     "attach_target_type": "side",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["星陨", "星陨印记"],
+    "recognition_alias_json": [
+      "星陨",
+      "星陨印记"
+    ],
     "default_layers": 1,
     "max_layers": null,
     "stack_rule": "add_layers",
@@ -348,7 +387,9 @@
     "can_be_doubled": true,
     "conflict_group": null,
     "conflict_policy": null,
-    "formula_hooks_json": ["post_attack_trigger_damage"],
+    "formula_hooks_json": [
+      "post_attack_trigger_damage"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -360,7 +401,9 @@
       "uses_type_effectiveness": true,
       "affected_by_reduction": true,
       "power_formula": "layers^2 + layers * 24 - 24",
-      "after_settlement": {"layer_change": "clear"}
+      "after_settlement": {
+        "layer_change": "clear"
+      }
     },
     "special_rule_id": "starfall_damage",
     "developer_notes": "使用非幻系技能攻击拥有此印记的精灵时触发，消耗全部层数造成额外幻系伤害；按幻系对防御方属性计算克制/抵抗。",
@@ -379,7 +422,9 @@
     "attach_target_type": "field",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["雨天"],
+    "recognition_alias_json": [
+      "雨天"
+    ],
     "default_layers": 1,
     "max_layers": 1,
     "stack_rule": "replace",
@@ -400,7 +445,9 @@
     "can_be_doubled": false,
     "conflict_group": "weather",
     "conflict_policy": "replace_old",
-    "formula_hooks_json": ["weather_damage_bonus"],
+    "formula_hooks_json": [
+      "weather_damage_bonus"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": {
@@ -428,7 +475,9 @@
     "attach_target_type": "field",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["沙暴"],
+    "recognition_alias_json": [
+      "沙暴"
+    ],
     "default_layers": 1,
     "max_layers": 1,
     "stack_rule": "replace",
@@ -449,7 +498,9 @@
     "can_be_doubled": false,
     "conflict_group": "weather",
     "conflict_policy": "replace_old",
-    "formula_hooks_json": ["weather_skill_cost_modifier"],
+    "formula_hooks_json": [
+      "weather_skill_cost_modifier"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": {
@@ -477,7 +528,10 @@
     "attach_target_type": "field",
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
-    "recognition_alias_json": ["暴风雪", "冬至天气"],
+    "recognition_alias_json": [
+      "暴风雪",
+      "冬至天气"
+    ],
     "default_layers": 1,
     "max_layers": 1,
     "stack_rule": "replace",
@@ -498,7 +552,9 @@
     "can_be_doubled": false,
     "conflict_group": "weather",
     "conflict_policy": "replace_old",
-    "formula_hooks_json": ["end_turn_apply_effect"],
+    "formula_hooks_json": [
+      "end_turn_apply_effect"
+    ],
     "stat_modifier_json": null,
     "damage_modifier_json": null,
     "skill_modifier_json": null,
@@ -513,5 +569,661 @@
     "special_rule_id": null,
     "developer_notes": "双方队伍每回合结束获得 2 层冻结。",
     "data_version": "p0_manual_20260529"
+  },
+  {
+    "effect_id": "effect_dual_attack_down_layered",
+    "effect_name": "双攻降低",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "negative",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "双攻降低"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "physical_attack",
+          "value_type": "percent_add",
+          "value_per_layer": -0.1
+        },
+        {
+          "modifier_type": "stat_stage",
+          "stat": "magic_attack",
+          "value_type": "percent_add",
+          "value_per_layer": -0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_dual_attack_up_layered",
+    "effect_name": "双攻增加",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "positive",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "双攻增加"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "physical_attack",
+          "value_type": "percent_add",
+          "value_per_layer": 0.1
+        },
+        {
+          "modifier_type": "stat_stage",
+          "stat": "magic_attack",
+          "value_type": "percent_add",
+          "value_per_layer": 0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_dual_defense_down_layered",
+    "effect_name": "双防降低",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "negative",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "双防降低"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "physical_defense",
+          "value_type": "percent_add",
+          "value_per_layer": -0.1
+        },
+        {
+          "modifier_type": "stat_stage",
+          "stat": "magic_defense",
+          "value_type": "percent_add",
+          "value_per_layer": -0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_magic_attack_up_layered",
+    "effect_name": "魔攻增加",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "positive",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "魔攻增加"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "magic_attack",
+          "value_type": "percent_add",
+          "value_per_layer": 0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_magic_defense_down_layered",
+    "effect_name": "魔防降低",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "negative",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "魔防降低"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "magic_defense",
+          "value_type": "percent_add",
+          "value_per_layer": -0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_physical_attack_down_layered",
+    "effect_name": "物攻降低",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "negative",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "物攻降低"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "physical_attack",
+          "value_type": "percent_add",
+          "value_per_layer": -0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_physical_attack_up_layered",
+    "effect_name": "物攻增加",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "positive",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "物攻增加"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "physical_attack",
+          "value_type": "percent_add",
+          "value_per_layer": 0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_physical_defense_down_layered",
+    "effect_name": "物防降低",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "negative",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "物防降低"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "physical_defense",
+          "value_type": "percent_add",
+          "value_per_layer": -0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_physical_defense_up_layered",
+    "effect_name": "物防增加",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "positive",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "物防增加"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "stat_stage",
+          "stat": "physical_defense",
+          "value_type": "percent_add",
+          "value_per_layer": 0.1
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_speed_down_layered",
+    "effect_name": "速度降低",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "negative",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "速度降低"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "flat_speed",
+          "stat": "speed",
+          "value_type": "flat_add",
+          "value_per_layer": -10
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
+  },
+  {
+    "effect_id": "effect_speed_up_layered",
+    "effect_name": "速度增加",
+    "icon": null,
+    "category": "stat_modifier",
+    "polarity": "positive",
+    "display_group": "stat_modifier_layered",
+    "display_priority": 300,
+    "owner_scope": "elf",
+    "target_scope": "single",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": true,
+    "recognition_alias_json": [
+      "速度增加"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": "keep_duration",
+    "duration_type": "until_switch_or_cleanse",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": true,
+    "can_be_converted": true,
+    "can_be_inherited": false,
+    "can_be_stolen": true,
+    "can_be_doubled": true,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "stat_modifier"
+    ],
+    "stat_modifier_json": {
+      "modifier_type": "stat_stage",
+      "modifiers": [
+        {
+          "modifier_type": "flat_speed",
+          "stat": "speed",
+          "value_type": "flat_add",
+          "value_per_layer": 10
+        }
+      ]
+    },
+    "damage_modifier_json": null,
+    "skill_modifier_json": null,
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "标准层数状态：属性百分比每层 10%，速度每层 10 点。",
+    "data_version": "manual_layered_standard_20260613"
   }
 ]

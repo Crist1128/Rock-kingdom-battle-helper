@@ -104,7 +104,7 @@ class DamageEvent(TimestampMixin, Base):
     - 连击：记录 per_hit_damage_value 和 hit_count
 
     伤害事件是敌方配置推算的主要依据，通过对比理论伤害和实际伤害，
-    可以排除不可能的候选配置。
+    可以记录不满足当前实时估计约束的冲突。
 
     Attributes:
         event_id: 伤害事件唯一标识（主键）

@@ -53,7 +53,7 @@ class EnemyPanelEstimateEvidenceOut(BaseModel):
     inferred_stats: dict[str, Any] | None = Field(default=None, description="本次推导属性")
     constraint_delta: dict[str, Any] | None = Field(default=None, description="约束变化")
     formula_context: dict[str, Any] | None = Field(default=None, description="公式上下文")
+    explanation: dict[str, Any] | None = Field(default=None, description="面向前端展示的推导解释")
     unknown_factors: list[str] = Field(default_factory=list, description="未知因素")
     conflict: dict[str, Any] | None = Field(default=None, description="冲突信息")
     confidence: str | None = Field(default=None, description="本次推导置信状态")
-

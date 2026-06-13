@@ -2,9 +2,10 @@
 伤害事件服务。
 
 第一阶段只负责事实记录、快照绑定和公式占位返回。伤害观测会同步写入
-敌方实时面板估计，不再写旧候选空间。
+敌方实时面板估计。
 """
 
+from decimal import Decimal
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -14,10 +15,11 @@ from app.calculation.damage_calculator import DamageCalculator
 from app.calculation.formula_context import DamageFormulaContext, PanelStats
 from app.calculation.rule_resolver import RuleResolver
 from app.core.enums import BattleEventType, DamageDisplayType, EventSource
-from app.inference.observation_matcher import ObservationEventInput
+from app.inference.observation_event import ObservationEventInput
 from app.inference.observation_types import ObservationType
 from app.models.battle import Battle, BattleElfState
 from app.models.event import BattleEvent, DamageEvent, ResourceChangeEvent
+from app.models.static import EffectDefinition, SkillDefinition
 from app.schemas.event import DamageEventCreate, DamageEventCreateResult
 from app.services.battle_service import BattleService
 from app.services.estimate_service import EstimateService
@@ -48,11 +50,59 @@ class DamageEventService:
         5. 调用伤害计算器，返回公式计算结果或占位状态；
         6. 可选更新防御方生命百分比。
         """
-        battle = BattleService(self.db).require_battle(battle_id)
+        battle_service = BattleService(self.db)
+        battle = battle_service.require_battle(battle_id)
         turn_number = payload.turn_number if payload.turn_number is not None else battle.turn_number
         total_damage = self._resolve_total_damage(payload)
         hp_percent_delta = self._resolve_hp_percent_delta(payload)
-        rule_payload = payload.model_dump(mode="json")
+        effective_payload = payload.model_dump(mode="json")
+        status_rule = self._resolve_status_effect_rule(payload.effect_id)
+        formula_type = payload.formula_type or "attack"
+        effect_layers = payload.effect_layers or self._resolve_active_effect_layers(
+            battle_id=battle_id,
+            effect_id=payload.effect_id,
+            target_side=payload.defender_side,
+            target_elf_id=payload.defender_elf_id,
+        )
+        skill_element_type = payload.skill_element_type or self._status_rule_element_type(
+            status_rule
+        )
+        effective_payload["formula_type"] = formula_type
+        if payload.effect_id:
+            effective_payload["effect_id"] = payload.effect_id
+        if effect_layers is not None:
+            effective_payload["effect_layers"] = effect_layers
+        if skill_element_type is not None:
+            effective_payload["skill_element_type"] = skill_element_type
+        status_percent_per_layer = self._status_rule_percent_per_layer(status_rule)
+        if status_percent_per_layer is not None:
+            effective_payload["status_percent_per_layer"] = float(status_percent_per_layer)
+        status_uses_type_effectiveness = self._status_rule_uses_type_effectiveness(status_rule)
+        if status_uses_type_effectiveness is not None:
+            effective_payload["status_uses_type_effectiveness"] = status_uses_type_effectiveness
+        defense_context = self._resolve_defense_response_context(
+            battle_id=battle_id,
+            turn_number=turn_number,
+            defender_side=payload.defender_side,
+            defender_elf_id=payload.defender_elf_id,
+            explicit_defense_skill_id=payload.defense_skill_id,
+            explicit_response_flags={
+                "response_attack_success": payload.response_attack_success,
+                "response_defense_success": payload.response_defense_success,
+                "response_status_success": payload.response_status_success,
+            },
+        )
+        effective_payload.update(defense_context)
+        condition_flags = self._resolve_condition_flags(
+            battle_id=battle_id,
+            turn_number=turn_number,
+            payload=payload,
+        )
+        if condition_flags:
+            effective_payload["condition_flags"] = condition_flags
+            for key, value in condition_flags.items():
+                effective_payload.setdefault(key, value)
+        rule_payload = dict(effective_payload)
         if self._should_resolve_rules(rule_payload):
             rule_payload["resolve_rules"] = True
 
@@ -69,11 +119,15 @@ class DamageEventService:
             skill_confirmed=payload.skill_confirmed,
             source=EventSource.MANUAL_INPUT.value,
             manual_override=True,
-            payload_json=dumps_json(payload.model_dump(mode="json")),
+            payload_json=dumps_json(effective_payload),
             notes=payload.notes,
         )
         self.db.add(battle_event)
         self.db.flush()
+        observed_skill_slot = battle_service.ensure_observed_skill_slot(battle_event)
+        if observed_skill_slot:
+            effective_payload["skill_runtime"] = observed_skill_slot
+            battle_event.payload_json = dumps_json(effective_payload)
 
         snapshot = SnapshotService(self.db).create_effect_snapshot(
             battle_id=battle_id,
@@ -127,19 +181,25 @@ class DamageEventService:
             damage_event_id=damage_event.event_id,
             battle_event_id=battle_event.event_id,
             snapshot_id=snapshot.snapshot_id,
+            formula_type=formula_type,
             attacker_side=payload.attacker_side,
             attacker_elf_id=payload.attacker_elf_id,
             defender_side=payload.defender_side,
             defender_elf_id=payload.defender_elf_id,
             skill_id=payload.skill_id,
-            defense_skill_id=payload.defense_skill_id,
-            response_attack_success=payload.response_attack_success,
-            response_defense_success=payload.response_defense_success,
-            response_status_success=payload.response_status_success,
+            defense_skill_id=effective_payload.get("defense_skill_id"),
+            response_attack_success=effective_payload.get("response_attack_success"),
+            response_defense_success=effective_payload.get("response_defense_success"),
+            response_status_success=effective_payload.get("response_status_success"),
+            skill_element_type=skill_element_type,
             attacker_panel_stats=self._panel_stats_from_state(attacker_state),
             defender_panel_stats=defender_panel_stats,
             defender_max_hp=defender_panel_stats.hp if defender_panel_stats is not None else None,
             damage_display_type=payload.damage_display_type.value,
+            effect_id=payload.effect_id,
+            effect_layers=effect_layers or 1,
+            status_percent_per_layer=status_percent_per_layer,
+            status_uses_type_effectiveness=status_uses_type_effectiveness,
             observed_damage_value=total_damage,
             observed_hp_percent_delta=hp_percent_delta,
             snapshot_payload=loads_json(snapshot.full_snapshot_json, []),
@@ -160,8 +220,6 @@ class DamageEventService:
             "status": damage_result.status,
             "damage_event_id": damage_event.event_id,
             "estimate_updated": bool(estimate_observation_results),
-            "legacy_candidate_filter_applied": False,
-            "legacy_excluded_candidate_count": 0,
             "confidence": damage_result.confidence,
             "missing_parts": damage_result.missing_parts,
             "message": damage_result.message,
@@ -228,6 +286,79 @@ class DamageEventService:
             return payload.enemy_hp_percent_damage
         return round(payload.hp_percent_before - payload.hp_percent_after, 4)
 
+    def _resolve_status_effect_rule(self, effect_id: str | None) -> dict:
+        """读取状态结算规则，用于手动录入状态伤害时补全属性和百分比。"""
+        if not effect_id:
+            return {}
+        definition = self.db.get(EffectDefinition, effect_id)
+        if definition is None or definition.deleted_at is not None:
+            return {}
+        resource_rule = loads_json(definition.resource_modifier_json, {})
+        return resource_rule if isinstance(resource_rule, dict) else {}
+
+    def _resolve_active_effect_layers(
+        self,
+        *,
+        battle_id: str,
+        effect_id: str | None,
+        target_side: str | None,
+        target_elf_id: str | None,
+    ) -> int | None:
+        """未手动指定层数时，从目标身上或目标队伍侧当前生效状态读取层数。"""
+        if not effect_id or not target_side:
+            return None
+        from app.models.effect import BattleEffectInstance
+
+        base_conditions = [
+            BattleEffectInstance.battle_id == battle_id,
+            BattleEffectInstance.effect_id == effect_id,
+            BattleEffectInstance.is_active.is_(True),
+            BattleEffectInstance.owner_side == target_side,
+        ]
+        if target_elf_id:
+            elf_instance = self.db.scalars(
+                select(BattleEffectInstance)
+                .where(
+                    *base_conditions,
+                    BattleEffectInstance.owner_scope == "elf",
+                    BattleEffectInstance.owner_elf_id == target_elf_id,
+                )
+                .order_by(BattleEffectInstance.created_at.desc())
+            ).first()
+            side_instance = self.db.scalars(
+                select(BattleEffectInstance)
+                .where(*base_conditions, BattleEffectInstance.owner_scope == "side")
+                .order_by(BattleEffectInstance.created_at.desc())
+            ).first()
+            instance = elf_instance or side_instance
+        else:
+            instance = self.db.scalars(
+                select(BattleEffectInstance)
+                .where(*base_conditions)
+                .order_by(BattleEffectInstance.created_at.desc())
+            ).first()
+        return int(instance.layers) if instance is not None and instance.layers else None
+
+    @staticmethod
+    def _status_rule_element_type(resource_rule: dict) -> str | None:
+        value = resource_rule.get("element_type")
+        return str(value) if value is not None and str(value) else None
+
+    @staticmethod
+    def _status_rule_percent_per_layer(resource_rule: dict) -> Decimal | None:
+        value = resource_rule.get("percent_per_layer")
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except Exception:
+            return None
+
+    @staticmethod
+    def _status_rule_uses_type_effectiveness(resource_rule: dict) -> bool | None:
+        value = resource_rule.get("uses_type_effectiveness")
+        return bool(value) if value is not None else None
+
     @staticmethod
     def _resolve_value_damage_delta(payload: DamageEventCreate) -> int | None:
         """根据前后精确生命值计算伤害值。"""
@@ -245,16 +376,227 @@ class DamageEventService:
     @staticmethod
     def _should_resolve_rules(payload: dict) -> bool:
         """有技能或应对/防御上下文时启用规则解析，结果只进入实时估计上下文。"""
+        if payload.get("formula_type") not in {None, "attack"}:
+            return True
         return any(
             payload.get(key) is not None
             for key in (
+                "effect_id",
+                "skill_element_type",
                 "skill_id",
                 "defense_skill_id",
                 "response_attack_success",
                 "response_defense_success",
                 "response_status_success",
+                "condition_flags",
             )
         )
+
+    def _resolve_condition_flags(
+        self,
+        *,
+        battle_id: str,
+        turn_number: int,
+        payload: DamageEventCreate,
+    ) -> dict[str, bool]:
+        """合并手动条件和同回合可推断条件，供技能分支读取。"""
+        result: dict[str, bool] = {}
+        if isinstance(payload.condition_flags, dict):
+            result.update(
+                {
+                    str(key): bool(value)
+                    for key, value in payload.condition_flags.items()
+                    if isinstance(key, str) and isinstance(value, bool)
+                }
+            )
+
+        switched_sides = self._switched_sides_this_turn(
+            battle_id=battle_id,
+            turn_number=turn_number,
+        )
+        if "self" in switched_sides:
+            result.setdefault("self_switched_this_turn", True)
+        if "enemy" in switched_sides:
+            result.setdefault("enemy_switched_this_turn", True)
+        if payload.defender_side in switched_sides:
+            result.setdefault("target_switched_this_turn", True)
+            result.setdefault("defender_switched_this_turn", True)
+        if payload.attacker_side in switched_sides:
+            result.setdefault("actor_switched_this_turn", True)
+        return result
+
+    def _switched_sides_this_turn(self, *, battle_id: str, turn_number: int) -> set[str]:
+        stmt = select(BattleEvent.actor_side).where(
+            BattleEvent.battle_id == battle_id,
+            BattleEvent.turn_number == turn_number,
+            BattleEvent.event_type == BattleEventType.SWITCH_ELF.value,
+            BattleEvent.actor_side.is_not(None),
+            BattleEvent.is_voided.is_(False),
+        )
+        return {side for side in self.db.scalars(stmt).all() if side}
+
+    def _resolve_defense_response_context(
+        self,
+        *,
+        battle_id: str,
+        turn_number: int,
+        defender_side: str | None,
+        defender_elf_id: str | None,
+        explicit_defense_skill_id: str | None,
+        explicit_response_flags: dict[str, bool | None],
+    ) -> dict:
+        """从同回合已记录的防御动作推导本次伤害的防御/应对上下文。"""
+        result: dict = {
+            key: value for key, value in explicit_response_flags.items() if value is not None
+        }
+        if explicit_defense_skill_id:
+            result["defense_skill_id"] = explicit_defense_skill_id
+            result["defense_response_source"] = "manual_damage_payload"
+            return result
+        if defender_side is None or defender_elf_id is None:
+            return result
+
+        defense_event = self._find_latest_unconsumed_defense_event(
+            battle_id=battle_id,
+            turn_number=turn_number,
+            defender_side=defender_side,
+            defender_elf_id=defender_elf_id,
+        )
+        if defense_event is None or defense_event.skill_id is None:
+            return result
+
+        result.update(
+            self._infer_response_flags_from_defense_skill(
+                defense_event.skill_id,
+                existing_flags=result,
+            )
+        )
+        result.update(
+            {
+                "defense_skill_id": defense_event.skill_id,
+                "defense_response_source": "latest_same_turn_defense_skill_event",
+                "defense_response_event_id": defense_event.event_id,
+                "defense_response_action_order": defense_event.action_order,
+            }
+        )
+        return result
+
+    def _find_latest_unconsumed_defense_event(
+        self,
+        *,
+        battle_id: str,
+        turn_number: int,
+        defender_side: str,
+        defender_elf_id: str,
+    ) -> BattleEvent | None:
+        """查找同回合该防御方最近一次尚未被自动消费的防御技能事件。"""
+        stmt = (
+            select(BattleEvent)
+            .where(
+                BattleEvent.battle_id == battle_id,
+                BattleEvent.turn_number == turn_number,
+                BattleEvent.event_type == BattleEventType.SKILL_USE.value,
+                BattleEvent.actor_side == defender_side,
+                BattleEvent.actor_elf_id == defender_elf_id,
+                BattleEvent.skill_id.is_not(None),
+                BattleEvent.is_voided.is_(False),
+            )
+            .order_by(
+                BattleEvent.action_order.desc().nullslast(),
+                BattleEvent.created_at.desc(),
+            )
+        )
+        for event in self.db.scalars(stmt).all():
+            if not self._skill_has_defense_modifier(event.skill_id):
+                continue
+            if self._defense_event_already_consumed(
+                battle_id=battle_id,
+                turn_number=turn_number,
+                defense_event=event,
+                defender_side=defender_side,
+                defender_elf_id=defender_elf_id,
+            ):
+                continue
+            return event
+        return None
+
+    def _defense_event_already_consumed(
+        self,
+        *,
+        battle_id: str,
+        turn_number: int,
+        defense_event: BattleEvent,
+        defender_side: str,
+        defender_elf_id: str,
+    ) -> bool:
+        """防御动作默认只自动套到下一次命中的伤害事件。"""
+        stmt = select(BattleEvent).where(
+            BattleEvent.battle_id == battle_id,
+            BattleEvent.turn_number == turn_number,
+            BattleEvent.target_side == defender_side,
+            BattleEvent.target_elf_id == defender_elf_id,
+            BattleEvent.event_type.in_(
+                [BattleEventType.DAMAGE.value, BattleEventType.COMBO_DAMAGE.value]
+            ),
+            BattleEvent.is_voided.is_(False),
+        )
+        for event in self.db.scalars(stmt).all():
+            payload = loads_json(event.payload_json, {})
+            if isinstance(payload, dict) and (
+                payload.get("defense_response_event_id") == defense_event.event_id
+            ):
+                return True
+        return False
+
+    def _skill_has_defense_modifier(self, skill_id: str | None) -> bool:
+        """判断技能定义是否包含可用于伤害减免的防御规则。"""
+        if skill_id is None:
+            return False
+        skill = self.db.get(SkillDefinition, skill_id)
+        if skill is None or skill.deleted_at is not None:
+            return False
+        rule = loads_json(skill.damage_rule_json, {})
+        if not isinstance(rule, dict):
+            return False
+        return any(
+            rule.get(key) is not None
+            for key in ("damage_reduction", "reduction", "damage_multiplier", "multiplier")
+        )
+
+    def _infer_response_flags_from_defense_skill(
+        self,
+        skill_id: str,
+        *,
+        existing_flags: dict,
+    ) -> dict[str, bool]:
+        """按防御技能 response_rule 推导本次攻击伤害的应对旗标。"""
+        explicit_flags = {
+            key: bool(value)
+            for key, value in existing_flags.items()
+            if key.startswith("response_") and value is not None
+        }
+        if explicit_flags:
+            return explicit_flags
+
+        skill = self.db.get(SkillDefinition, skill_id)
+        if skill is None or skill.deleted_at is not None:
+            return {}
+        rule = loads_json(skill.damage_rule_json, {})
+        response_rule = rule.get("response_rule") if isinstance(rule, dict) else None
+        if not isinstance(response_rule, dict):
+            return {}
+
+        condition = response_rule.get("condition")
+        target = response_rule.get("target") or response_rule.get("response_target")
+        if condition is None and target in {"attack", "defense", "status"}:
+            condition = f"response_{target}_success"
+
+        # DamageEvent 表示一次攻击伤害，因此 target=attack 的防御应对可以自动判定成功。
+        if condition == "response_attack_success":
+            return {"response_attack_success": True}
+        if isinstance(condition, str) and condition.startswith("response_"):
+            return {condition: False}
+        return {}
 
     def _get_elf_state(
         self,
@@ -424,14 +766,23 @@ class DamageEventService:
         hp_percent_delta: float | None,
     ) -> list[dict]:
         """把已确认的伤害事件同步转成实时面板估计观测。"""
-        if not payload.sync_observation or total_damage is None or not payload.skill_id:
+        if not payload.sync_observation or total_damage is None:
             return []
         enemy_role, enemy_elf_id = self._resolve_enemy_observation_target(payload)
         if enemy_role is None or enemy_elf_id is None:
             return []
-        if enemy_role == "defender" and context.attacker_panel_stats is None:
-            return []
-        if enemy_role == "attacker" and context.defender_panel_stats is None:
+        formula_type = payload.formula_type or "attack"
+        if formula_type == "attack":
+            if not payload.skill_id:
+                return []
+            if enemy_role == "defender" and context.attacker_panel_stats is None:
+                return []
+            if enemy_role == "attacker" and context.defender_panel_stats is None:
+                return []
+        elif formula_type == "status":
+            if enemy_role != "defender" or not payload.effect_id:
+                return []
+        else:
             return []
 
         base_payload = context.model_dump(mode="json")
@@ -455,7 +806,6 @@ class DamageEventService:
             observation_type=ObservationType.DAMAGE_VALUE,
             observed_value=total_damage,
             payload=base_payload,
-            allow_hard_exclude=False,
         )
         estimate = estimate_service.record_observation(damage_observation, commit=False)
         if estimate is not None:
@@ -490,7 +840,6 @@ class DamageEventService:
                 observation_type=ObservationType.HP_PERCENT_DELTA,
                 observed_value=hp_percent_delta,
                 payload=percent_payload,
-                allow_hard_exclude=False,
             )
             estimate = estimate_service.record_observation(percent_observation, commit=False)
             if estimate is not None:
@@ -511,7 +860,6 @@ class DamageEventService:
             "estimate_id": getattr(estimate, "estimate_id", None),
             "affected_stats": affected_stats,
             "inferred_stat_count": len(affected_stats),
-            "hard_filter_applied": False,
         }
 
     @staticmethod

@@ -21,6 +21,7 @@ from app.schemas.battle import (
     EndTurnResult,
     LineupInput,
     LineupOut,
+    RuntimeFormChangeInput,
     StartBattleInput,
     SwitchElfInput,
 )
@@ -91,8 +92,7 @@ def setup_lineup(
     """
     录入双方阵容。
 
-    己方精灵必须带 build_id，敌方只需要 elf_id。提交后会初始化敌方面板估计档案；
-    旧候选配置不再默认生成。
+    己方精灵必须带 build_id，敌方只需要 elf_id。提交后会初始化敌方面板估计档案。
     """
     try:
         return BattleService(db).setup_lineup(battle_id, payload)
@@ -130,6 +130,22 @@ def switch_elf(
     """切换当前上场精灵，并执行状态切换清除规则。"""
     try:
         return BattleService(db).switch_elf(battle_id, payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{battle_id}/elves/{state_id}/runtime-form", response_model=BattleStateOut)
+def change_runtime_form(
+    battle_id: str,
+    state_id: str,
+    payload: RuntimeFormChangeInput,
+    db: Session = Depends(get_db),
+) -> BattleStateOut:
+    """手动调整精灵运行时有效形态，不触发切换/返场副作用。"""
+    try:
+        return BattleService(db).change_runtime_form(battle_id, state_id, payload)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -243,7 +259,7 @@ def create_damage_event(
     创建伤害事件。
 
     记录手动伤害事实；阶段 C 起会在伤害后尝试结算星陨等 post_attack 触发效果。
-    若同步观测开启，会更新敌方实时面板估计；旧候选空间不会被写入。
+    若同步观测开启，会更新敌方实时面板估计。
     """
     try:
         return DamageEventService(db).create_damage_event(battle_id, payload)

@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 class PanelStats(BaseModel):
     """六维面板属性。
 
-    候选反推时，敌方字段来自 BuildCandidate；己方字段可来自 BattleElfState 或前端输入。
+    实时反推时，敌方字段来自当前估计档案；己方字段可来自 BattleElfState 或前端输入。
     """
 
     hp: int
@@ -31,7 +31,7 @@ class DamageFormulaContext(BaseModel):
     字段分为三类：
     1. 事件追踪字段，用于把结果写回 DamageEvent / evidence；
     2. 公式输入字段，用于普通攻击伤害计算；
-    3. 观测字段，用于 DamageMatcher 比较玩家录入值。
+    3. 观测字段，用于实时估计比较玩家录入值。
     """
 
     # 事件追踪字段。为兼容旧调用，除 battle_id 外均允许为空。
@@ -83,6 +83,8 @@ class DamageFormulaContext(BaseModel):
     # 状态/印记结算字段。
     effect_id: str | None = None
     effect_layers: int = 1
+    status_percent_per_layer: Decimal | int | float | None = None
+    status_uses_type_effectiveness: bool | None = None
 
     # 观测字段。
     observed_damage_value: int | None = None
@@ -110,6 +112,6 @@ class CalculationPlaceholderResult(BaseModel):
     missing_parts: list[str] = Field(default_factory=list)
     unknown_factors: list[str] = Field(default_factory=list)
     context_id: str | None = None
-    message: str = "伤害公式尚未确认，本次只记录事实，不执行候选排除。"
+    message: str = "伤害公式尚未确认，本次只记录事实，不收窄实时估计。"
     explanation: dict[str, Any] = Field(default_factory=dict)
     secondary_events: list[dict[str, Any]] = Field(default_factory=list)

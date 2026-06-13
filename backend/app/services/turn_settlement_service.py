@@ -10,7 +10,7 @@ from app.calculation.damage_calculator import DamageCalculator
 from app.calculation.formula_context import DamageFormulaContext, PanelStats
 from app.calculation.rule_resolver import RuleResolver
 from app.core.enums import BattleEventType, DamageDisplayType, EventSource
-from app.inference.observation_matcher import ObservationEventInput
+from app.inference.observation_event import ObservationEventInput
 from app.inference.observation_payload import build_damage_observation_payload
 from app.inference.observation_types import ObservationType
 from app.models.battle import Battle, BattleElfState
@@ -37,7 +37,7 @@ class TurnSettlementService:
         self.db = db
 
     def settle_end_turn(self, battle: Battle, turn_number: int) -> list[dict]:
-        """结算回合末 P0 状态，调用方负责最终 commit。"""
+        """结算回合末状态，调用方负责最终 commit。"""
         instances = self._load_active_effects(battle.battle_id)
         definitions = self._load_definitions([item.effect_id for item in instances])
         summaries: list[dict] = []
@@ -74,7 +74,18 @@ class TurnSettlementService:
                 resource_rule.get("settlement_type") == "end_turn"
                 or "end_turn_apply_effect" in hooks
             ):
-                if self._is_end_turn_apply_effect(hooks, resource_rule):
+                if self._is_end_turn_resource_change(resource_rule):
+                    summaries.append(
+                        self._settle_resource_change(
+                            battle=battle,
+                            turn_number=turn_number,
+                            instance=instance,
+                            definition=definition,
+                            resource_rule=resource_rule,
+                            settlement_phase="end_turn",
+                        )
+                    )
+                elif self._is_end_turn_apply_effect(hooks, resource_rule):
                     summaries.extend(
                         self._settle_end_turn_apply_effect(
                             battle=battle,
@@ -97,13 +108,12 @@ class TurnSettlementService:
         side: str,
         elf_id: str,
     ) -> list[dict]:
-        """结算入场触发效果，当前 P0 支持棘刺印记。"""
+        """结算入场触发效果。"""
         instances = [
             item
             for item in self._load_active_effects(battle.battle_id)
             if item.owner_scope == "side"
             and item.owner_side == side
-            and item.effect_id == "effect_thorn_mark"
         ]
         definitions = self._load_definitions([item.effect_id for item in instances])
         summaries: list[dict] = []
@@ -120,17 +130,30 @@ class TurnSettlementService:
             if target is None:
                 summaries.append(self._skipped(instance, "target_state_missing"))
                 continue
-            summaries.append(
-                self._settle_status_damage(
-                    battle=battle,
-                    turn_number=turn_number,
-                    instance=instance,
-                    definition=definition,
-                    resource_rule=resource_rule,
-                    settlement_phase="switch_in",
-                    target_override=target,
+            if self._is_resource_change(resource_rule):
+                summaries.append(
+                    self._settle_resource_change(
+                        battle=battle,
+                        turn_number=turn_number,
+                        instance=instance,
+                        definition=definition,
+                        resource_rule=resource_rule,
+                        settlement_phase="switch_in",
+                        target_override=target,
+                    )
                 )
-            )
+            else:
+                summaries.append(
+                    self._settle_status_damage(
+                        battle=battle,
+                        turn_number=turn_number,
+                        instance=instance,
+                        definition=definition,
+                        resource_rule=resource_rule,
+                        settlement_phase="switch_in",
+                        target_override=target,
+                    )
+                )
         return summaries
 
     def settle_post_attack(
@@ -201,9 +224,35 @@ class TurnSettlementService:
         if target is None:
             return self._skipped(instance, "target_state_missing")
 
+        if settlement_phase == "end_turn":
+            manual_damage_event = self._manual_status_damage_event_for_turn(
+                battle_id=battle.battle_id,
+                turn_number=turn_number,
+                effect_id=instance.effect_id,
+                target=target,
+            )
+            if manual_damage_event is not None:
+                return self._settle_after_manual_status_damage(
+                    battle=battle,
+                    turn_number=turn_number,
+                    instance=instance,
+                    definition=definition,
+                    resource_rule=resource_rule,
+                    target=target,
+                    manual_damage_event=manual_damage_event,
+                )
+
         max_hp = self._max_hp(target)
         if max_hp is None:
-            return self._skipped(instance, "defender_max_hp_missing")
+            return self._settle_status_percent_damage(
+                battle=battle,
+                turn_number=turn_number,
+                instance=instance,
+                definition=definition,
+                resource_rule=resource_rule,
+                settlement_phase=settlement_phase,
+                target=target,
+            )
 
         source_side, source_elf_id = self._resolve_source(battle, instance, target.side)
         battle_event_id = f"event_{uuid4().hex}"
@@ -357,6 +406,223 @@ class TurnSettlementService:
         if observation_result is not None:
             summary["observation_result"] = observation_result
         return summary
+
+    def _settle_status_percent_damage(
+        self,
+        *,
+        battle: Battle,
+        turn_number: int,
+        instance: BattleEffectInstance,
+        definition: EffectDefinition,
+        resource_rule: dict,
+        settlement_phase: str,
+        target: BattleElfState,
+    ) -> dict:
+        """在敌方最大生命未知时，按百分比扣减当前生命百分比。"""
+        if target.current_hp_percent is None:
+            return self._skipped(instance, "defender_max_hp_and_hp_percent_missing")
+
+        source_side, source_elf_id = self._resolve_source(battle, instance, target.side)
+        context = DamageFormulaContext(
+            battle_id=battle.battle_id,
+            formula_type="status",
+            attacker_side=source_side,
+            attacker_elf_id=source_elf_id,
+            defender_side=target.side,
+            defender_elf_id=target.elf_id,
+            skill_element_type=resource_rule.get("element_type"),
+            damage_display_type=DamageDisplayType.SPECIAL_DAMAGE.value,
+            defender_hp_percent=target.current_hp_percent,
+            effect_id=instance.effect_id,
+            effect_layers=instance.layers,
+            notes=f"{settlement_phase} percent-only settlement from {instance.effect_id}",
+        )
+        if resource_rule.get("uses_type_effectiveness"):
+            RuleResolver(self.db).resolve_damage_context(context, {"resolve_rules": True})
+
+        layers = max(int(instance.layers or 1), 1)
+        percent_per_layer = Decimal(str(resource_rule.get("percent_per_layer") or 0))
+        type_multiplier = Decimal(str(context.type_multiplier))
+        percent_delta = float(
+            (percent_per_layer * Decimal(layers) * type_multiplier * Decimal("100"))
+            .quantize(Decimal("0.0001"))
+        )
+        if percent_delta <= 0:
+            return self._skipped(instance, "percent_damage_zero")
+
+        before_percent = target.current_hp_percent
+        target.current_hp_percent = max(round(float(before_percent) - percent_delta, 4), 0.0)
+        target.is_defeated = target.current_hp_percent == 0
+
+        battle_event_id = f"event_{uuid4().hex}"
+        damage_event_id = f"damage_event_{uuid4().hex}"
+        battle_event = BattleEvent(
+            event_id=battle_event_id,
+            battle_id=battle.battle_id,
+            turn_number=turn_number,
+            event_type=BattleEventType.DAMAGE.value,
+            actor_side=source_side,
+            actor_elf_id=source_elf_id,
+            target_side=target.side,
+            target_elf_id=target.elf_id,
+            source=EventSource.SYSTEM_CALCULATED.value,
+            manual_override=False,
+            payload_json=dumps_json(
+                {
+                    "settlement_phase": settlement_phase,
+                    "effect_instance_id": instance.instance_id,
+                    "effect_id": instance.effect_id,
+                    "formula_type": "status_percent_only",
+                    "calculation_status": "calculated_percent_only",
+                    "percent_delta": percent_delta,
+                    "reason": "defender_max_hp_missing",
+                }
+            ),
+            notes=f"{self._phase_label(settlement_phase)}自动结算：{definition.effect_name}",
+        )
+        self.db.add(battle_event)
+        self.db.add(
+            DamageEvent(
+                event_id=damage_event_id,
+                battle_id=battle.battle_id,
+                battle_event_id=battle_event.event_id,
+                attacker_side=source_side,
+                attacker_elf_id=source_elf_id,
+                defender_side=target.side,
+                defender_elf_id=target.elf_id,
+                damage_display_type=DamageDisplayType.SPECIAL_DAMAGE.value,
+                damage_value=None,
+                hp_percent_before=before_percent,
+                hp_percent_after=target.current_hp_percent,
+                hp_percent_delta=percent_delta,
+                enemy_hp_percent_damage=percent_delta,
+                type_effectiveness=float(type_multiplier),
+                special_formula_id=definition.special_rule_id or instance.effect_id,
+                calculation_confidence=0.8,
+                manual_override=False,
+                formula_context_json=dumps_json(context),
+            )
+        )
+        self._create_hp_resource_event(
+            battle_id=battle.battle_id,
+            battle_event_id=battle_event.event_id,
+            source_side=source_side,
+            source_elf_id=source_elf_id,
+            target_side=target.side,
+            target_elf_id=target.elf_id,
+            change_type="damage",
+            value=percent_delta,
+            before_value=before_percent,
+            after_value=target.current_hp_percent,
+            confidence=0.8,
+            value_type="percent",
+        )
+
+        layer_summary = self._apply_after_settlement(
+            instance=instance,
+            definition=definition,
+            battle_event_id=battle_event.event_id,
+            turn_number=turn_number,
+            resource_rule=resource_rule,
+        )
+        self.db.flush()
+        snapshot = SnapshotService(self.db).create_effect_snapshot(
+            battle.battle_id,
+            turn_number,
+            source_event_id=battle_event.event_id,
+            commit=False,
+        )
+        battle_event.snapshot_id = snapshot.snapshot_id
+        context.snapshot_id = snapshot.snapshot_id
+        context.snapshot_payload = loads_json(snapshot.full_snapshot_json, [])
+        damage_event = self.db.get(DamageEvent, damage_event_id)
+        if damage_event is not None:
+            damage_event.formula_context_json = dumps_json(context)
+        return {
+            **self._base_summary(instance),
+            "status": "settled",
+            "battle_event_id": battle_event.event_id,
+            "snapshot_id": snapshot.snapshot_id,
+            "settlement_phase": settlement_phase,
+            "target_side": target.side,
+            "target_elf_id": target.elf_id,
+            "damage_value": None,
+            "hp_percent_delta": percent_delta,
+            "type_multiplier": str(type_multiplier),
+            "percent_only": True,
+            **layer_summary,
+        }
+
+    def _settle_after_manual_status_damage(
+        self,
+        *,
+        battle: Battle,
+        turn_number: int,
+        instance: BattleEffectInstance,
+        definition: EffectDefinition,
+        resource_rule: dict,
+        target: BattleElfState,
+        manual_damage_event: BattleEvent,
+    ) -> dict:
+        """本回合已手动录入状态伤害时，只执行结算后的层数衰减或清除。"""
+        source_side, source_elf_id = self._resolve_source(battle, instance, target.side)
+        battle_event = BattleEvent(
+            event_id=f"event_{uuid4().hex}",
+            battle_id=battle.battle_id,
+            turn_number=turn_number,
+            event_type=BattleEventType.EFFECT_TRIGGER.value,
+            actor_side=source_side,
+            actor_elf_id=source_elf_id,
+            target_side=target.side,
+            target_elf_id=target.elf_id,
+            source=EventSource.SYSTEM_CALCULATED.value,
+            manual_override=False,
+            payload_json=dumps_json(
+                {
+                    "settlement_phase": "end_turn",
+                    "effect_instance_id": instance.instance_id,
+                    "effect_id": instance.effect_id,
+                    "formula_type": "status",
+                    "damage_skipped": True,
+                    "skip_reason": "manual_status_damage_already_recorded_this_turn",
+                    "manual_damage_event_id": manual_damage_event.event_id,
+                }
+            ),
+            notes=(
+                f"{self._phase_label('end_turn')}自动结算：{definition.effect_name}"
+                "伤害已手动录入，仅执行层数变化"
+            ),
+        )
+        self.db.add(battle_event)
+        layer_summary = self._apply_after_settlement(
+            instance=instance,
+            definition=definition,
+            battle_event_id=battle_event.event_id,
+            turn_number=turn_number,
+            resource_rule=resource_rule,
+        )
+        self.db.flush()
+        snapshot = SnapshotService(self.db).create_effect_snapshot(
+            battle.battle_id,
+            turn_number,
+            source_event_id=battle_event.event_id,
+            commit=False,
+        )
+        battle_event.snapshot_id = snapshot.snapshot_id
+        return {
+            **self._base_summary(instance),
+            "status": "manual_damage_already_recorded",
+            "battle_event_id": battle_event.event_id,
+            "snapshot_id": snapshot.snapshot_id,
+            "settlement_phase": "end_turn",
+            "target_side": target.side,
+            "target_elf_id": target.elf_id,
+            "damage_value": None,
+            "damage_skipped": True,
+            "skip_reason": "manual_status_damage_already_recorded_this_turn",
+            "manual_damage_event_id": manual_damage_event.event_id,
+            **layer_summary,
+        }
 
     def _settle_starfall_damage(
         self,
@@ -831,12 +1097,58 @@ class TurnSettlementService:
         applied_turn = instance.applied_turn if instance.applied_turn is not None else 0
         return (order, applied_turn, instance.instance_id)
 
+    def _manual_status_damage_event_for_turn(
+        self,
+        *,
+        battle_id: str,
+        turn_number: int,
+        effect_id: str,
+        target: BattleElfState,
+    ) -> BattleEvent | None:
+        """查找同一回合、同一目标、同一状态已经由玩家录入的状态伤害。"""
+        rows = self.db.execute(
+            select(BattleEvent, DamageEvent)
+            .join(DamageEvent, DamageEvent.battle_event_id == BattleEvent.event_id)
+            .where(
+                BattleEvent.battle_id == battle_id,
+                BattleEvent.turn_number == turn_number,
+                BattleEvent.manual_override.is_(True),
+                BattleEvent.event_type.in_(
+                    [BattleEventType.DAMAGE.value, BattleEventType.COMBO_DAMAGE.value]
+                ),
+                DamageEvent.defender_side == target.side,
+                DamageEvent.defender_elf_id == target.elf_id,
+            )
+        ).all()
+        for battle_event, damage_event in rows:
+            payload = loads_json(battle_event.payload_json, {}) or {}
+            context = loads_json(damage_event.formula_context_json, {}) or {}
+            formula_type = payload.get("formula_type") or context.get("formula_type")
+            recorded_effect_id = (
+                payload.get("effect_id")
+                or context.get("effect_id")
+                or damage_event.special_formula_id
+            )
+            if formula_type == "status" and recorded_effect_id == effect_id:
+                return battle_event
+        return None
+
     @staticmethod
     def _is_end_turn_status_damage(hooks: list, resource_rule: dict) -> bool:
         return (
             "end_turn_status_damage" in hooks
             and resource_rule.get("settlement_type") == "end_turn"
             and resource_rule.get("damage_kind") in {"status", "true"}
+        )
+
+    @staticmethod
+    def _is_resource_change(resource_rule: dict) -> bool:
+        return resource_rule.get("operation") == "resource_change"
+
+    def _is_end_turn_resource_change(self, resource_rule: dict) -> bool:
+        return (
+            resource_rule.get("settlement_type") == "end_turn"
+            and self._is_resource_change(resource_rule)
         )
 
     @staticmethod
@@ -853,6 +1165,97 @@ class TurnSettlementService:
             and resource_rule.get("settlement_type") == "end_turn"
             and resource_rule.get("operation") == "apply_effect"
         )
+
+    def _settle_resource_change(
+        self,
+        *,
+        battle: Battle,
+        turn_number: int,
+        instance: BattleEffectInstance,
+        definition: EffectDefinition,
+        resource_rule: dict,
+        settlement_phase: str,
+        target_override: BattleElfState | None = None,
+    ) -> dict:
+        """执行回合末/入场等阶段的非伤害资源变化。"""
+        target = target_override or self._resolve_target_state(battle, instance)
+        if target is None:
+            return self._skipped(instance, "target_state_missing")
+        resource_type = str(resource_rule.get("resource_type") or "")
+        if resource_type != "energy":
+            return self._skipped(instance, f"unsupported_resource_type:{resource_type}")
+
+        raw_value = self._resource_change_value(resource_rule, instance.layers)
+        if raw_value == 0:
+            return self._skipped(instance, "resource_change_zero")
+        change_type = str(resource_rule.get("change_type") or "gain")
+        before = target.energy
+        if change_type in {"gain", "restore", "increase"}:
+            target.energy = max(int(target.energy or 0) + raw_value, 0)
+        elif change_type in {"lose", "consume", "decrease"}:
+            target.energy = max(int(target.energy or 0) - raw_value, 0)
+        else:
+            return self._skipped(instance, f"unsupported_resource_change_type:{change_type}")
+
+        event = BattleEvent(
+            event_id=f"event_{uuid4().hex}",
+            battle_id=battle.battle_id,
+            turn_number=turn_number,
+            event_type=BattleEventType.ENERGY_CHANGE.value,
+            actor_side=instance.owner_side,
+            actor_elf_id=instance.owner_elf_id,
+            target_side=target.side,
+            target_elf_id=target.elf_id,
+            source=EventSource.SYSTEM_CALCULATED.value,
+            manual_override=False,
+            payload_json=dumps_json(
+                {
+                    "settlement_phase": settlement_phase,
+                    "effect_instance_id": instance.instance_id,
+                    "effect_id": instance.effect_id,
+                    "resource_type": resource_type,
+                    "change_type": change_type,
+                    "value": raw_value,
+                }
+            ),
+            notes=f"{self._phase_label(settlement_phase)}自动结算：{definition.effect_name}",
+        )
+        self.db.add(event)
+        self._create_resource_event(
+            battle_id=battle.battle_id,
+            battle_event_id=event.event_id,
+            resource_type=resource_type,
+            source_side=instance.owner_side,
+            source_elf_id=instance.owner_elf_id,
+            target_side=target.side,
+            target_elf_id=target.elf_id,
+            change_type=change_type,
+            value=raw_value,
+            before_value=before,
+            after_value=target.energy,
+            confidence=1.0,
+        )
+        self.db.flush()
+        return {
+            **self._base_summary(instance),
+            "status": "settled",
+            "settlement_phase": settlement_phase,
+            "resource_type": resource_type,
+            "change_type": change_type,
+            "value": raw_value,
+            "before_value": before,
+            "after_value": target.energy,
+            "battle_event_id": event.event_id,
+        }
+
+    @staticmethod
+    def _resource_change_value(resource_rule: dict, layers: int) -> int:
+        value = resource_rule.get("value")
+        if value is None:
+            value = resource_rule.get("value_per_layer")
+            if value is not None:
+                return int(Decimal(str(value)) * Decimal(str(layers)))
+        return int(Decimal(str(value or 0)))
 
     def _resolve_apply_effect_targets(
         self,
@@ -1082,6 +1485,43 @@ class TurnSettlementService:
             )
         )
 
+    def _create_resource_event(
+        self,
+        *,
+        battle_id: str,
+        battle_event_id: str,
+        resource_type: str,
+        source_side: str | None,
+        source_elf_id: str | None,
+        target_side: str | None,
+        target_elf_id: str | None,
+        change_type: str,
+        value: float,
+        before_value: float | int | None,
+        after_value: float | int | None,
+        confidence: float,
+        value_type: str = "value",
+    ) -> None:
+        self.db.add(
+            ResourceChangeEvent(
+                event_id=f"resource_event_{uuid4().hex}",
+                battle_id=battle_id,
+                battle_event_id=battle_event_id,
+                resource_type=resource_type,
+                change_type=change_type,
+                source_side=source_side,
+                source_elf_id=source_elf_id,
+                target_side=target_side,
+                target_elf_id=target_elf_id,
+                value_type=value_type,
+                value=value,
+                before_value=float(before_value) if before_value is not None else None,
+                after_value=float(after_value) if after_value is not None else None,
+                confidence=confidence,
+                manual_override=False,
+            )
+        )
+
     def _process_damage_observation(
         self,
         *,
@@ -1101,7 +1541,6 @@ class TurnSettlementService:
             observation_type=ObservationType.DAMAGE_VALUE,
             observed_value=observed_damage,
             payload=payload,
-            allow_hard_exclude=False,
         )
         estimate = EstimateService(self.db).record_observation(observation, commit=False)
         if estimate is None:
@@ -1117,7 +1556,6 @@ class TurnSettlementService:
             "estimate_id": estimate.estimate_id,
             "affected_stats": affected_stats,
             "inferred_stat_count": len(affected_stats),
-            "hard_filter_applied": False,
         }
 
     def _apply_after_settlement(

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.inference.observation_matcher import ObservationEventInput
+from app.inference.observation_event import ObservationEventInput
 from app.schemas.observation import ObservationCreate, ObservationProcessResult
 from app.services.battle_service import BattleService
 from app.services.estimate_service import EstimateService
@@ -32,7 +32,6 @@ def process_observation(
             observed_value=payload.observed_value,
             payload=payload.payload,
             event_weight=payload.event_weight,
-            allow_hard_exclude=False,
         )
         estimate = EstimateService(db).record_observation(observation, commit=True)
         inferred_stats = estimate.evidence_summary[-1].get("affected_stats", []) if estimate else []
@@ -46,7 +45,6 @@ def process_observation(
             inferred_stat_count=len(inferred_stats),
             affected_stats=[str(item) for item in inferred_stats],
             unknown_factor_count=len(estimate.unknown_factors) if estimate is not None else 0,
-            hard_filter_applied=False,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

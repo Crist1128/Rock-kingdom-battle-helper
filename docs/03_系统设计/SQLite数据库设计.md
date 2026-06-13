@@ -17,7 +17,7 @@
 | 数据类型 | 用途 | 示例 |
 |---|---|---|
 | 静态规则数据 | 查规则 | 精灵、性格、技能、状态、属性克制 |
-| 战斗运行时数据 | 算当前结果 | 当前生命、能量、当前状态实例、敌方候选配置 |
+| 战斗运行时数据 | 算当前结果 | 当前生命、能量、当前状态实例、敌方实时估计 |
 | 事件日志数据 | 回放、纠错、解释 | 技能事件、伤害事件、状态变化事件、快照 |
 
 ### 1.2 SQLite 设计取舍
@@ -185,7 +185,7 @@ CREATE TABLE elf_definition (
 
 | 字段 | 类型 | 必填 | 来源 | 作用 |
 |---|---|---:|---|---|
-| `elf_id` | TEXT | 是 | 数据库录入 | 精灵唯一 ID。所有运行时状态、候选配置、事件日志都引用该字段。 |
+| `elf_id` | TEXT | 是 | 数据库录入 | 精灵唯一 ID。所有运行时状态、实时估计、事件日志都引用该字段。 |
 | `elf_name` | TEXT | 是 | 数据库录入 | 精灵标准名称。用于 UI 展示和搜索，不作为复杂识别别名。 |
 | `avatar` | TEXT | 是 | 资源维护 | 精灵头像资源路径或资源 ID。用于 UI 展示和图像识别。 |
 | `element_types_json` | TEXT(JSON) | 是 | 数据库录入 | 精灵系别数组，支持单系或双系。示例：`["fire"]`。 |
@@ -975,106 +975,9 @@ CREATE INDEX idx_battle_skill_slot_skill ON battle_skill_slot(battle_id, skill_i
 
 ---
 
-## 5.4 `build_candidate` 敌方候选配置表（已废弃，待迁移删除）
+## 5.4 旧候选配置表删除说明
 
-### 用途
-
-历史方案中用于记录敌方精灵候选培养配置。当前实时反推主流程已经不再生成、查询或更新该表；Observation、手动伤害事件和自动结算伤害只写 `enemy_panel_estimate` / `enemy_panel_estimate_evidence`。本表暂不删除，原因是需要保留迁移窗口和归档清理兼容；确认无存量兼容需求后，应通过 Alembic 删除本表和相关索引。
-
-### 建表 SQL
-
-```sql
-CREATE TABLE build_candidate (
-  candidate_id TEXT PRIMARY KEY,
-  battle_id TEXT NOT NULL,
-  elf_id TEXT NOT NULL,
-  battle_elf_state_id TEXT,
-  nature_id TEXT NOT NULL,
-
-  individual_hp INTEGER NOT NULL DEFAULT 0,
-  individual_physical_attack INTEGER NOT NULL DEFAULT 0,
-  individual_physical_defense INTEGER NOT NULL DEFAULT 0,
-  individual_magic_attack INTEGER NOT NULL DEFAULT 0,
-  individual_magic_defense INTEGER NOT NULL DEFAULT 0,
-  individual_speed INTEGER NOT NULL DEFAULT 0,
-
-  final_hp INTEGER NOT NULL,
-  final_physical_attack INTEGER NOT NULL,
-  final_physical_defense INTEGER NOT NULL,
-  final_magic_attack INTEGER NOT NULL,
-  final_magic_defense INTEGER NOT NULL,
-  final_speed INTEGER NOT NULL,
-
-  possible_skill_ids_json TEXT,
-  confirmed_skill_ids_json TEXT,
-
-  initial_weight REAL NOT NULL DEFAULT 1.0,
-  match_score REAL NOT NULL DEFAULT 0.0,
-  confidence REAL NOT NULL DEFAULT 0.0,
-  is_excluded INTEGER NOT NULL DEFAULT 0,
-  excluded_reason TEXT,
-  excluded_by_event_id TEXT,
-  evidence_ids_json TEXT,
-
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-
-  FOREIGN KEY (battle_id) REFERENCES battle(battle_id),
-  FOREIGN KEY (elf_id) REFERENCES elf_definition(elf_id),
-  FOREIGN KEY (battle_elf_state_id) REFERENCES battle_elf_state(battle_elf_state_id),
-  FOREIGN KEY (nature_id) REFERENCES nature_definition(nature_id)
-);
-```
-
-### 字段说明
-
-| 字段 | 类型 | 必填 | 来源 | 作用 |
-|---|---|---:|---|---|
-| `candidate_id` | TEXT | 是 | 系统生成 | 候选配置 ID。 |
-| `battle_id` | TEXT | 是 | 系统生成 | 所属战斗。 |
-| `elf_id` | TEXT | 是 | 准备阶段敌方阵容 | 敌方精灵 ID。 |
-| `battle_elf_state_id` | TEXT | 否 | 系统生成 | 对应敌方运行时状态。 |
-| `nature_id` | TEXT | 是 | 候选生成 | 候选性格。 |
-| `individual_hp` | INTEGER | 是 | 候选生成 | 生命个体资质。 |
-| `individual_physical_attack` | INTEGER | 是 | 候选生成 | 物攻个体资质。 |
-| `individual_physical_defense` | INTEGER | 是 | 候选生成 | 物防个体资质。 |
-| `individual_magic_attack` | INTEGER | 是 | 候选生成 | 魔攻个体资质。 |
-| `individual_magic_defense` | INTEGER | 是 | 候选生成 | 魔防个体资质。 |
-| `individual_speed` | INTEGER | 是 | 候选生成 | 速度个体资质。 |
-| `final_hp` | INTEGER | 是 | 系统计算 | 候选面板生命。 |
-| `final_physical_attack` | INTEGER | 是 | 系统计算 | 候选面板物攻。 |
-| `final_physical_defense` | INTEGER | 是 | 系统计算 | 候选面板物防。 |
-| `final_magic_attack` | INTEGER | 是 | 系统计算 | 候选面板魔攻。 |
-| `final_magic_defense` | INTEGER | 是 | 系统计算 | 候选面板魔防。 |
-| `final_speed` | INTEGER | 是 | 系统计算 | 候选面板速度。 |
-| `possible_skill_ids_json` | TEXT(JSON) | 否 | 候选生成 | 当前仍可能存在的技能列表。 |
-| `confirmed_skill_ids_json` | TEXT(JSON) | 否 | 事件推导 / 手动确认 | 已确认技能列表。 |
-| `initial_weight` | REAL | 是 | 候选生成 | 基于常见配置的初始权重。只影响排序。 |
-| `match_score` | REAL | 是 | 推算引擎 | 与历史证据匹配分数。 |
-| `confidence` | REAL | 是 | 推算引擎 | 候选置信度。 |
-| `is_excluded` | INTEGER | 是 | 推算引擎 | 是否已排除。 |
-| `excluded_reason` | TEXT | 否 | 推算引擎 | 排除原因。 |
-| `excluded_by_event_id` | TEXT | 否 | 推算引擎 | 触发排除的事件 ID。 |
-| `evidence_ids_json` | TEXT(JSON) | 否 | 推算引擎 | 支撑或反驳该候选的事件 ID 列表。 |
-| `created_at` | TEXT | 是 | 系统生成 | 创建时间。 |
-| `updated_at` | TEXT | 是 | 系统生成 | 更新时间。 |
-
-说明：以下字段只描述历史表结构，不再作为新业务设计依据。新实时反推使用 `default_config_json`、`stat_constraints_json` 和 evidence。
-
-### 索引
-
-```sql
-CREATE INDEX idx_build_candidate_battle_elf_excluded ON build_candidate(battle_id, elf_id, is_excluded);
-CREATE INDEX idx_build_candidate_battle_state ON build_candidate(battle_id, battle_elf_state_id);
-CREATE INDEX idx_build_candidate_speed ON build_candidate(battle_id, elf_id, final_speed);
-CREATE INDEX idx_build_candidate_confidence ON build_candidate(battle_id, elf_id, confidence);
-```
-
-### 废弃说明
-
-- 不要在新功能中依赖 `build_candidate`。
-- 不再规划 `candidate_group_hash` 或候选 evidence 扩展。
-- 后续删除前需要确认归档清理、测试夹具和旧文档已同步移除。
+历史 `build_candidate` 表已通过 Alembic `0006_drop_legacy_candidate_tables` 删除；旧 ORM、service、schema、接口和测试也已移除。当前敌方配置推算状态只由 `enemy_panel_estimate` 和 `enemy_panel_estimate_evidence` 承担。新功能不得重新依赖候选空间落库筛选。
 
 ---
 
@@ -1251,7 +1154,7 @@ CREATE INDEX idx_snapshot_hash ON battle_effect_snapshot(snapshot_hash);
 
 - 快照必须不可变。
 - 不允许只保存实例 ID 而不保存完整 JSON 副本。
-- 候选过滤必须使用伤害事件关联的快照，而不是当前状态。
+- 实时反推必须使用伤害事件关联的快照，而不是当前状态。
 
 ---
 
@@ -1439,7 +1342,7 @@ CREATE INDEX idx_damage_event_display_type ON damage_event(battle_id, damage_dis
 - `single_damage`：`damage_value` 必填。
 - `visual_total_damage`：`damage_value` 和 `final_total_damage_value` 均填最终总伤害。
 - `combo_repeated_damage`：`per_hit_damage_value`、`hit_count`、`computed_total_damage_value` 必填。
-- 候选过滤：单次和动画多段使用 `damage_value`；连击优先使用 `per_hit_damage_value`。
+- 实时反推：单次和动画多段使用 `damage_value`；连击优先使用 `per_hit_damage_value`。
 - 击杀判断：连击使用 `computed_total_damage_value`。
 
 ---
@@ -1611,45 +1514,9 @@ CREATE INDEX idx_resource_change_battle_target ON resource_change_event(battle_i
 
 ## 7. 计算与缓存表
 
-## 7.1 `calculation_cache` 计算缓存表（可选）
+## 7.1 计算缓存策略
 
-### 用途
-
-缓存高频伤害计算结果。第一阶段可先使用进程内缓存；若需要持久缓存再启用该表。
-
-### 建表 SQL
-
-```sql
-CREATE TABLE calculation_cache (
-  cache_key TEXT PRIMARY KEY,
-  cache_type TEXT NOT NULL,
-  battle_id TEXT,
-  snapshot_hash TEXT,
-  input_hash TEXT NOT NULL,
-  result_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-```
-
-### 字段说明
-
-| 字段 | 类型 | 必填 | 来源 | 作用 |
-|---|---|---:|---|---|
-| `cache_key` | TEXT | 是 | 系统生成 | 缓存键。 |
-| `cache_type` | TEXT | 是 | 系统生成 | 缓存类型，如 `damage_result`、`speed_result`。 |
-| `battle_id` | TEXT | 否 | 系统生成 | 所属战斗。 |
-| `snapshot_hash` | TEXT | 否 | 系统生成 | 快照哈希。 |
-| `input_hash` | TEXT | 是 | 系统生成 | 计算输入哈希。 |
-| `result_json` | TEXT(JSON) | 是 | 系统生成 | 计算结果。 |
-| `created_at` | TEXT | 是 | 系统生成 | 创建时间。 |
-| `updated_at` | TEXT | 是 | 系统生成 | 更新时间。 |
-
-### 索引
-
-```sql
-CREATE INDEX idx_calculation_cache_type_battle ON calculation_cache(cache_type, battle_id);
-```
+历史 `calculation_cache` 表已通过 Alembic `0006_drop_legacy_candidate_tables` 删除。当前阶段不保留持久计算缓存；后续如需缓存，应重新设计为与实时估计、状态快照和公式上下文绑定的新结构，并新增独立迁移。
 
 ---
 
@@ -1713,15 +1580,14 @@ WHERE bei.is_active = 1;
 11. `battle`
 12. `battle_elf_state`
 13. `battle_skill_slot`
-14. `build_candidate`
-15. `battle_effect_instance`
-16. `battle_effect_snapshot`
-17. `battle_event`
-18. `damage_event`
-19. `effect_change_event`
-20. `resource_change_event`
-
-`calculation_cache` 可以第二阶段再加入。
+14. `battle_effect_instance`
+15. `battle_effect_snapshot`
+16. `battle_event`
+17. `damage_event`
+18. `effect_change_event`
+19. `resource_change_event`
+20. `enemy_panel_estimate`
+21. `enemy_panel_estimate_evidence`
 
 ---
 
@@ -1746,7 +1612,7 @@ WHERE bei.is_active = 1;
 
 - 伤害事件必须有关联快照。
 - 快照必须保存完整状态实例副本。
-- 候选过滤不得直接读取当前状态。
+- 实时反推不得直接读取已变化的当前状态冒充历史状态。
 - 修正历史事件后，必须从修正点重放并重建后续快照。
 
 ### 10.4 伤害事件一致性
@@ -1756,12 +1622,12 @@ WHERE bei.is_active = 1;
 - `combo_repeated_damage`：`per_hit_damage_value`、`hit_count`、`computed_total_damage_value` 必填。
 - 连击总伤害必须由系统计算，不依赖用户手填总伤害。
 
-### 10.5 候选配置一致性
+### 10.5 实时估计一致性
 
-- `build_candidate` 只保存面板属性。
-- 不保存状态修正后的临时属性。
-- 常见配置只影响权重，不直接排除冷门配置。
-- 候选被排除必须记录原因和事件证据。
+- 当前推算状态只写 `enemy_panel_estimate` 和 `enemy_panel_estimate_evidence`。
+- 不再为敌方配置生成、保存或筛选候选空间。
+- 玩家默认配置只作为展示和计算入口；保存时必须按当前实时约束校验。
+- 估计约束、冲突、unknown factors 和来源事件必须能追溯。
 
 ---
 
@@ -1775,7 +1641,7 @@ WHERE bei.is_active = 1;
 003_create_battle_runtime_tables.py
 004_create_event_tables.py
 005_create_views.py
-006_create_optional_calculation_cache.py
+006_drop_legacy_candidate_tables.py
 ```
 
 迁移顺序必须满足外键依赖：
@@ -1787,11 +1653,13 @@ player_elf_build / elf_learnable_skill
   ↓
 team_preset / team_preset_slot
   ↓
-battle / battle_elf_state / battle_skill_slot / build_candidate
+battle / battle_elf_state / battle_skill_slot
   ↓
 battle_effect_instance / battle_effect_snapshot
   ↓
 battle_event / damage_event / effect_change_event / resource_change_event
+  ↓
+enemy_panel_estimate / enemy_panel_estimate_evidence
 ```
 
 由于 `battle_effect_instance.source_event_id` 和 `battle_event.snapshot_id` 存在互相引用需求，实际实现时可：
@@ -1923,23 +1791,15 @@ battle_event / damage_event / effect_change_event / resource_change_event
 
 用于处理游戏平衡调整和规则库导入。
 
-### 13.3 候选聚合表
+### 13.3 实时面板估计表
 
-如果候选数量过大，可增加：
-
-- `build_candidate_group`
-
-按面板属性哈希聚合多个候选，减少伤害计算重复量。
-
-### 13.4 实时面板估计表
-
-候选推算主流程已经切换为“实时面板估计 + 默认配置校验”。完整方案见：
+推算主流程已经切换为“实时面板估计 + 默认配置校验”。当前不再规划候选聚合表。完整方案见：
 
 ```text
-docs/03_系统设计/实时面板估计与候选按需展开迁移方案.md
+docs/03_系统设计/实时面板估计落地方案.md
 ```
 
-以下表用于保存敌方估计档案和估计 evidence。`build_candidate` 不再作为默认主推算状态，也不再作为按需展开缓存；它只是待删除遗留表。
+以下表用于保存敌方估计档案和估计 evidence。旧 `build_candidate` / `calculation_cache` 已由 Alembic `0006_drop_legacy_candidate_tables` 删除。
 
 #### `enemy_panel_estimate`
 
@@ -2040,5 +1900,20 @@ ON enemy_panel_estimate_evidence(source_event_id);
 4. 印记和天气都是状态实例，不再建立独立主规则系统。
 5. 伤害事件必须绑定不可变状态快照。
 6. 动画多段和连击必须分开记录。
-7. 候选配置只保存面板属性，不保存战斗有效属性。
+7. 敌方默认配置只保存展示配置，真实推导以实时约束和 evidence 为准。
 8. 所有复杂规则使用 JSON 存储，并由 Pydantic 在代码层校验。
+
+## battle_elf_state 运行时有效形态扩展（2026-06-12）
+
+为支持退化、萌化面板回退等战斗中临时按另一种族值结算的场景，`battle_elf_state` 新增以下可空字段（Alembic `0007_battle_runtime_form`）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `runtime_form_elf_id` | string nullable | 当前运行时有效形态精灵 ID；为空表示使用原始 `elf_id`。 |
+| `runtime_form_elf_name` | string nullable | 有效形态显示名冗余。 |
+| `runtime_form_avatar` | string nullable | 有效形态头像冗余。 |
+| `runtime_form_reason` | text nullable | 形态调整原因，例如退化/萌化面板回退。 |
+| `nature_id` | string nullable | 战斗中保留的性格快照，用于运行时形态重算。 |
+| `individual_talent_distribution_json` | text nullable | 战斗中保留的六维个体培养快照。 |
+
+设计原则：原始 `elf_id` 表示这只战斗精灵的身份，不随退化变化；伤害预览、本系、属性和展示面板在存在 `runtime_form_elf_id` 时使用有效形态。

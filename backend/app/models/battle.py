@@ -94,6 +94,18 @@ class BattleElfState(TimestampMixin, Base):
     elf_id: Mapped[str] = mapped_column(ForeignKey("elf_definition.elf_id"), nullable=False)
     elf_name: Mapped[str] = mapped_column(String, nullable=False)
     avatar: Mapped[str] = mapped_column(String, nullable=False)
+    runtime_form_elf_id: Mapped[str | None] = mapped_column(
+        ForeignKey("elf_definition.elf_id"),
+        nullable=True,
+    )
+    runtime_form_elf_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    runtime_form_avatar: Mapped[str | None] = mapped_column(String, nullable=True)
+    runtime_form_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    nature_id: Mapped[str | None] = mapped_column(
+        ForeignKey("nature_definition.nature_id"),
+        nullable=True,
+    )
+    individual_talent_distribution_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # 面板属性（JSON 格式存储六维）
     panel_stats_json: Mapped[str] = mapped_column(Text, nullable=False)

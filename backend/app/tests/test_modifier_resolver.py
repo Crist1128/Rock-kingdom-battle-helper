@@ -12,11 +12,11 @@ from app.calculation.modifier_resolver import ModifierResolver
 from app.calculation.response_resolver import ResponseResolver
 from app.db.base import Base
 from app.models import battle as _battle_models  # noqa: F401
-from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.static import EffectDefinition, SkillDefinition
+from app.services.battle_service import BattleService
 from app.utils.json import dumps_json
 
 
@@ -42,6 +42,10 @@ def db_session() -> Iterator[Session]:
                         "damage_type": "defense_modifier",
                         "damage_reduction": 0.7,
                         "active": True,
+                        "response_rule": {
+                            "target": "attack",
+                            "condition": "response_attack_success",
+                        },
                     }
                 ),
             ),
@@ -60,6 +64,74 @@ def db_session() -> Iterator[Session]:
                         "damage_type": "defense_modifier",
                         "damage_reduction": 0.5,
                         "active": True,
+                    }
+                ),
+            ),
+            EffectDefinition(
+                effect_id="weather_rain",
+                effect_name="雨天",
+                category="weather",
+                polarity="neutral",
+                display_group="weather",
+                display_priority=300,
+                owner_scope="field",
+                target_scope="field",
+                attach_target_type="field",
+                skill_modifier_json=dumps_json(
+                    {
+                        "modifier_type": "damage_bonus",
+                        "element_type": "水",
+                        "value_type": "percent_add",
+                        "value": 0.75,
+                    }
+                ),
+            ),
+            EffectDefinition(
+                effect_id="weather_blizzard",
+                effect_name="暴风雪",
+                category="weather",
+                polarity="neutral",
+                display_group="weather",
+                display_priority=320,
+                owner_scope="field",
+                target_scope="field",
+                attach_target_type="field",
+            ),
+            EffectDefinition(
+                effect_id="effect_physical_attack_up_layered",
+                effect_name="物攻增加",
+                category="stat_modifier",
+                polarity="positive",
+                display_group="stat_modifier",
+                display_priority=410,
+                owner_scope="elf",
+                target_scope="single_elf",
+                attach_target_type="elf",
+                stat_modifier_json=dumps_json(
+                    {
+                        "modifier_type": "stat_stage",
+                        "stat": "physical_attack",
+                        "value_type": "percent_add",
+                        "value_per_layer": 0.1,
+                    }
+                ),
+            ),
+            EffectDefinition(
+                effect_id="effect_skill_power_combo_cost_layered",
+                effect_name="技能层数综合测试",
+                category="skill_modifier",
+                polarity="positive",
+                display_group="skill_modifier",
+                display_priority=420,
+                owner_scope="elf",
+                target_scope="single_elf",
+                attach_target_type="elf",
+                skill_modifier_json=dumps_json(
+                    {
+                        "modifier_type": "skill_layer_units",
+                        "power_add_per_layer": 10,
+                        "hit_count_delta_per_layer": 1,
+                        "energy_cost_delta_per_layer": -1,
                     }
                 ),
             ),
@@ -99,10 +171,25 @@ def test_modifier_resolver_loads_defense_skill_rule_from_db(db_session: Session)
 
     ModifierResolver(db_session).resolve_formula_modifiers(
         context,
-        {"defense_skill_id": "defense_skill"},
+        {"defense_skill_id": "defense_skill", "response_attack_success": True},
     )
 
     assert context.damage_reductions == [Decimal("0.7")]
+
+
+def test_modifier_resolver_marks_defense_response_unknown_when_flag_missing(
+    db_session: Session,
+) -> None:
+    """防御技能存在应对条件但未确认成功时，不应直接套减伤。"""
+    context = DamageFormulaContext(battle_id="battle_1")
+
+    ModifierResolver(db_session).resolve_formula_modifiers(
+        context,
+        {"defense_skill_id": "defense_skill"},
+    )
+
+    assert context.damage_reductions == []
+    assert "damage_reduction_active_unknown:0" in context.unknown_factors
 
 
 def test_modifier_resolver_uses_snapshot_effect_instances(db_session: Session) -> None:
@@ -126,6 +213,144 @@ def test_modifier_resolver_uses_snapshot_effect_instances(db_session: Session) -
     ModifierResolver(db_session).resolve_formula_modifiers(context, {})
 
     assert context.damage_reductions == [Decimal("0.5")]
+
+
+def test_modifier_resolver_uses_rain_weather_multiplier(db_session: Session) -> None:
+    """雨天应让水系攻击技能进入 1.75 天气倍率。"""
+    context = DamageFormulaContext(
+        battle_id="battle_1",
+        skill_element_type="水",
+        snapshot_payload=[
+            {
+                "instance_id": "weather_rain_1",
+                "effect_id": "weather_rain",
+                "owner_scope": "field",
+                "layers": 1,
+            }
+        ],
+    )
+
+    details = ModifierResolver(db_session).resolve_formula_modifiers(context, {})
+
+    assert context.weather_multiplier == Decimal("1.75")
+    assert details["weather_multiplier"]["source"] == "weather_skill_modifier"
+    assert details["weather_multiplier"]["effect_id"] == "weather_rain"
+
+
+def test_modifier_resolver_recognizes_blizzard_without_damage_bonus(
+    db_session: Session,
+) -> None:
+    """暴风雪目前只提供回合末冻结结算，不应误加攻击伤害天气倍率。"""
+    context = DamageFormulaContext(
+        battle_id="battle_1",
+        skill_element_type="冰",
+        snapshot_payload=[
+            {
+                "instance_id": "weather_blizzard_1",
+                "effect_id": "weather_blizzard",
+                "owner_scope": "field",
+                "layers": 1,
+            }
+        ],
+    )
+
+    details = ModifierResolver(db_session).resolve_formula_modifiers(context, {})
+
+    assert context.weather_multiplier == Decimal("1")
+    assert details["weather_multiplier"]["source"] == "weather_effect_no_damage_bonus"
+
+
+def test_modifier_resolver_uses_physical_attack_up_stat_modifier(
+    db_session: Session,
+) -> None:
+    """力量增效这类物攻+100%状态应进入物理技能能力等级倍率。"""
+    context = DamageFormulaContext(
+        battle_id="battle_1",
+        attacker_side="self",
+        attacker_elf_id="elf_self",
+        defender_side="enemy",
+        defender_elf_id="elf_enemy",
+        skill_category="physical",
+        snapshot_payload=[
+            {
+                "instance_id": "attack_up_1",
+                "effect_id": "effect_physical_attack_up_layered",
+                "owner_scope": "elf",
+                "owner_side": "self",
+                "owner_elf_id": "elf_self",
+                "layers": 10,
+            }
+        ],
+    )
+
+    details = ModifierResolver(db_session).resolve_formula_modifiers(context, {})
+
+    assert context.stat_stage_multiplier == Decimal("2")
+    assert details["stat_stage_multiplier"]["source"] == "snapshot_stat_modifiers"
+    assert details["stat_stage_multiplier"]["items"][0]["effect_id"] == (
+        "effect_physical_attack_up_layered"
+    )
+
+
+def test_modifier_resolver_uses_percent_value_per_layer(db_session: Session) -> None:
+    """属性修正新规则按 10% 一层解析，同时不影响旧 value 直写规则。"""
+    context = DamageFormulaContext(
+        battle_id="battle_1",
+        attacker_side="self",
+        attacker_elf_id="elf_self",
+        defender_side="enemy",
+        defender_elf_id="elf_enemy",
+        skill_category="physical",
+        snapshot_payload=[
+            {
+                "instance_id": "attack_layered",
+                "effect_id": "effect_physical_attack_up_layered",
+                "owner_scope": "elf",
+                "owner_side": "self",
+                "owner_elf_id": "elf_self",
+                "layers": 3,
+            }
+        ],
+    )
+
+    details = ModifierResolver(db_session).resolve_formula_modifiers(context, {})
+
+    assert context.stat_stage_multiplier == Decimal("1.3")
+    assert details["stat_stage_multiplier"]["items"][0]["layers"] == "3"
+    assert details["stat_stage_multiplier"]["items"][0]["value"] == "0.3"
+
+
+def test_battle_service_reads_skill_modifier_layer_units(db_session: Session) -> None:
+    """技能威力、连击、能耗状态按约定层数单位解析。"""
+    context = DamageFormulaContext(
+        battle_id="battle_1",
+        attacker_side="self",
+        attacker_elf_id="elf_self",
+        defender_side="enemy",
+        defender_elf_id="elf_enemy",
+        skill_category="physical",
+        skill_element_type="火",
+        snapshot_payload=[
+            {
+                "instance_id": "skill_layered",
+                "effect_id": "effect_skill_power_combo_cost_layered",
+                "owner_scope": "elf",
+                "owner_side": "self",
+                "owner_elf_id": "elf_self",
+                "layers": 2,
+            }
+        ],
+    )
+
+    result = BattleService(db_session)._skill_power_modifier_from_effects(
+        context,
+        context.snapshot_payload,
+        "",
+    )
+
+    assert result["flat_power_bonus"] == Decimal("20")
+    assert result["hit_count_delta"] == 2
+    assert result["energy_cost_delta"] == -2
 
 
 def test_response_resolver_marks_unknown_when_success_flag_missing() -> None:

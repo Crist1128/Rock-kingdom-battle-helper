@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.core.enums import BattlePhase
 from app.models.battle import Battle, BattleElfState, BattleSkillSlot
-from app.models.candidate import BuildCandidate, CalculationCache
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
+from app.models.estimate import EnemyPanelEstimate, EnemyPanelEstimateEvidence
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
 from app.schemas.admin_battle import BattlePurgePlanOut, BattlePurgeResultOut
 
@@ -27,14 +27,14 @@ class AdminBattleService:
     #: 删除顺序必须先删事件详情与依赖表，最后删 battle 主表。
     #: 目前模型没有依赖 SQLAlchemy 关系级 cascade，因此服务层显式控制顺序。
     _PURGE_ORDER = (
+        EnemyPanelEstimateEvidence,
+        EnemyPanelEstimate,
         DamageEvent,
         EffectChangeEvent,
         ResourceChangeEvent,
         BattleEffectSnapshot,
         BattleEffectInstance,
         BattleEvent,
-        BuildCandidate,
-        CalculationCache,
         BattleSkillSlot,
         BattleElfState,
         Battle,

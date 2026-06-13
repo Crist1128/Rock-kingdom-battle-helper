@@ -66,7 +66,7 @@ STAT_FIELD_MAP = {
     "spd": "base_speed_talent",
 }
 
-SPRITE_SKILL_RE = re.compile(r"([^;()]+)\(LV(\d+)/([^/]*)/([^/]*)/(-?\d+)/(-?\d+)/(.*?)\)(?:;|$)")
+SPRITE_SKILL_RE = re.compile(r"([^;()]+)\(LV(\d+)/([^/]*)/([^/]*)/([^/]*)/([^/]*)/(.*?)\)(?:;|$)")
 EVOLUTION_RE = re.compile(r"([^;()]+)\(([^/]*)/([^)]*)\)")
 
 
@@ -161,6 +161,39 @@ def normalize_skill_category(value: Any) -> str:
     return SKILL_CATEGORY_MAP.get(text, "special" if text else "status")
 
 
+def infer_skill_category(raw_category: Any, description: Any = "") -> str:
+    """Infer backend skill category from BWIKI category and description."""
+    text = normalize_text(raw_category)
+    desc = normalize_text(description)
+    mapped = SKILL_CATEGORY_MAP.get(text)
+    if mapped:
+        return mapped
+    if text in {"攻击", "伤害"}:
+        if re.search(r"物伤|物理伤害", desc):
+            return "physical"
+        if re.search(r"魔伤|魔法伤害", desc):
+            return "magic"
+        return "special"
+    if re.search(r"造成.*物伤|造成物理伤害", desc):
+        return "physical"
+    if re.search(r"造成.*魔伤|造成魔法伤害", desc):
+        return "magic"
+    return "special" if text else "status"
+
+
+def parse_skill_power(value: Any, raw_category: Any = "") -> int | None:
+    """Parse BWIKI skill power. Numeric values are int; empty or '-' stays None."""
+    text = normalize_text(value)
+    if not text or text in {"-", "—", "无"}:
+        return None
+    parsed = optional_int(text)
+    if parsed is None:
+        return None
+    if parsed == 0 and normalize_text(raw_category) in {"状态", "防御"}:
+        return None
+    return parsed
+
+
 def parse_defense_damage_rule(raw_category: str, description: str) -> dict[str, Any] | None:
     """从防御技能描述中提取稳定的减伤规则。"""
     if raw_category != "防御" or not description:
@@ -199,6 +232,123 @@ def parse_defense_damage_rule(raw_category: str, description: str) -> dict[str, 
     }
 
 
+def parse_priority_modifier(description: str) -> int:
+    """Extract simple priority hints when BWIKI description states a clear value."""
+    text = normalize_text(description)
+    match = re.search(r"先手\s*([+-]?\d+)", text)
+    if match:
+        return safe_int(match.group(1), 0)
+    match = re.search(r"优先级\s*([+-]?\d+)", text)
+    if match:
+        return safe_int(match.group(1), 0)
+    return 0
+
+
+def build_hit_rule(description: str) -> dict[str, Any]:
+    """Build a conservative hit rule from clear multi-hit text."""
+    text = normalize_text(description)
+    hit_count = None
+    match = re.search(r"连续(?:攻击)?\s*(\d+)\s*次|(\d+)\s*次攻击|攻击\s*(\d+)\s*次", text)
+    if match:
+        hit_count = safe_int(next(group for group in match.groups() if group), 0)
+    if hit_count and hit_count > 1:
+        return {
+            "damage_display_type": "combo_repeated_damage",
+            "runtime_record_strategy": "per_hit_value_and_count",
+            "hit_count": hit_count,
+            "source": "rocom_description_parser",
+            "needs_manual_review": True,
+        }
+    return {
+        "damage_display_type": "single_damage",
+        "runtime_record_strategy": "single_value",
+        "source": "cleaner_default",
+        "needs_manual_review": True,
+    }
+
+
+def parse_effect_operations(description: str, category: str) -> list[dict[str, Any]] | None:
+    """Parse only stable, low-risk operation hints; keep uncertain text reviewable."""
+    text = normalize_text(description)
+    if not text:
+        return None
+
+    operations: list[dict[str, Any]] = []
+    rain_duration = _parse_weather_duration(text) if "雨天" in text else None
+    if "天气变为雨天" in text or "变为雨天" in text or "改为雨天" in text:
+        operations.append(
+            {
+                "operation": "change_weather",
+                "effect_id": "weather_rain",
+                "target": "field",
+                "timing": "on_skill_use",
+                "remaining_turns": rain_duration,
+                "source": "rocom_description_parser",
+                "raw_description": text,
+                "needs_manual_review": True,
+            }
+        )
+
+    blizzard_duration = _parse_weather_duration(text) if "暴风雪" in text else None
+    if "天气变为暴风雪" in text or "变为暴风雪" in text or "改为暴风雪" in text:
+        operations.append(
+            {
+                "operation": "change_weather",
+                "effect_id": "weather_blizzard",
+                "target": "field",
+                "timing": "on_skill_use",
+                "remaining_turns": blizzard_duration,
+                "source": "rocom_description_parser",
+                "raw_description": text,
+                "needs_manual_review": True,
+            }
+        )
+
+    if "自己获得物攻+100%" in text:
+        operations.append(
+            {
+                "operation": "apply_effect",
+                "effect_id": "effect_physical_attack_up_layered",
+                "target": "actor_side",
+                "layers": 10,
+                "timing": "on_skill_use",
+                "source": "rocom_description_parser",
+                "raw_description": text,
+                "needs_manual_review": True,
+            }
+        )
+
+    auto_match = re.search(r"无法主动使用.*?使用\s*(\d+)\s*次(.+?)系技能后.*?自动使用", text)
+    if auto_match:
+        operations.append(
+            {
+                "status": "parsed_auto_trigger_rule",
+                "trigger": {
+                    "event": "skill_used",
+                    "count": safe_int(auto_match.group(1)),
+                    "raw_element": normalize_text(auto_match.group(2)),
+                },
+                "action": "auto_use_this_skill",
+                "raw_description": text,
+                "needs_manual_review": True,
+            }
+        )
+
+    if operations:
+        return operations
+    if category == "status":
+        return [{"status": "unparsed", "raw_description": text}]
+    return None
+
+
+def _parse_weather_duration(text: str) -> int | None:
+    """从天气技能描述中提取持续回合数。"""
+    match = re.search(r"持续\s*(\d+)\s*回合", text)
+    if match is None:
+        return None
+    return safe_int(match.group(1), 0) or None
+
+
 def short_hash(value: str, length: int = 8) -> str:
     """生成稳定短 hash，用于跨版本保持 ID 可复现。"""
     return hashlib.sha1(value.encode("utf-8")).hexdigest()[:length]
@@ -234,6 +384,8 @@ def parse_sprite_skills(skills_text: Any) -> list[dict[str, Any]]:
         return []
     result: list[dict[str, Any]] = []
     for name, level, attr, category, power, cost, desc in SPRITE_SKILL_RE.findall(text):
+        description = normalize_text(desc)
+        raw_category = normalize_text(category)
         result.append(
             {
                 "skill_name": normalize_text(name),
@@ -241,13 +393,11 @@ def parse_sprite_skills(skills_text: Any) -> list[dict[str, Any]]:
                 "level": safe_int(level),
                 "raw_attribute": normalize_text(attr),
                 "element_type": normalize_element(attr),
-                "raw_category": normalize_text(category),
-                "skill_category": normalize_skill_category(category),
-                "base_power": None
-                if safe_int(power) == 0 and category in {"状态", "防御"}
-                else safe_int(power),
+                "raw_category": raw_category,
+                "skill_category": infer_skill_category(raw_category, description),
+                "base_power": parse_skill_power(power, raw_category),
                 "base_energy_cost": safe_int(cost),
-                "description": normalize_text(desc),
+                "description": description,
             }
         )
     return result
@@ -292,12 +442,22 @@ def build_skill_catalog(
         if not name:
             return
         skill_id = make_skill_id(name)
-        category = normalize_skill_category(raw_category)
+        description = normalize_text(description)
+        raw_category = normalize_text(raw_category)
+        category = infer_skill_category(raw_category, description)
         tags = []
         if raw_category == "防御":
             tags.append("defense")
         if power is None and category in {"physical", "magic"}:
             tags.append("power_missing")
+        if raw_category:
+            tags.append(raw_category)
+        if "无法主动使用" in description:
+            tags.append("cannot_manual_use")
+        if "自动使用" in description:
+            tags.append("auto_trigger")
+        if "天气" in description:
+            tags.append("weather_rule")
 
         defense_rule = parse_defense_damage_rule(raw_category, description)
         if defense_rule is not None:
@@ -324,15 +484,8 @@ def build_skill_catalog(
         else:
             damage_rule = None
 
-        hit_rule = {
-            "damage_display_type": "single_damage",
-            "runtime_record_strategy": "single_value",
-            "source": "cleaner_default",
-            "needs_manual_review": True,
-        }
-        effect_operations = None
-        if description and category == "status":
-            effect_operations = [{"status": "unparsed", "raw_description": description}]
+        hit_rule = build_hit_rule(description)
+        effect_operations = parse_effect_operations(description, category)
 
         catalog[skill_id] = {
             "skill_id": skill_id,
@@ -343,8 +496,8 @@ def build_skill_catalog(
             "skill_category": category,
             "base_power": power,
             "base_energy_cost": cost,
-            "priority_modifier": 0,
-            "tags_json": dumps_json(tags or [raw_category]) if (tags or raw_category) else None,
+            "priority_modifier": parse_priority_modifier(description),
+            "tags_json": dumps_json(sorted(set(tags))) if tags else None,
             "damage_rule_json": dumps_json(damage_rule) if damage_rule else None,
             "hit_rule_json": dumps_json(hit_rule),
             "effect_operations_json": dumps_json(effect_operations) if effect_operations else None,
@@ -359,8 +512,7 @@ def build_skill_catalog(
     data_version = default_data_version()
     for row in skill_rows:
         category = normalize_text(row.get("类型"))
-        raw_power = safe_int(row.get("威力"))
-        power = None if raw_power == 0 and category in {"状态", "防御"} else raw_power
+        power = parse_skill_power(row.get("威力"), category)
         upsert_skill(
             skill_name=normalize_text(row.get("技能名")),
             raw_attribute=normalize_text(row.get("属性")),
@@ -501,7 +653,12 @@ def build_elf_record(
         )
 
     name = normalize_text(row.get("name"))
-    avatar = image_refs.get((display_name(row), "sprite")) or image_refs.get((name, "sprite")) or ""
+    avatar = (
+        normalize_text(row.get("sprite_image"))
+        or image_refs.get((display_name(row), "sprite"))
+        or image_refs.get((name, "sprite"))
+        or ""
+    )
     stats = {target: safe_int(row.get(source)) for source, target in STAT_FIELD_MAP.items()}
 
     forms_payload = {
@@ -626,13 +783,17 @@ def raw_sprite_to_row(sprite: dict[str, Any]) -> dict[str, Any]:
     matchup = sprite.get("type_matchup") or {}
 
     def skill_str(skill: dict[str, Any]) -> str:
+        power = skill.get("power")
+        power_text = "" if power is None else str(power)
+        cost = skill.get("cost")
+        cost_text = "" if cost is None else str(cost)
         return (
             f"{normalize_text(skill.get('name'))}("
             f"LV{safe_int(skill.get('level'))}/"
             f"{normalize_text(skill.get('attribute'))}/"
             f"{normalize_text(skill.get('category'))}/"
-            f"{safe_int(skill.get('power'))}/"
-            f"{safe_int(skill.get('cost'))}/"
+            f"{power_text}/"
+            f"{cost_text}/"
             f"{normalize_text(skill.get('description'))})"
         )
 
@@ -641,6 +802,7 @@ def raw_sprite_to_row(sprite: dict[str, Any]) -> dict[str, Any]:
         "name": sprite.get("name", ""),
         "form": sprite.get("form") or "",
         "url": sprite.get("url", ""),
+        "sprite_image": sprite.get("sprite_image", ""),
         "has_shiny": sprite.get("has_shiny", False),
         "attributes": ",".join(sprite.get("attributes") or []),
         "total_stats": stats.get("total", ""),
@@ -664,32 +826,47 @@ def raw_sprite_to_row(sprite: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def raw_skills_to_catalog_rows(raw_sprites: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """从 raw JSON 技能池中提取去重技能行，替代历史 skills.csv。"""
-    seen: set[str] = set()
-    rows: list[dict[str, str]] = []
+def raw_skills_to_catalog_rows(
+    raw_sprites: list[dict[str, Any]],
+    raw_skill_rows: list[dict[str, Any]] | None = None,
+) -> list[dict[str, str]]:
+    """从精灵技能池和技能图鉴详情中提取去重技能行，替代历史 skills.csv。"""
+    rows_by_name: dict[str, dict[str, str]] = {}
+
+    def upsert_from_raw(skill: dict[str, Any], *, source: str) -> None:
+        name = normalize_text(skill.get("name"))
+        if not name:
+            return
+        row = {
+            "技能名": name,
+            "属性": normalize_text(skill.get("attribute")),
+            "类型": normalize_text(skill.get("category")),
+            "威力": "" if skill.get("power") is None else str(skill.get("power")),
+            "耗能": "" if skill.get("cost") is None else str(skill.get("cost")),
+            "效果描述": normalize_text(skill.get("description")),
+            "来源": source,
+            "解析状态": normalize_text(skill.get("parse_status")),
+            "source_url": normalize_text(skill.get("url")),
+        }
+        rows_by_name[name] = row
+
     for sprite in raw_sprites:
         for skill in sprite.get("skills") or []:
-            name = normalize_text(skill.get("name"))
-            if not name or name in seen:
-                continue
-            seen.add(name)
-            rows.append(
-                {
-                    "技能名": name,
-                    "属性": normalize_text(skill.get("attribute")),
-                    "类型": normalize_text(skill.get("category")),
-                    "威力": str(safe_int(skill.get("power"))),
-                    "耗能": str(safe_int(skill.get("cost"))),
-                    "效果描述": normalize_text(skill.get("description")),
-                }
-            )
-    return rows
+            upsert_from_raw(skill, source="sprite_detail")
+
+    # Skill catalog details are authoritative for adjusted power/cost/description.
+    for skill in raw_skill_rows or []:
+        if normalize_text(skill.get("parse_status")) == "unresolved":
+            continue
+        upsert_from_raw(skill, source="skill_detail")
+
+    return list(rows_by_name.values())
 
 
 def clean_from_raw_sprites(
     raw_sprites: list[dict[str, Any]],
     *,
+    raw_skill_rows: list[dict[str, Any]] | None = None,
     image_url_rows: list[dict[str, Any]] | None = None,
     lineups_csv: str | Path | None = None,
     data_version: str | None = None,
@@ -698,7 +875,7 @@ def clean_from_raw_sprites(
     """从爬虫 raw JSON 直接生成后端静态规则导入数据，不依赖任何 CSV。"""
     version = data_version or default_data_version()
     sprite_rows = [raw_sprite_to_row(sprite) for sprite in raw_sprites]
-    skill_rows = raw_skills_to_catalog_rows(raw_sprites)
+    skill_rows = raw_skills_to_catalog_rows(raw_sprites, raw_skill_rows)
     url_rows = [dict(row) for row in (image_url_rows or [])]
     lineup_rows = read_csv_rows(lineups_csv)
 
@@ -724,6 +901,25 @@ def clean_from_raw_sprites(
     warnings.extend(conflicts)
     if not sprite_rows:
         warnings.append("未读取到 raw_sprites 数据。")
+    for sprite in raw_sprites:
+        display = display_name(sprite)
+        stats = sprite.get("stats") or {}
+        missing_stats = [key for key in STAT_FIELD_MAP if safe_int(stats.get(key), -1) < 0]
+        if missing_stats:
+            warnings.append(f"精灵六维缺失或不完整: {display} missing={missing_stats}")
+        if not sprite.get("skills"):
+            warnings.append(f"精灵技能列表为空: {display}")
+    unresolved_skills = [
+        normalize_text(skill.get("name"))
+        for skill in (raw_skill_rows or [])
+        if normalize_text(skill.get("parse_status")) == "unresolved"
+    ]
+    if unresolved_skills:
+        warnings.append(
+            "技能详情页未解析: "
+            + ", ".join(name for name in unresolved_skills[:30] if name)
+            + (" ..." if len(unresolved_skills) > 30 else "")
+        )
     if not url_rows:
         warnings.append("未提供 image_url_rows，avatar/skill_icon 将为空。MVP 阶段可接受。")
 
@@ -735,6 +931,7 @@ def clean_from_raw_sprites(
         warnings=warnings,
         stats={
             "raw_sprites": len(raw_sprites),
+            "raw_skill_details": len(raw_skill_rows or []),
             "sprites_rows": len(sprite_rows),
             "skills_rows": len(skill_rows),
             "urls_rows": len(url_rows),
@@ -844,6 +1041,7 @@ def main() -> None:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--raw-json", help="爬虫产出的 sprites_raw.json，推荐入口")
     source.add_argument("--sprites-csv", help="历史兼容：爬虫产出的 sprites.csv")
+    parser.add_argument("--skills-raw-json", help="爬虫产出的 skills_raw.json，可选")
     parser.add_argument("--image-urls-json", help="爬虫产出的 image_urls.json")
     parser.add_argument("--skills-csv", help="历史兼容：爬虫产出的 skills.csv")
     parser.add_argument("--urls-csv", help="历史兼容：爬虫产出的 urls.csv")
@@ -860,11 +1058,15 @@ def main() -> None:
 
     if args.raw_json:
         raw_sprites = json.loads(Path(args.raw_json).read_text(encoding="utf-8"))
+        raw_skill_rows = []
+        if args.skills_raw_json and Path(args.skills_raw_json).exists():
+            raw_skill_rows = json.loads(Path(args.skills_raw_json).read_text(encoding="utf-8"))
         image_url_rows = []
         if args.image_urls_json and Path(args.image_urls_json).exists():
             image_url_rows = json.loads(Path(args.image_urls_json).read_text(encoding="utf-8"))
         dataset = clean_from_raw_sprites(
             raw_sprites,
+            raw_skill_rows=raw_skill_rows,
             image_url_rows=image_url_rows,
             lineups_csv=args.lineups_csv,
             data_version=args.data_version,

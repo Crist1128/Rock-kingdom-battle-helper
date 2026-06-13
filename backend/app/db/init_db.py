@@ -17,7 +17,7 @@ from app.db.session import engine
 
 # 导入模型，确保 Base.metadata 收集所有表。
 # noqa: F401 表示忽略未使用的导入警告，这些导入是为了注册模型到 Base.metadata
-from app.models import battle, candidate, effect, event, static  # noqa: F401
+from app.models import battle, effect, estimate, event, static  # noqa: F401
 
 
 def init_db() -> None:

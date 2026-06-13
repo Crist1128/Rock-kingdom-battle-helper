@@ -3,24 +3,26 @@
 from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.enums import Side
 from app.db.base import Base
-from app.inference.observation_matcher import ObservationEventInput
+from app.inference.observation_event import ObservationEventInput
 from app.inference.observation_types import ObservationType
 from app.models import battle as _battle_models  # noqa: F401
-from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import estimate as _estimate_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.battle import Battle, BattleElfState
-from app.models.static import ElfDefinition, NatureDefinition
+from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
+from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
+from app.models.static import EffectDefinition, ElfDefinition, NatureDefinition
 from app.schemas.estimate import EnemyDefaultConfigInput
 from app.schemas.player_build import IndividualTalentInput
+from app.services.battle_service import BattleService
 from app.services.estimate_service import EstimateService
-from app.utils.json import dumps_json
+from app.utils.json import dumps_json, loads_json
 
 
 @pytest.fixture()
@@ -184,6 +186,7 @@ def test_record_observation_derives_hp_and_defense_constraints(
             observed_value=90,
             payload={
                 "enemy_role": "defender",
+                "snapshot_id": "snapshot_formula_1",
                 "attacker_panel_stats": {
                     "hp": 300,
                     "physical_attack": 200,
@@ -197,6 +200,8 @@ def test_record_observation_derives_hp_and_defense_constraints(
                 "damage_tolerance": 0,
                 "observed_hp_percent_delta": 30,
                 "percent_tolerance": 0,
+                "type_multiplier": 1,
+                "stab_multiplier": 1,
             },
         ),
         commit=True,
@@ -216,6 +221,86 @@ def test_record_observation_derives_hp_and_defense_constraints(
     assert evidence[0].inferred_stats is not None
     assert evidence[0].inferred_stats["physical_defense"]["integer_min"] == 100
     assert evidence[0].inferred_stats["hp"]["integer_max"] == 300
+    assert evidence[0].explanation is not None
+    assert evidence[0].explanation["summary"] == "已根据本次观测生成属性约束。"
+    assert evidence[0].explanation["event"] == {
+        "source_event_id": "event_reverse_damage_1",
+        "snapshot_id": "snapshot_formula_1",
+    }
+    assert evidence[0].explanation["formula"]["missing_inputs"] == ["defender_panel_stats"]
+    assert evidence[0].explanation["formula"]["key_multipliers"]["base_power"] == "50"
+    assert evidence[0].explanation["formula"]["key_multipliers"]["type_multiplier"] == "1"
+    assert evidence[0].explanation["formula"]["key_multipliers"]["formula_factor"] == "45.1220"
+    changes = {
+        item["stat_key"]: item for item in evidence[0].explanation["constraint_changes"]
+    }
+    assert changes["hp"]["outcome"] == "new_constraint"
+    assert changes["hp"]["merged"]["integer_min"] == 300
+    assert changes["physical_defense"]["outcome"] == "new_constraint"
+    assert changes["physical_defense"]["source_event_ids"] == ["event_reverse_damage_1"]
+
+
+def test_evidence_explanation_marks_unmapped_snapshot_modifiers(
+    db_session: Session,
+) -> None:
+    """快照里存在天气/状态但没有规则映射时，解释结构应明确标记 unknown。"""
+    state = _enemy_state()
+    db_session.add(state)
+    service = EstimateService(db_session)
+    service.create_for_enemy_state("battle_estimate", state, commit=True)
+
+    out = service.record_observation(
+        ObservationEventInput(
+            battle_id="battle_estimate",
+            enemy_elf_id="enemy_elf",
+            event_id="event_snapshot_modifier_1",
+            observation_type=ObservationType.DAMAGE_VALUE,
+            observed_value=90,
+            payload={
+                "enemy_role": "defender",
+                "defender_side": "enemy",
+                "defender_elf_id": "enemy_elf",
+                "attacker_panel_stats": {
+                    "hp": 300,
+                    "physical_attack": 200,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+                "skill_category": "physical",
+                "base_power": 50,
+                "damage_tolerance": 0,
+                "snapshot_payload": [
+                    {
+                        "instance_id": "weather_rain_1",
+                        "effect_id": "weather_rain",
+                        "owner_scope": "field",
+                        "owner_side": None,
+                    },
+                    {
+                        "instance_id": "mark_guard_1",
+                        "effect_id": "mark_guard",
+                        "owner_scope": "elf",
+                        "owner_side": "enemy",
+                        "owner_elf_id": "enemy_elf",
+                    },
+                ],
+            },
+        ),
+        commit=True,
+    )
+
+    assert out is not None
+    assert "weather_modifier_rule_unmapped" in out.unknown_factors
+    assert "active_effect_modifier_rules_unmapped" in out.unknown_factors
+    evidence = service.list_evidence("battle_estimate", "enemy_elf")
+    assert evidence[0].explanation is not None
+    modifiers = evidence[0].explanation["modifiers"]
+    assert modifiers["snapshot_effects"]["active_effect_count"] == 2
+    assert modifiers["snapshot_effects"]["field_effect_count"] == 1
+    assert modifiers["snapshot_effects"]["defender_effect_count"] == 1
+    assert modifiers["unmapped_effect_modifier_count"] == 2
 
 
 def test_floor_remaining_percent_derives_usable_hp_constraint(
@@ -338,6 +423,448 @@ def test_hp_only_observation_repairs_invalid_player_default_to_base_heuristic(
     assert 448 <= out.default_panel["hp"] <= 474
 
 
+def test_replay_from_event_rebuilds_enemy_panel_estimates(db_session: Session) -> None:
+    """事件重放会从已落库伤害事件重建实时面板估计和 evidence。"""
+    state = _enemy_state()
+    db_session.add(state)
+    EstimateService(db_session).create_for_enemy_state("battle_estimate", state, commit=True)
+    db_session.add(
+        BattleEvent(
+            event_id="event_replay_damage_1",
+            battle_id="battle_estimate",
+            turn_number=1,
+            event_type="damage",
+            actor_side="self",
+            actor_elf_id="self_elf",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            skill_id="skill_replay_test",
+            skill_confirmed=True,
+            source="manual_input",
+            manual_override=True,
+            payload_json=dumps_json(
+                {
+                    "sync_observation": True,
+                    "damage_tolerance": 999,
+                    "percent_tolerance": 1,
+                }
+            ),
+        )
+    )
+    db_session.add(
+        DamageEvent(
+            event_id="damage_event_replay_1",
+            battle_id="battle_estimate",
+            battle_event_id="event_replay_damage_1",
+            attacker_side="self",
+            attacker_elf_id="self_elf",
+            defender_side="enemy",
+            defender_elf_id="enemy_elf",
+            skill_id="skill_replay_test",
+            damage_display_type="single_damage",
+            damage_value=76,
+            hp_percent_before=100,
+            hp_percent_after=83,
+            hp_percent_delta=17,
+            enemy_hp_percent_damage=17,
+            formula_context_json=dumps_json(
+                {
+                    "formula_type": "attack",
+                    "skill_category": "physical",
+                    "observed_damage_value": 76,
+                }
+            ),
+            calculation_confidence=0.0,
+            manual_override=True,
+        )
+    )
+    db_session.commit()
+
+    result = BattleService(db_session).replay_from_event(
+        "battle_estimate",
+        "event_replay_damage_1",
+    )
+    out = EstimateService(db_session).get_estimate("battle_estimate", "enemy_elf")
+    evidence = EstimateService(db_session).list_evidence("battle_estimate", "enemy_elf")
+
+    assert result.status == "runtime_and_estimate_rebuilt"
+    assert result.rebuilt_estimate_count == 1
+    assert result.replayed_observation_count == 2
+    assert result.runtime_replay_status == "partial_runtime_rebuilt"
+    assert out.stat_constraints["hp"]["integer_min"] == 448
+    assert out.stat_constraints["hp"]["integer_max"] == 474
+    assert len(evidence) == 2
+    assert {item.source_event_id for item in evidence} == {
+        "replay:event_replay_damage_1:damage_value",
+        "replay:event_replay_damage_1:hp_percent_delta",
+    }
+
+
+def test_replay_from_event_rebuilds_basic_runtime_state(db_session: Session) -> None:
+    """事件重放会按非作废资源和切换事件重算基础 BattleElfState。"""
+    db_session.add(
+        ElfDefinition(
+            elf_id="enemy_elf_bench",
+            elf_name="测试敌方替补",
+            avatar="",
+            element_types_json=dumps_json(["normal"]),
+            base_hp_talent=100,
+            base_physical_attack_talent=100,
+            base_physical_defense_talent=100,
+            base_magic_attack_talent=90,
+            base_magic_defense_talent=90,
+            base_speed_talent=90,
+        )
+    )
+    db_session.flush()
+    active_enemy = _enemy_state()
+    bench_enemy = _enemy_state(state_id="state_enemy_bench", elf_id="enemy_elf_bench")
+    bench_enemy.is_active_elf = False
+    bench_enemy.last_switch_turn = None
+    active_enemy.current_hp_percent = 12
+    active_enemy.energy = 1
+    bench_enemy.current_hp_percent = 77
+    db_session.add(active_enemy)
+    db_session.add(bench_enemy)
+    db_session.add(
+        BattleEvent(
+            event_id="event_runtime_damage_voided",
+            battle_id="battle_estimate",
+            turn_number=1,
+            event_type="damage",
+            actor_side="self",
+            actor_elf_id="self_elf",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            source="manual_input",
+            manual_override=True,
+            is_voided=True,
+        )
+    )
+    db_session.add(
+        ResourceChangeEvent(
+            event_id="resource_voided",
+            battle_id="battle_estimate",
+            battle_event_id="event_runtime_damage_voided",
+            resource_type="hp",
+            change_type="damage",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            value_type="percent",
+            value=50,
+            before_value=100,
+            after_value=50,
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        BattleEvent(
+            event_id="event_runtime_damage_kept",
+            battle_id="battle_estimate",
+            turn_number=1,
+            event_type="damage",
+            actor_side="self",
+            actor_elf_id="self_elf",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        ResourceChangeEvent(
+            event_id="resource_kept",
+            battle_id="battle_estimate",
+            battle_event_id="event_runtime_damage_kept",
+            resource_type="hp",
+            change_type="damage",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            value_type="percent",
+            value=17,
+            before_value=100,
+            after_value=83,
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        BattleEvent(
+            event_id="event_runtime_energy",
+            battle_id="battle_estimate",
+            turn_number=1,
+            event_type="energy_change",
+            actor_side="enemy",
+            actor_elf_id="enemy_elf",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        ResourceChangeEvent(
+            event_id="resource_energy",
+            battle_id="battle_estimate",
+            battle_event_id="event_runtime_energy",
+            resource_type="energy",
+            change_type="consume",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            value_type="value",
+            value=3,
+            before_value=10,
+            after_value=7,
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        BattleEvent(
+            event_id="event_runtime_switch",
+            battle_id="battle_estimate",
+            turn_number=2,
+            event_type="switch_elf",
+            actor_side="enemy",
+            actor_elf_id="enemy_elf",
+            target_side="enemy",
+            target_elf_id="enemy_elf_bench",
+            source="manual_input",
+            manual_override=True,
+            payload_json=dumps_json(
+                {"from_elf_id": "enemy_elf", "to_elf_id": "enemy_elf_bench"}
+            ),
+        )
+    )
+    db_session.commit()
+
+    result = BattleService(db_session).replay_from_event(
+        "battle_estimate",
+        "event_runtime_damage_kept",
+    )
+    active_after = db_session.get(BattleElfState, "state_enemy")
+    bench_after = db_session.get(BattleElfState, "state_enemy_bench")
+    battle = db_session.get(Battle, "battle_estimate")
+
+    assert result.runtime_resource_event_count == 2
+    assert result.runtime_switch_event_count == 1
+    assert active_after is not None
+    assert active_after.current_hp_percent == 83
+    assert active_after.energy == 7
+    assert active_after.is_active_elf is False
+    assert bench_after is not None
+    assert bench_after.current_hp_percent == 100
+    assert bench_after.is_active_elf is True
+    assert battle is not None
+    assert battle.enemy_active_elf_id == "enemy_elf_bench"
+
+
+def test_replay_from_event_rebuilds_effect_instances(db_session: Session) -> None:
+    """事件重放会按 EffectChangeEvent 重建最终生效状态实例。"""
+    state = _enemy_state()
+    db_session.add(state)
+    db_session.add(
+        EffectDefinition(
+            effect_id="effect_replay_mark",
+            effect_name="重放测试印记",
+            category="mark",
+            polarity="buff",
+            display_group="mark",
+            owner_scope="elf",
+            target_scope="elf",
+            attach_target_type="elf",
+            stack_rule="replace",
+            max_layers=5,
+            default_layers=1,
+        )
+    )
+    db_session.flush()
+    db_session.add(
+        BattleEffectInstance(
+            instance_id="effect_instance_stale",
+            battle_id="battle_estimate",
+            effect_id="effect_replay_mark",
+            category="mark",
+            owner_scope="elf",
+            owner_side="enemy",
+            owner_elf_id="enemy_elf",
+            layers=9,
+            is_active=True,
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        BattleEvent(
+            event_id="event_effect_apply_active",
+            battle_id="battle_estimate",
+            turn_number=1,
+            event_type="effect_apply",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        EffectChangeEvent(
+            event_id="effect_change_apply_active",
+            battle_id="battle_estimate",
+            battle_event_id="event_effect_apply_active",
+            turn_number=1,
+            change_type="apply",
+            effect_instance_id="effect_instance_active",
+            effect_id="effect_replay_mark",
+            effect_name="重放测试印记",
+            category="mark",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            owner_scope="elf",
+            layers_before=None,
+            layers_after=2,
+            duration_after=3,
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        BattleEvent(
+            event_id="event_effect_apply_removed",
+            battle_id="battle_estimate",
+            turn_number=1,
+            event_type="effect_apply",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        EffectChangeEvent(
+            event_id="effect_change_apply_removed",
+            battle_id="battle_estimate",
+            battle_event_id="event_effect_apply_removed",
+            turn_number=1,
+            change_type="apply",
+            effect_instance_id="effect_instance_removed",
+            effect_id="effect_replay_mark",
+            effect_name="重放测试印记",
+            category="mark",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            owner_scope="elf",
+            layers_before=None,
+            layers_after=1,
+            duration_after=2,
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        BattleEvent(
+            event_id="event_effect_remove",
+            battle_id="battle_estimate",
+            turn_number=2,
+            event_type="effect_remove",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.add(
+        EffectChangeEvent(
+            event_id="effect_change_remove",
+            battle_id="battle_estimate",
+            battle_event_id="event_effect_remove",
+            turn_number=2,
+            change_type="remove",
+            effect_instance_id="effect_instance_removed",
+            effect_id="effect_replay_mark",
+            effect_name="重放测试印记",
+            category="mark",
+            target_side="enemy",
+            target_elf_id="enemy_elf",
+            owner_scope="elf",
+            layers_before=1,
+            layers_after=0,
+            duration_after=0,
+            source="manual_input",
+            manual_override=True,
+        )
+    )
+    db_session.commit()
+
+    result = BattleService(db_session).replay_from_event(
+        "battle_estimate",
+        "event_effect_apply_active",
+    )
+    stale = db_session.get(BattleEffectInstance, "effect_instance_stale")
+    active = db_session.get(BattleEffectInstance, "effect_instance_active")
+    removed = db_session.get(BattleEffectInstance, "effect_instance_removed")
+
+    assert result.runtime_effect_change_event_count == 3
+    assert result.runtime_active_effect_count == 1
+    assert result.runtime_snapshot_id is not None
+    assert result.runtime_snapshot_rebuilt_count == 3
+    assert result.runtime_snapshot_effect_count == 1
+    assert stale is None
+    assert active is not None
+    assert active.is_active is True
+    assert active.layers == 2
+    assert active.remaining_turns == 3
+    assert active.expire_turn == 4
+    assert removed is not None
+    assert removed.is_active is False
+    assert removed.layers == 0
+    battle = db_session.get(Battle, "battle_estimate")
+    assert battle is not None
+    assert battle.current_snapshot_id == result.runtime_snapshot_id
+    snapshot = db_session.get(BattleEffectSnapshot, result.runtime_snapshot_id)
+    assert snapshot is not None
+    assert snapshot.source_event_id == "event_effect_remove"
+    snapshot_items = loads_json(snapshot.full_snapshot_json, [])
+    assert len(snapshot_items) == 1
+    assert snapshot_items[0]["instance_id"] == "effect_instance_active"
+    assert snapshot_items[0]["layers"] == 2
+
+    event_apply_active = db_session.get(BattleEvent, "event_effect_apply_active")
+    event_apply_removed = db_session.get(BattleEvent, "event_effect_apply_removed")
+    event_remove = db_session.get(BattleEvent, "event_effect_remove")
+    assert event_apply_active is not None and event_apply_active.snapshot_id
+    assert event_apply_removed is not None and event_apply_removed.snapshot_id
+    assert event_remove is not None and event_remove.snapshot_id == result.runtime_snapshot_id
+
+    apply_snapshot = db_session.get(BattleEffectSnapshot, event_apply_active.snapshot_id)
+    middle_snapshot = db_session.get(BattleEffectSnapshot, event_apply_removed.snapshot_id)
+    assert apply_snapshot is not None
+    assert middle_snapshot is not None
+    assert apply_snapshot.source_event_id == "event_effect_apply_active"
+    assert middle_snapshot.source_event_id == "event_effect_apply_removed"
+    assert len(loads_json(apply_snapshot.full_snapshot_json, [])) == 1
+    assert len(loads_json(middle_snapshot.full_snapshot_json, [])) == 2
+
+    first_replay_snapshot_ids = {
+        event_apply_active.snapshot_id,
+        event_apply_removed.snapshot_id,
+        event_remove.snapshot_id,
+    }
+    second_result = BattleService(db_session).replay_from_event(
+        "battle_estimate",
+        "event_effect_apply_active",
+    )
+    second_replay_snapshot_ids = {
+        db_session.get(BattleEvent, "event_effect_apply_active").snapshot_id,
+        db_session.get(BattleEvent, "event_effect_apply_removed").snapshot_id,
+        db_session.get(BattleEvent, "event_effect_remove").snapshot_id,
+    }
+    assert second_result.runtime_snapshot_rebuilt_count == 3
+    assert first_replay_snapshot_ids.isdisjoint(second_replay_snapshot_ids)
+    old_snapshots = db_session.scalars(
+        select(BattleEffectSnapshot).where(
+            BattleEffectSnapshot.snapshot_id.in_(first_replay_snapshot_ids)
+        )
+    ).all()
+    assert {item.deleted_at is not None for item in old_snapshots} == {True}
+
+
 def test_conflicting_numeric_constraints_are_recorded_in_evidence(
     db_session: Session,
 ) -> None:
@@ -391,6 +918,14 @@ def test_conflicting_numeric_constraints_are_recorded_in_evidence(
     assert evidence[0].confidence == "constraint_conflict"
     assert evidence[0].conflict is not None
     assert evidence[0].conflict["conflicts"][0]["stat_key"] == "physical_defense"
+    assert evidence[0].explanation is not None
+    assert evidence[0].explanation["summary"] == "本次观测与已有约束存在冲突，需要人工复核。"
+    conflict_changes = {
+        item["stat_key"]: item for item in evidence[0].explanation["constraint_changes"]
+    }
+    assert conflict_changes["physical_defense"]["outcome"] == "conflict"
+    assert conflict_changes["physical_defense"]["previous"]["integer_min"] == 100
+    assert conflict_changes["physical_defense"]["incoming"]["integer_min"] == 292
 
 
 def test_observation_repairs_default_config_when_existing_choice_violates_constraints(
@@ -470,12 +1005,17 @@ def test_observation_repairs_default_config_when_existing_choice_violates_constr
     assert out.default_panel["physical_attack"] == 273
 
 
-def _enemy_state() -> BattleElfState:
+def _enemy_state(
+    *,
+    state_id: str = "state_enemy",
+    elf_id: str = "enemy_elf",
+    is_active_elf: bool = True,
+) -> BattleElfState:
     return BattleElfState(
-        state_id="state_enemy",
+        state_id=state_id,
         battle_id="battle_estimate",
         side=Side.ENEMY.value,
-        elf_id="enemy_elf",
+        elf_id=elf_id,
         elf_name="测试敌方精灵",
         avatar="",
         panel_stats_json=dumps_json({}),
@@ -485,7 +1025,7 @@ def _enemy_state() -> BattleElfState:
         skill_ids_json=dumps_json([]),
         confirmed_skill_ids_json=dumps_json([]),
         active_effect_instance_ids_json=dumps_json([]),
-        is_active_elf=True,
+        is_active_elf=is_active_elf,
         is_defeated=False,
         manual_override=True,
     )

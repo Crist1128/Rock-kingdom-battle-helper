@@ -48,7 +48,7 @@ class ElfDefinition(TimestampMixin, Base):
     base_magic_defense_talent: Mapped[int] = mapped_column(Integer, nullable=False)
     base_speed_talent: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # 常见配置（用于生成候选配置时的权重参考）
+    # 常见配置（用于默认配置建议和后续统计参考）
     common_skill_sets_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     common_natures_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     common_individual_talent_patterns_json: Mapped[str | None] = mapped_column(Text, nullable=True)

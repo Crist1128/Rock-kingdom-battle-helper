@@ -25,7 +25,7 @@ python -m pytest -q
 - 静态规则查询：精灵、技能、性格、状态。
 - 己方配置管理：`/api/v1/player-builds`。
 - 战斗流程：创建战斗、录入阵容、进入战斗、切换精灵。
-- 敌方面板估计：`/api/v1/estimates/*`，支持默认配置、估计 evidence 和按需内存展开可能配置。
+- 敌方面板估计：`/api/v1/estimates/*`，支持默认配置、估计 evidence 和实时约束展示。
 - 统一状态实例：手动施加、手动移除、切换清除/保留。
 - 伤害事件记录：支持单次伤害、动画多段最终总伤害、连击伤害。
 - 资源变化事件记录：支持治疗、能量获得、能量消耗等手动事实。
@@ -34,7 +34,7 @@ python -m pytest -q
 - RuleResolver 雏形：支持技能基础信息、本系、属性克制、双属性合并、应对倍率和基础减伤解析。
 - 核心默认技能：后端启动时幂等补齐“聚能”（`core_skill_focus_energy`），所有精灵运行时初始能量为 10，聚能能耗 0，使用后增加 5 能量。
 - Observation API：`POST /api/v1/observations/{battle_id}`，可根据观测事件更新 `EnemyPanelEstimate` 属性约束、unknown factors 和 evidence。
-- 旧候选空间策略已下线：`/api/v1/candidates/*` 不再挂载，`build_candidate` 旧表仅等待后续迁移删除。
+- 旧候选空间策略已删除：`/api/v1/candidates/*` 不再挂载，旧候选代码已删除，`build_candidate` / `calculation_cache` 由 Alembic `0006_drop_legacy_candidate_tables` 删除。
 - 数据管线管理接口：远程检查、远程同步、本地 cleaned JSON 导入。
 
 ## 手动输入 MVP 流程

@@ -35,7 +35,11 @@ import type {
   RocomDataUpdateJobStatus,
   RocomDataUpdateRequest,
   RocomLocalImportRequest,
+  RuntimeFormChangeInput,
   SkillDefinitionOut,
+  SkillRuleCapabilityAuditOut,
+  SkillRuleManualUpdate,
+  SkillRuleReviewOut,
   SkillUseEventCreate,
   StartBattleInput,
   SwitchElfInput,
@@ -102,7 +106,17 @@ export const api = {
   skills: {
     list: (params: { q?: string; limit?: number; offset?: number } = {}) =>
       request<SkillDefinitionOut[]>(`/skills${qs({ limit: 50, ...params })}`),
+    review: (
+      params: { q?: string; review_status?: string; limit?: number; offset?: number } = {},
+    ) => request<SkillRuleReviewOut[]>(`/skills/review${qs({ limit: 50, ...params })}`),
+    capabilityAudit: () => request<SkillRuleCapabilityAuditOut>("/skills/capability-audit"),
     get: (skillId: string) => request<SkillDefinitionOut>(`/skills/${skillId}`),
+    updateRules: (skillId: string, payload: SkillRuleManualUpdate, adminToken?: string) =>
+      request<SkillRuleReviewOut>(`/skills/${skillId}/rules`, {
+        method: "PUT",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        body: JSON.stringify(payload),
+      }),
   },
 
   natures: {
@@ -114,6 +128,7 @@ export const api = {
   effects: {
     list: (params: { q?: string; category?: string; owner_scope?: string; limit?: number; offset?: number } = {}) =>
       request<EffectDefinitionOut[]>(`/effects${qs({ limit: 80, ...params })}`),
+    get: (effectId: string) => request<EffectDefinitionOut>(`/effects/${effectId}`),
     apply: (payload: EffectApplyInput) =>
       request<Record<string, unknown>>("/effects/instances", { method: "POST", body: JSON.stringify(payload) }),
     remove: (instanceId: string, payload?: { turn_number?: number | null; reason?: string | null }) =>
@@ -166,6 +181,11 @@ export const api = {
       request<BattleOut>(`/battles/${battleId}/start`, { method: "POST", body: JSON.stringify(payload) }),
     switchElf: (battleId: string, payload: SwitchElfInput) =>
       request<BattleOut>(`/battles/${battleId}/switch`, { method: "POST", body: JSON.stringify(payload) }),
+    changeRuntimeForm: (battleId: string, stateId: string, payload: RuntimeFormChangeInput) =>
+      request<BattleStateOut>(`/battles/${battleId}/elves/${stateId}/runtime-form`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
     endTurn: (battleId: string, payload: EndTurnInput = {}) =>
       request<EndTurnResult>(`/battles/${battleId}/turns/end`, {
         method: "POST",

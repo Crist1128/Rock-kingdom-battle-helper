@@ -15,13 +15,12 @@ from app.data_pipeline.skill_operations.importer import import_skill_effect_oper
 from app.db.base import Base
 from app.db.session import get_db
 from app.models import battle as _battle_models  # noqa: F401
-from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.battle import Battle, BattleElfState
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
-from app.models.event import EffectChangeEvent, ResourceChangeEvent
+from app.models.event import BattleEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import EffectDefinition, ElfDefinition, SkillDefinition
 from app.utils.json import dumps_json, loads_json
 
@@ -536,6 +535,264 @@ def test_resource_change_and_remove_effect_share_skill_event(
         assert instance.is_active is False
 
 
+def test_manual_clear_effect_layers_requires_selected_instances(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """手动消层只按玩家指定的状态实例扣层，不由后端自动挑选。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_unused", layers=1)
+        session.add(
+            BattleEffectInstance(
+                instance_id="existing_starfall",
+                battle_id="battle_ops",
+                effect_id="effect_starfall_mark",
+                category="mark",
+                owner_scope="side",
+                owner_side="enemy",
+                layers=5,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.EFFECT_DISPEL.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "payload_json": dumps_json(
+                {
+                    "manual_effect_operations": [
+                        {
+                            "op_type": "clear_effect_layers",
+                            "target": "enemy_side",
+                            "selected_effect_instance_layers": [
+                                {"instance_id": "existing_starfall", "layers": 3}
+                            ],
+                        }
+                    ]
+                }
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    result = payload["effect_operation_results"][0]
+    assert result["operation"] == "clear_effect_layers"
+    assert result["changed_effects"][0]["layers_before"] == 5
+    assert result["changed_effects"][0]["layers_after"] == 2
+    with session_factory() as session:
+        instance = session.get(BattleEffectInstance, "existing_starfall")
+        assert instance is not None
+        assert instance.layers == 2
+        assert instance.is_active is True
+
+
+def test_clear_effects_by_polarity_and_multiply_positive_layers(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """可按极性清除状态，也可对正面状态执行层数翻倍。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_polarity", layers=1)
+        session.add(_positive_definition("effect_power_up", "威力增加", max_layers=5))
+        skill = session.get(SkillDefinition, "skill_polarity")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "multiply_layers_by_polarity",
+                    "target": "actor_side",
+                    "polarity": "positive",
+                    "multiplier": 2,
+                }
+            ]
+        )
+        session.flush()
+        session.add(
+            BattleEffectInstance(
+                instance_id="existing_power_up",
+                battle_id="battle_ops",
+                effect_id="effect_power_up",
+                category="skill_modifier",
+                owner_scope="elf",
+                owner_side="self",
+                owner_elf_id="elf_self",
+                layers=3,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.SKILL_USE.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_polarity",
+            "skill_confirmed": True,
+        },
+    )
+
+    assert response.status_code == 201
+    with session_factory() as session:
+        instance = session.get(BattleEffectInstance, "existing_power_up")
+        assert instance is not None
+        assert instance.layers == 5
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.EFFECT_DISPEL.value,
+            "actor_side": "enemy",
+            "actor_elf_id": "elf_enemy",
+            "target_side": "self",
+            "target_elf_id": "elf_self",
+            "payload_json": dumps_json(
+                {
+                    "manual_effect_operations": [
+                        {"op_type": "clear_effects", "target": "self", "polarity": "positive"}
+                    ]
+                }
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    with session_factory() as session:
+        instance = session.get(BattleEffectInstance, "existing_power_up")
+        assert instance is not None
+        assert instance.is_active is False
+
+
+def test_heal_from_damage_dealt_rounds_down(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """按伤害吸血时，回复值向下取整。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_lifesteal", layers=1)
+        self_state = session.get(BattleElfState, "state_self")
+        assert self_state is not None
+        self_state.current_hp_value = 100
+        self_state.current_hp_percent = 20
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.EFFECT_TRIGGER.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "payload_json": dumps_json(
+                {
+                    "damage_value": 33,
+                    "manual_effect_operations": [
+                        {
+                            "op_type": "heal_from_damage_dealt",
+                            "target": "actor_side",
+                            "ratio": 0.5,
+                        }
+                    ],
+                }
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    result = payload["effect_operation_results"][0]
+    assert result["heal_value"] == 16
+    assert result["rounding"] == "floor"
+    with session_factory() as session:
+        self_state = session.get(BattleElfState, "state_self")
+        assert self_state is not None
+        assert self_state.current_hp_value == 116
+
+
+def test_switch_lock_records_conflict_without_blocking_switch(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """换宠锁定只写入规则冲突提示，不阻止 switch 接口执行。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_unused", layers=1)
+        session.add(_elf("elf_self_2", "己方后备", ["水"]))
+        session.flush()
+        session.add(
+            BattleElfState(
+                state_id="state_self_2",
+                battle_id="battle_ops",
+                side="self",
+                elf_id="elf_self_2",
+                elf_name="己方后备",
+                avatar="",
+                panel_stats_json=dumps_json({"hp": 500}),
+                current_hp_value=500,
+                current_hp_percent=100.0,
+                energy=0,
+                is_active_elf=False,
+                is_defeated=False,
+                manual_override=True,
+            )
+        )
+        session.add(_switch_lock_definition())
+        session.flush()
+        session.add(
+            BattleEffectInstance(
+                instance_id="switch_lock_self",
+                battle_id="battle_ops",
+                effect_id="effect_switch_lock",
+                category="action_modifier",
+                owner_scope="elf",
+                owner_side="self",
+                owner_elf_id="elf_self",
+                layers=1,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/switch",
+        json={"side": "self", "elf_id": "elf_self_2", "turn_number": 1},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["self_active_elf_id"] == "elf_self_2"
+    with session_factory() as session:
+        event = session.scalar(
+            select(BattleEvent).where(
+                BattleEvent.battle_id == "battle_ops",
+                BattleEvent.event_type == BattleEventType.SWITCH_ELF.value,
+            )
+        )
+        assert event is not None
+        payload = loads_json(event.payload_json, {})
+        assert payload["rule_conflicts"][0]["conflict_type"] == "switch_lock"
+
+
 def test_conditional_branch_executes_child_operations(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
@@ -815,4 +1072,56 @@ def _weather_definition(effect_id: str, effect_name: str) -> EffectDefinition:
         clear_by_weather_replace=True,
         conflict_group="weather",
         conflict_policy="replace_old",
+    )
+
+
+def _positive_definition(
+    effect_id: str,
+    effect_name: str,
+    *,
+    max_layers: int | None = None,
+) -> EffectDefinition:
+    """构造可叠层正面状态定义。"""
+    return EffectDefinition(
+        effect_id=effect_id,
+        effect_name=effect_name,
+        category="skill_modifier",
+        polarity="positive",
+        display_group="skill_modifier",
+        display_priority=410,
+        owner_scope="elf",
+        target_scope="single_elf",
+        attach_target_type="elf",
+        is_visible_icon=True,
+        is_recognizable_by_icon=False,
+        default_layers=1,
+        max_layers=max_layers,
+        stack_rule="add_layers",
+        duration_type="until_removed",
+        clear_on_switch=True,
+        clear_by_stat_clear=True,
+    )
+
+
+def _switch_lock_definition() -> EffectDefinition:
+    """构造换宠锁定状态定义。"""
+    return EffectDefinition(
+        effect_id="effect_switch_lock",
+        effect_name="换宠锁定",
+        category="action_modifier",
+        polarity="negative",
+        display_group="action_modifier",
+        display_priority=500,
+        owner_scope="elf",
+        target_scope="single_elf",
+        attach_target_type="elf",
+        is_visible_icon=True,
+        is_recognizable_by_icon=False,
+        default_layers=1,
+        max_layers=1,
+        stack_rule="replace",
+        duration_type="until_removed",
+        clear_on_switch=True,
+        action_modifier_json=dumps_json({"switch_lock": True}),
+        special_rule_id="switch_lock",
     )

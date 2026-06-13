@@ -424,7 +424,7 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle>归档战斗物理清理</CardTitle>
           <CardDescription>
-            “移除最近战斗”只是归档；这里会真正删除归档战斗及其候选、事件、快照、状态实例和计算缓存。
+            “移除最近战斗”只是归档；这里会真正删除归档战斗及其实时估计、事件、快照、状态实例和资源记录。
             默认先 dry-run 预览，确认无误后再执行删除。
           </CardDescription>
         </CardHeader>
@@ -619,7 +619,7 @@ function PurgeResultPanel({ title, result, compact = false }: { title: string; r
       <div className="mt-2 text-sm text-muted-foreground">{result.message}</div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
         <InfoMini label="战斗数" value={String(result.battle_count)} />
-        <InfoMini label="候选" value={String(result.rows.build_candidate ?? 0)} />
+        <InfoMini label="估计" value={String(result.rows.enemy_panel_estimate ?? 0)} />
         <InfoMini label="事件" value={String(result.rows.battle_event ?? 0)} />
         <InfoMini label="快照" value={String(result.rows.battle_effect_snapshot ?? 0)} />
       </div>

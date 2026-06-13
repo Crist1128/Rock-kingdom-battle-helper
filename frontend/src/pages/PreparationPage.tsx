@@ -8,12 +8,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { AvatarImage } from "@/components/ui/avatar";
 import { ElfSearchSelect } from "@/components/EntitySearchSelect";
 import { compactId, elementTypeNames, parseElementTypes, phaseName } from "@/lib/utils";
-import type { LineupElfInput, TeamPresetOut } from "@/types/api";
+import type { LineupElfInput, PlayerElfBuildOut, TeamPresetOut } from "@/types/api";
 
 interface SelfSlot { build_id: string; elf_id: string; active: boolean }
-interface EnemySlot { elf_id: string; active: boolean }
+interface EnemySlot {
+  elf_id: string;
+  active: boolean;
+  elf_name?: string | null;
+  avatar?: string | null;
+  element_types_json?: string | null;
+}
 
 export function PreparationPage() {
   const navigate = useNavigate();
@@ -35,27 +42,25 @@ export function PreparationPage() {
     queryFn: () => api.teamPresets.list({ side_usage: "enemy" }),
   });
 
-  const setupLineup = useMutation({
-    mutationFn: () => {
+  const submitAndStartBattle = useMutation({
+    mutationFn: async () => {
       if (!battleId) throw new Error("缺少 battle_id");
       const elves: LineupElfInput[] = [
         ...selfSlots.filter((item) => item.build_id && item.elf_id).map((item) => ({ side: "self" as const, elf_id: item.elf_id, build_id: item.build_id, is_active_elf: item.active })),
         ...enemySlots.filter((item) => item.elf_id).map((item) => ({ side: "enemy" as const, elf_id: item.elf_id, is_active_elf: item.active })),
       ];
-      return api.battles.setupLineup(battleId, { elves });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["battle", battleId] }),
-  });
-
-  const startBattle = useMutation({
-    mutationFn: () => {
-      if (!battleId) throw new Error("缺少 battle_id");
+      await api.battles.setupLineup(battleId, { elves });
       return api.battles.start(battleId, {
         self_active_elf_id: selfSlots.find((item) => item.active)?.elf_id,
         enemy_active_elf_id: enemySlots.find((item) => item.active)?.elf_id,
       });
     },
-    onSuccess: () => navigate("/battle"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["battle", battleId] });
+      queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
+      navigate("/battle");
+    },
   });
 
   const canSubmit = useMemo(() => Boolean(battleId && selfSlots.some((item) => item.build_id && item.active) && enemySlots.some((item) => item.elf_id && item.active)), [battleId, selfSlots, enemySlots]);
@@ -81,6 +86,9 @@ export function PreparationPage() {
       const slot = preset.slots.find((item) => item.slot_index === index);
       return {
         elf_id: slot?.elf_id ?? "",
+        elf_name: slot?.elf_name ?? null,
+        avatar: slot?.avatar ?? null,
+        element_types_json: slot?.element_types_json ?? null,
         active: index === 0 && Boolean(slot?.elf_id),
       };
     });
@@ -179,6 +187,7 @@ export function PreparationPage() {
                     return <option key={build.build_id} value={build.build_id}>{label}</option>;
                   })}
                 </Select>
+                <PreparationSelfSelection build={builds.data?.find((item) => item.build_id === slot.build_id)} />
                 <Button className="mt-2 w-full" variant="outline" size="sm" onClick={() => setSelfSlots(selfSlots.map((item, i) => ({ ...item, active: i === index })))}>设为首发</Button>
               </div>
             ))}
@@ -194,9 +203,16 @@ export function PreparationPage() {
             {enemySlots.map((slot, index) => (
               <div key={index} className="rounded-2xl border bg-white p-3">
                 <div className="mb-2 flex items-center justify-between"><span className="font-medium">槽位 {index + 1}</span>{slot.active ? <Badge>首发</Badge> : null}</div>
-                <ElfSearchSelect label="敌方精灵" value={slot.elf_id} onChange={(id) => {
+                <PreparationEnemySelection slot={slot} />
+                <ElfSearchSelect label="敌方精灵" value={slot.elf_id} resultsMode="focus" onChange={(id, elf) => {
                   const next = [...enemySlots];
-                  next[index] = { ...next[index], elf_id: id };
+                  next[index] = {
+                    ...next[index],
+                    elf_id: id,
+                    elf_name: elf.elf_name,
+                    avatar: elf.avatar,
+                    element_types_json: elf.element_types_json,
+                  };
                   setEnemySlots(next);
                 }} />
                 <Button className="mt-2 w-full" variant="outline" size="sm" onClick={() => setEnemySlots(enemySlots.map((item, i) => ({ ...item, active: i === index })))}>设为首发</Button>
@@ -211,12 +227,58 @@ export function PreparationPage() {
           <div className="text-sm text-muted-foreground">
             阵容提交后，后端会初始化敌方面板估计档案。战斗开始后后端不允许直接重录阵容，应走后续纠错流程。
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" disabled={!canSubmit || setupLineup.isPending} onClick={() => setupLineup.mutate()}>{setupLineup.isPending ? "提交中..." : "提交阵容并初始化估计"}</Button>
-            <Button disabled={!canSubmit || startBattle.isPending} onClick={() => startBattle.mutate()}>{startBattle.isPending ? "进入中..." : "进入战斗"}</Button>
-          </div>
+          <Button
+            disabled={!canSubmit || submitAndStartBattle.isPending}
+            onClick={() => submitAndStartBattle.mutate()}
+          >
+            {submitAndStartBattle.isPending ? "提交并进入中..." : "提交阵容并进入战斗"}
+          </Button>
         </CardContent>
       </Card>
+      {submitAndStartBattle.error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          提交失败：{String(submitAndStartBattle.error.message ?? "unknown error")}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PreparationSelfSelection({ build }: { build?: PlayerElfBuildOut }) {
+  if (!build) {
+    return <div className="mt-2 rounded-xl border border-dashed bg-slate-50 p-2 text-xs text-muted-foreground">未选择配置</div>;
+  }
+  const name = build.elf_name ?? compactId(build.elf_id);
+  const elements = parseElementTypes(build.element_types_json);
+  return (
+    <div className="mt-2 flex items-center gap-3 rounded-xl border bg-slate-50 p-2">
+      <AvatarImage src={build.avatar} alt={name} fallback={name} className="h-12 w-12" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold">{name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {build.build_name ? `${build.build_name} · ` : ""}
+          {elements.length > 0 ? elementTypeNames(elements) : "未知系别"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreparationEnemySelection({ slot }: { slot: EnemySlot }) {
+  if (!slot.elf_id) {
+    return <div className="mb-2 rounded-xl border border-dashed bg-slate-50 p-2 text-xs text-muted-foreground">未选择敌方精灵</div>;
+  }
+  const name = slot.elf_name ?? compactId(slot.elf_id);
+  const elements = parseElementTypes(slot.element_types_json);
+  return (
+    <div className="mb-2 flex items-center gap-3 rounded-xl border bg-slate-50 p-2">
+      <AvatarImage src={slot.avatar} alt={name} fallback={name} className="h-12 w-12" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold">{name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {elements.length > 0 ? elementTypeNames(elements) : compactId(slot.elf_id)}
+        </div>
+      </div>
     </div>
   );
 }

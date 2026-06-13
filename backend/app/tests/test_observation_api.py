@@ -14,13 +14,11 @@ from app.api.router import api_router
 from app.db.base import Base
 from app.db.session import get_db
 from app.models import battle as _battle_models  # noqa: F401
-from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import estimate as _estimate_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.battle import Battle, BattleElfState
-from app.models.candidate import BuildCandidate
 from app.models.estimate import EnemyPanelEstimate, EnemyPanelEstimateEvidence
 from app.models.static import ElfDefinition, NatureDefinition
 from app.utils.json import dumps_json, loads_json
@@ -70,7 +68,7 @@ def api_client() -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
 
 
 def _seed_base_data(session: Session) -> None:
-    """写入候选反推 API 测试所需的最小静态数据与战斗记录。"""
+    """写入实时反推 API 测试所需的最小静态数据与战斗记录。"""
     session.add_all(
         [
             Battle(battle_id="battle_1", battle_name="observation api test"),
@@ -118,42 +116,11 @@ def _seed_base_data(session: Session) -> None:
     session.commit()
 
 
-def _candidate(candidate_id: str, *, physical_defense: int) -> BuildCandidate:
-    """构造一条候选配置，只填充本次 API 测试依赖的字段。"""
-    return BuildCandidate(
-        candidate_id=candidate_id,
-        battle_id="battle_1",
-        side="enemy",
-        elf_id="enemy_elf",
-        nature_id="nature_1",
-        individual_talent_distribution_json=dumps_json({"physical_defense": physical_defense}),
-        final_hp=300,
-        final_physical_attack=100,
-        final_physical_defense=physical_defense,
-        final_magic_attack=100,
-        final_magic_defense=100,
-        final_speed=100,
-        possible_skill_ids_json=dumps_json([]),
-        confirmed_skill_ids_json=dumps_json([]),
-        match_score=0.0,
-        confidence=0.0,
-        is_excluded=False,
-    )
-
-
 def test_process_damage_observation_updates_estimate_constraints(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
-    """提交伤害数字观察后，应更新实时估计约束，不再写旧候选评分。"""
+    """提交伤害数字观察后，应更新实时估计约束和 evidence。"""
     client, session_factory = api_client
-    with session_factory() as session:
-        session.add_all(
-            [
-                _candidate("candidate_low_defense", physical_defense=100),
-                _candidate("candidate_high_defense", physical_defense=200),
-            ]
-        )
-        session.commit()
 
     response = client.post(
         "/api/v1/observations/battle_1",
@@ -187,19 +154,6 @@ def test_process_damage_observation_updates_estimate_constraints(
     assert body["observation_type"] == "damage_value"
     assert body["inferred_stat_count"] >= 1
     assert "physical_defense" in body["affected_stats"]
-    assert body["hard_filter_applied"] is False
-
-    with session_factory() as session:
-        rows = {
-            row.candidate_id: row
-            for row in session.scalars(select(BuildCandidate)).all()
-        }
-    assert rows["candidate_low_defense"].match_score == 0
-    assert rows["candidate_high_defense"].match_score == 0
-    assert rows["candidate_low_defense"].confidence == 0
-    assert rows["candidate_high_defense"].confidence == 0
-    assert rows["candidate_high_defense"].is_excluded is False
-    assert rows["candidate_low_defense"].evidence_ids_json is None
 
     with session_factory() as session:
         estimate = session.scalar(
@@ -233,7 +187,7 @@ def test_process_damage_observation_updates_estimate_constraints(
 def test_process_observation_returns_404_for_missing_battle(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
-    """战斗不存在时，接口应返回 404，避免误写候选证据链。"""
+    """战斗不存在时，接口应返回 404，避免误写实时估计 evidence。"""
     client, _session_factory = api_client
 
     response = client.post(
@@ -253,14 +207,6 @@ def test_process_damage_observation_can_resolve_basic_rules(
 ) -> None:
     """观察接口使用已解析的公式上下文更新实时估计。"""
     client, session_factory = api_client
-    with session_factory() as session:
-        session.add_all(
-            [
-                _candidate("candidate_low_defense_rule", physical_defense=100),
-                _candidate("candidate_high_defense_rule", physical_defense=200),
-            ]
-        )
-        session.commit()
 
     response = client.post(
         "/api/v1/observations/battle_1",
@@ -309,14 +255,6 @@ def test_process_damage_observation_accepts_v1_payload(
 ) -> None:
     """v1 嵌套 Observation payload 应被归一化后进入实时估计。"""
     client, session_factory = api_client
-    with session_factory() as session:
-        session.add_all(
-            [
-                _candidate("candidate_v1_low_defense", physical_defense=100),
-                _candidate("candidate_v1_high_defense", physical_defense=200),
-            ]
-        )
-        session.commit()
 
     response = client.post(
         "/api/v1/observations/battle_1",

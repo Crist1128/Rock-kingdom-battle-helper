@@ -10,9 +10,6 @@
 # 战斗运行时模型
 from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 
-# 候选配置模型
-from app.models.candidate import BuildCandidate, CalculationCache
-
 # 状态效果模型
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
 
@@ -42,10 +39,6 @@ __all__ = [
     "Battle",
     "BattleElfState",
     "BattleSkillSlot",
-
-    # 候选配置相关模型
-    "BuildCandidate",
-    "CalculationCache",
 
     # 状态效果相关模型
     "BattleEffectInstance",

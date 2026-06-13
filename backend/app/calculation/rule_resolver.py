@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.calculation.formula_context import DamageFormulaContext
 from app.calculation.modifier_resolver import ModifierResolver
 from app.calculation.response_resolver import ResponseResolver
+from app.models.battle import BattleSkillSlot
 from app.models.static import ElfDefinition, SkillDefinition, TypeEffectivenessRule
 from app.utils.json import loads_json
 
@@ -44,7 +45,7 @@ class RuleResolver:
     ) -> DamageFormulaContext:
         """解析普通攻击伤害所需的规则字段。
 
-        该方法会原地补全并返回 ``context``。这样可以避免在候选循环中频繁复制大型对象，
+        该方法会原地补全并返回 ``context``。这样可以避免在实时估计链路中频繁复制大型对象，
         也让后续 evidence 能直接看到最终参与计算的上下文。
         """
         payload = dict(payload or {})
@@ -53,7 +54,10 @@ class RuleResolver:
 
         details: dict[str, Any] = {}
         self._fill_skill_definition(context, details)
+        self._fill_runtime_skill_slot(context, details)
         self._fill_element_types(context, payload, details)
+        self._load_attack_skill_response_rule(context, payload, details)
+        self._record_condition_flags(payload, details)
         details.update(self.response_resolver.resolve_response_modifiers(context, payload))
         self._resolve_stab_multiplier(context, payload, details)
         self._resolve_type_multiplier(context, payload, details)
@@ -88,6 +92,82 @@ class RuleResolver:
             "skill_category": skill.skill_category,
             "base_power": skill.base_power,
         }
+
+    def _fill_runtime_skill_slot(
+        self,
+        context: DamageFormulaContext,
+        details: dict[str, Any],
+    ) -> None:
+        """读取当前战斗技能槽覆盖值；没有覆盖时不改变静态技能定义。"""
+        if (
+            self.db is None
+            or not context.battle_id
+            or not context.attacker_side
+            or not context.attacker_elf_id
+            or not context.skill_id
+        ):
+            return
+        slot = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == context.battle_id,
+                BattleSkillSlot.side == context.attacker_side,
+                BattleSkillSlot.elf_id == context.attacker_elf_id,
+                BattleSkillSlot.skill_id == context.skill_id,
+            )
+        ).first()
+        if slot is None:
+            return
+        if slot.current_power is not None:
+            context.base_power = slot.current_power
+        details["skill_slot_runtime"] = {
+            "slot_id": slot.slot_id,
+            "current_energy_cost": slot.current_energy_cost,
+            "current_power": slot.current_power,
+            "cooldown_remaining": slot.cooldown_remaining,
+            "base_power_overridden": slot.current_power is not None,
+        }
+
+    def _load_attack_skill_response_rule(
+        self,
+        context: DamageFormulaContext,
+        payload: dict[str, Any],
+        details: dict[str, Any],
+    ) -> None:
+        """从攻击技能规则中自动带入应对分支，缺少成功标记时只记录 unknown。"""
+        if (
+            payload.get("response_rule") is not None
+            or payload.get("skill_response_rule") is not None
+        ):
+            return
+        if self.db is None or not context.skill_id:
+            return
+        skill = self.db.get(SkillDefinition, context.skill_id)
+        if skill is None or skill.deleted_at is not None:
+            return
+        rule = loads_json(skill.damage_rule_json, {})
+        if not isinstance(rule, dict):
+            return
+        response_rule = rule.get("response_rule")
+        if not isinstance(response_rule, dict):
+            return
+        payload["skill_response_rule"] = response_rule
+        details["attack_skill_response_rule"] = {
+            "source": "skill_definition.damage_rule_json",
+            "skill_id": skill.skill_id,
+            "target": response_rule.get("target"),
+            "condition": response_rule.get("condition"),
+            "modifier": response_rule.get("modifier") or "response_multiplier",
+        }
+
+    @staticmethod
+    def _record_condition_flags(payload: dict[str, Any], details: dict[str, Any]) -> None:
+        flags = payload.get("condition_flags")
+        if isinstance(flags, dict) and flags:
+            details["condition_flags"] = {
+                str(key): bool(value)
+                for key, value in flags.items()
+                if isinstance(key, str) and isinstance(value, bool)
+            }
 
     def _fill_element_types(
         self,
@@ -129,7 +209,7 @@ class RuleResolver:
         应对是否成功是规则分支判断结果，不属于伤害公式本身。若调用方明确给了
         ``response_multiplier``，则尊重手动值；否则可用 ``response_success`` 与
         ``response_success_multiplier`` 解析。若存在应对规则但成功与否未知，则标记 unknown，
-        让 DamageMatcher 不进行误扣分。
+        让实时估计不进行误判。
         """
         if "response_multiplier" in payload:
             details["response_multiplier"] = {
@@ -149,7 +229,7 @@ class RuleResolver:
             context.unknown_factors.append("response_success_unknown")
             details["response_multiplier"] = {
                 "source": "rule_branch_unknown",
-                "candidate_multiplier": str(response_success_multiplier),
+                "possible_multiplier": str(response_success_multiplier),
             }
             return
 

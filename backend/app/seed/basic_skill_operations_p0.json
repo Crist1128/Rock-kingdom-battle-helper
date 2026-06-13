@@ -1,0 +1,50 @@
+[
+  {
+    "skill_name": "落雨",
+    "source": "bwiki_skill_definition:落雨",
+    "operations": [
+      {
+        "op_type": "change_weather",
+        "effect_id": "weather_rain",
+        "target": "field",
+        "layers": 1,
+        "remaining_turns": 8,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "将天气改为雨天，持续8回合。"
+      }
+    ]
+  },
+  {
+    "skill_name": "冬至",
+    "source": "bwiki_skill_definition:冬至",
+    "operations": [
+      {
+        "op_type": "change_weather",
+        "effect_id": "weather_blizzard",
+        "target": "field",
+        "layers": 1,
+        "remaining_turns": 8,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "将天气改为暴风雪，持续8回合。"
+      }
+    ]
+  },
+  {
+    "skill_name": "力量增效",
+    "source": "bwiki_skill_definition:力量增效",
+    "operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_physical_attack_up_layered",
+        "target": "actor_side",
+        "layers": 10,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "自己获得物攻+100%。",
+        "standardized_from_effect_id": "effect_physical_attack_up_100"
+      }
+    ]
+  }
+]

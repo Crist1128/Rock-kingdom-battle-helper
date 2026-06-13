@@ -16,7 +16,6 @@ from app.data_pipeline.effects.importer import (
 )
 from app.db.base import Base
 from app.models import battle as _battle_models  # noqa: F401
-from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401

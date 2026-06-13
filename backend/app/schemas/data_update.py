@@ -20,6 +20,10 @@ class RocomDataUpdateRequest(BaseModel):
         description="写入数据版本号；为空则按 UTC 日期生成",
     )
     write_artifacts: bool = Field(default=True, description="是否写 raw/cleaned JSON 文件便于审阅")
+    refresh_static: bool = Field(
+        default=False,
+        description="是否按全量刷新处理 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项",
+    )
 
 
 class RocomCheckRequest(BaseModel):
@@ -45,6 +49,10 @@ class RocomLocalImportRequest(BaseModel):
     data_version: str | None = Field(
         default=None,
         description="可选：覆盖 cleaned 数据中的 data_version",
+    )
+    refresh_static: bool = Field(
+        default=False,
+        description="是否按全量刷新处理 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项",
     )
 
 

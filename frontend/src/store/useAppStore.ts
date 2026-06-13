@@ -24,6 +24,7 @@ interface AppState {
   setEstimatePanelElfId: (elfId: string | null) => void;
   addRecentBattle: (battle: { battle_id: string; battle_name?: string | null; phase?: string | null }) => void;
   removeRecentBattle: (battleId: string) => void;
+  clearRecentBattles: () => void;
 }
 
 const storageKey = "rock-pvp-helper.recentBattles";
@@ -69,5 +70,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = get().recentBattles.filter((item) => item.battle_id !== battleId);
     saveRecentBattles(next);
     set({ recentBattles: next });
+  },
+  clearRecentBattles: () => {
+    saveRecentBattles([]);
+    set({ recentBattles: [] });
   },
 }));

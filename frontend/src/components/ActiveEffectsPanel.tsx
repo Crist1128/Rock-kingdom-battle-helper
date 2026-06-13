@@ -1,15 +1,55 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { buildEffectLayerSummary } from "@/lib/effectLayerSummary";
 import { effectCategoryName, ownerScopeName, sideName } from "@/lib/utils";
 import type { BattleEffectInstanceDict } from "@/types/api";
 
-export function ActiveEffectsPanel({ battleId, effects }: { battleId: string; effects: BattleEffectInstanceDict[] }) {
+export function ActiveEffectsPanel({
+  battleId,
+  effects,
+  turnNumber,
+}: {
+  battleId: string;
+  effects: BattleEffectInstanceDict[];
+  turnNumber: number;
+}) {
   const queryClient = useQueryClient();
+  const [clearLayersByInstance, setClearLayersByInstance] = useState<Record<string, number>>({});
   const { data: definitions = [] } = useQuery({ queryKey: ["effects", "all"], queryFn: () => api.effects.list({ limit: 500 }) });
   const removeMutation = useMutation({
     mutationFn: (instanceId: string) => api.effects.remove(instanceId, { reason: "manual_remove" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", battleId] });
+    },
+  });
+  const clearLayersMutation = useMutation({
+    mutationFn: (payload: { effect: BattleEffectInstanceDict; layers: number }) =>
+      api.battles.createEvent(battleId, {
+        turn_number: turnNumber,
+        event_type: "effect_dispel",
+        actor_side: payload.effect.owner_side ?? "self",
+        actor_elf_id: payload.effect.owner_elf_id ?? null,
+        target_side: payload.effect.owner_side ?? null,
+        target_elf_id: payload.effect.owner_elf_id ?? null,
+        manual_override: true,
+        payload_json: JSON.stringify({
+          manual_effect_operations: [
+            {
+              op_type: "clear_effect_layers",
+              target: payload.effect.owner_side ?? "field",
+              selected_effect_instance_layers: [
+                { instance_id: payload.effect.instance_id, layers: payload.layers },
+              ],
+            },
+          ],
+        }),
+        notes: "手动指定消除状态层数",
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] });
       queryClient.invalidateQueries({ queryKey: ["timeline", battleId] });
@@ -40,14 +80,53 @@ export function ActiveEffectsPanel({ battleId, effects }: { battleId: string; ef
             <div className="space-y-2">
               {items.map((effect) => {
                 const def = defById[effect.effect_id];
+                const summary = buildEffectLayerSummary(def, effect.layers);
                 return (
                   <div key={effect.instance_id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-2 text-xs">
-                    <div>
-                      <div className="font-medium">{def?.effect_name ?? effect.effect_id}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium">{summary.displayName ?? def?.effect_name ?? effect.effect_id}</div>
                       <div className="text-muted-foreground">{effectCategoryName(def?.category ?? effect.category)} · {ownerScopeName(effect.owner_scope)} · {effect.owner_side ? sideName(effect.owner_side) : "战场"} · {effect.owner_elf_id ?? effect.field_id ?? effect.owner_skill_slot_id ?? "--"}</div>
+                      {summary.finalTexts.length > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {summary.finalTexts.map((text) => (
+                            <Badge key={text} variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                              最终 {text}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">层 {effect.layers ?? 1}</Badge>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Badge variant="secondary">{summary.layerText}</Badge>
+                      <Input
+                        className="h-8 w-20"
+                        type="number"
+                        min={1}
+                        max={Number(effect.layers ?? 1)}
+                        value={clearLayersByInstance[effect.instance_id] ?? 1}
+                        onChange={(event) =>
+                          setClearLayersByInstance((current) => ({
+                            ...current,
+                            [effect.instance_id]: Math.max(1, Number(event.target.value) || 1),
+                          }))
+                        }
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={clearLayersMutation.isPending}
+                        onClick={() =>
+                          clearLayersMutation.mutate({
+                            effect,
+                            layers: Math.min(
+                              clearLayersByInstance[effect.instance_id] ?? 1,
+                              Number(effect.layers ?? 1),
+                            ),
+                          })
+                        }
+                      >
+                        消层
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -59,6 +138,11 @@ export function ActiveEffectsPanel({ battleId, effects }: { battleId: string; ef
                 );
               })}
             </div>
+            {clearLayersMutation.error ? (
+              <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                消层失败：{String((clearLayersMutation.error as Error).message)}
+              </div>
+            ) : null}
           </div>
         );
       })}

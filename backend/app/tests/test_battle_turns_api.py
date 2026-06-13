@@ -14,17 +14,20 @@ from app.core.enums import BattleEventType, BattlePhase
 from app.db.base import Base
 from app.db.session import get_db
 from app.models import battle as _battle_models  # noqa: F401
-from app.models import candidate as _candidate_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import estimate as _estimate_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.battle import Battle
-from app.models.candidate import BuildCandidate
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
 from app.models.estimate import EnemyPanelEstimate
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
-from app.models.static import EffectDefinition, ElfDefinition, NatureDefinition, SkillDefinition
+from app.models.static import (
+    EffectDefinition,
+    ElfDefinition,
+    SkillDefinition,
+    TypeEffectivenessRule,
+)
 from app.utils.json import dumps_json, loads_json
 
 
@@ -233,7 +236,330 @@ def test_end_turn_settles_burn_damage_and_layer_change(
         assert effect_change.change_type == "settlement_layer_change"
 
 
-def test_damage_event_triggers_starfall_and_candidate_observation(
+def test_end_turn_skips_status_damage_when_manual_status_damage_recorded(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """同回合已手动录入灼烧伤害时，结束回合只做层数衰减，不重复扣血。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_two_active_elves(session, battle_id="battle_manual_status_then_end")
+        session.add(
+            _effect_definition(
+                effect_id="effect_burn",
+                effect_name="灼烧",
+                resource_rule={
+                    "settlement_type": "end_turn",
+                    "damage_kind": "status",
+                    "percent_of": "target_max_hp",
+                    "percent_per_layer": 0.02,
+                    "element_type": "火",
+                    "uses_type_effectiveness": True,
+                    "after_settlement": {"layer_change": "halve_floor"},
+                },
+            )
+        )
+        session.flush()
+        session.add(
+            BattleEffectInstance(
+                instance_id="effect_instance_manual_burn",
+                battle_id="battle_manual_status_then_end",
+                effect_id="effect_burn",
+                category="abnormal",
+                owner_scope="elf",
+                owner_side="self",
+                owner_elf_id="elf_self",
+                layers=10,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    manual_response = client.post(
+        "/api/v1/battles/battle_manual_status_then_end/damage-events",
+        json={
+            "turn_number": 1,
+            "attacker_side": "enemy",
+            "attacker_elf_id": "elf_enemy",
+            "defender_side": "self",
+            "defender_elf_id": "elf_self",
+            "formula_type": "status",
+            "effect_id": "effect_burn",
+            "effect_layers": 10,
+            "damage_display_type": "single_damage",
+            "damage_value": 100,
+            "sync_observation": False,
+        },
+    )
+    assert manual_response.status_code == 201
+
+    response = client.post("/api/v1/battles/battle_manual_status_then_end/turns/end", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["battle"]["turn_number"] == 2
+    assert body["settlement_events"][0]["effect_id"] == "effect_burn"
+    assert body["settlement_events"][0]["status"] == "manual_damage_already_recorded"
+    assert body["settlement_events"][0]["damage_skipped"] is True
+    assert body["settlement_events"][0]["damage_value"] is None
+    assert body["settlement_events"][0]["layers_before"] == 10
+    assert body["settlement_events"][0]["layers_after"] == 5
+
+    with session_factory() as session:
+        state = session.scalar(
+            select(_battle_models.BattleElfState).where(
+                _battle_models.BattleElfState.battle_id == "battle_manual_status_then_end",
+                _battle_models.BattleElfState.side == "self",
+                _battle_models.BattleElfState.elf_id == "elf_self",
+            )
+        )
+        assert state is not None
+        assert state.current_hp_value == 400
+        assert state.current_hp_percent == 80.0
+
+        instance = session.get(BattleEffectInstance, "effect_instance_manual_burn")
+        assert instance is not None
+        assert instance.layers == 5
+
+        damage_events = list(
+            session.scalars(
+                select(DamageEvent).where(
+                    DamageEvent.battle_id == "battle_manual_status_then_end"
+                )
+            ).all()
+        )
+        assert len(damage_events) == 1
+        assert damage_events[0].manual_override is True
+
+
+@pytest.mark.parametrize(
+    ("effect_id", "effect_name", "element_type", "percent_per_layer", "layers", "expected_delta"),
+    [
+        ("effect_burn", "灼烧", "火", 0.02, 1, 2.0),
+        ("effect_poison", "中毒", "毒", 0.03, 2, 6.0),
+    ],
+)
+def test_end_turn_settles_status_percent_when_enemy_max_hp_unknown(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+    effect_id: str,
+    effect_name: str,
+    element_type: str,
+    percent_per_layer: float,
+    layers: int,
+    expected_delta: float,
+) -> None:
+    """敌方最大生命未知时，灼烧/中毒仍应按百分比扣减当前生命百分比。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        session.add(
+            Battle(
+                battle_id="battle_unknown_hp_status",
+                phase=BattlePhase.BATTLE.value,
+                turn_number=1,
+                enemy_active_elf_id="elf_enemy",
+            )
+        )
+        session.add(
+            ElfDefinition(
+                elf_id="elf_enemy",
+                elf_name="敌方未知血量精灵",
+                avatar="",
+                element_types_json=dumps_json(["草"]),
+                base_hp_talent=100,
+                base_physical_attack_talent=100,
+                base_physical_defense_talent=100,
+                base_magic_attack_talent=100,
+                base_magic_defense_talent=100,
+                base_speed_talent=100,
+            )
+        )
+        session.add(
+            _effect_definition(
+                effect_id=effect_id,
+                effect_name=effect_name,
+                resource_rule={
+                    "settlement_type": "end_turn",
+                    "damage_kind": "status",
+                    "percent_of": "target_max_hp",
+                    "percent_per_layer": percent_per_layer,
+                    "element_type": element_type,
+                    "uses_type_effectiveness": True,
+                    "after_settlement": {"layer_change": "unchanged"},
+                },
+            )
+        )
+        session.flush()
+        state = _elf_state(
+            battle_id="battle_unknown_hp_status",
+            side="enemy",
+            elf_id="elf_enemy",
+            hp=500,
+        )
+        state.panel_stats_json = dumps_json(
+            {
+                "hp": None,
+                "physical_attack": None,
+                "physical_defense": None,
+                "magic_attack": None,
+                "magic_defense": None,
+                "speed": None,
+            }
+        )
+        state.current_hp_value = None
+        session.add(state)
+        session.add(
+            BattleEffectInstance(
+                instance_id=f"effect_instance_unknown_{effect_id}",
+                battle_id="battle_unknown_hp_status",
+                effect_id=effect_id,
+                category="abnormal",
+                owner_scope="elf",
+                owner_side="enemy",
+                owner_elf_id="elf_enemy",
+                layers=layers,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post("/api/v1/battles/battle_unknown_hp_status/turns/end", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["settlement_status"] == "settled"
+    assert body["settlement_events"][0]["percent_only"] is True
+    assert body["settlement_events"][0]["hp_percent_delta"] == expected_delta
+    with session_factory() as session:
+        state = session.scalar(
+            select(_battle_models.BattleElfState).where(
+                _battle_models.BattleElfState.battle_id == "battle_unknown_hp_status",
+                _battle_models.BattleElfState.elf_id == "elf_enemy",
+            )
+        )
+        assert state is not None
+        assert state.current_hp_value is None
+        assert state.current_hp_percent == 100.0 - expected_delta
+        damage_event = session.scalar(
+            select(DamageEvent).where(DamageEvent.battle_id == "battle_unknown_hp_status")
+        )
+        assert damage_event is not None
+        assert damage_event.damage_value is None
+        assert damage_event.hp_percent_delta == expected_delta
+        resource_event = session.scalar(
+            select(ResourceChangeEvent).where(
+                ResourceChangeEvent.battle_id == "battle_unknown_hp_status"
+            )
+        )
+        assert resource_event is not None
+        assert resource_event.value_type == "percent"
+        assert resource_event.value == expected_delta
+
+
+def test_status_damage_event_records_effect_observation_and_type_multiplier(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """手动录入灼烧/中毒等状态结算伤害时，应按属性克制写入 HP 反推证据。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_two_active_elves(session, battle_id="battle_status_damage_observation")
+        session.add(
+            _effect_definition(
+                effect_id="effect_burn",
+                effect_name="灼烧",
+                resource_rule={
+                    "settlement_type": "end_turn",
+                    "damage_kind": "status",
+                    "percent_of": "target_max_hp",
+                    "percent_per_layer": 0.02,
+                    "element_type": "火",
+                    "uses_type_effectiveness": True,
+                    "after_settlement": {"layer_change": "halve_floor"},
+                },
+            )
+        )
+        session.add(
+            TypeEffectivenessRule(
+                attack_element_type="火",
+                defense_element_type="草",
+                multiplier=2.0,
+            )
+        )
+        session.flush()
+        enemy_state = session.scalar(
+            select(_battle_models.BattleElfState).where(
+                _battle_models.BattleElfState.battle_id == "battle_status_damage_observation",
+                _battle_models.BattleElfState.side == "enemy",
+                _battle_models.BattleElfState.elf_id == "elf_enemy",
+            )
+        )
+        assert enemy_state is not None
+        enemy_state.panel_stats_json = dumps_json(
+            {
+                "hp": None,
+                "physical_attack": None,
+                "physical_defense": None,
+                "magic_attack": None,
+                "magic_defense": None,
+                "speed": None,
+            }
+        )
+        enemy_state.current_hp_value = None
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_status_damage_observation/damage-events",
+        json={
+            "turn_number": 1,
+            "attacker_side": "self",
+            "attacker_elf_id": "elf_self",
+            "defender_side": "enemy",
+            "defender_elf_id": "elf_enemy",
+            "formula_type": "status",
+            "effect_id": "effect_burn",
+            "effect_layers": 1,
+            "damage_display_type": "single_damage",
+            "damage_value": 20,
+            "hp_percent_before": 100,
+            "hp_percent_after": 96,
+            "sync_observation": True,
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["inference_result"]["estimate_updated"] is True
+    context = loads_json(body["damage_event"]["formula_context_json"], {})
+    assert context["formula_type"] == "status"
+    assert context["effect_id"] == "effect_burn"
+    assert context["skill_element_type"] == "火"
+    assert context["type_multiplier"] == "2.0"
+    with session_factory() as session:
+        enemy_state = session.scalar(
+            select(_battle_models.BattleElfState).where(
+                _battle_models.BattleElfState.battle_id == "battle_status_damage_observation",
+                _battle_models.BattleElfState.side == "enemy",
+                _battle_models.BattleElfState.elf_id == "elf_enemy",
+            )
+        )
+        assert enemy_state is not None
+        assert enemy_state.current_hp_value is None
+        assert enemy_state.current_hp_percent == 96
+        estimate = session.scalar(
+            select(EnemyPanelEstimate).where(
+                EnemyPanelEstimate.battle_id == "battle_status_damage_observation",
+                EnemyPanelEstimate.elf_id == "elf_enemy",
+            )
+        )
+        assert estimate is not None
+        constraints = loads_json(estimate.stat_constraints_json, {})
+        assert constraints["hp"]["integer_min"] == 500
+        assert constraints["hp"]["integer_max"] == 524
+
+
+def test_damage_event_triggers_starfall_and_estimate_observation(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     """攻击后星陨会生成额外伤害事件，并把伤害写入实时估计。"""
@@ -284,7 +610,6 @@ def test_damage_event_triggers_starfall_and_candidate_observation(
                 manual_override=True,
             )
         )
-        _seed_candidate(session, battle_id="battle_starfall", elf_id="elf_enemy")
         session.commit()
 
     response = client.post(
@@ -333,9 +658,6 @@ def test_damage_event_triggers_starfall_and_candidate_observation(
         assert instance is not None
         assert instance.is_active is False
 
-        candidate = session.get(BuildCandidate, "candidate_battle_starfall")
-        assert candidate is not None
-        assert candidate.evidence_ids_json is None
         estimate = session.scalar(
             select(EnemyPanelEstimate).where(
                 EnemyPanelEstimate.battle_id == "battle_starfall",
@@ -506,6 +828,108 @@ def test_switch_in_settles_thorn_mark(
         )
         assert damage_event is not None
         assert damage_event.damage_value == 60
+
+
+def test_switch_in_settles_thorn_mark_percent_when_max_hp_unknown(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """入场精灵最大生命未知时，棘刺印记仍应扣减生命百分比。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_two_active_elves(
+            session,
+            battle_id="battle_thorn_unknown_hp",
+            enemy_active_elf_id="elf_enemy_old",
+        )
+        session.add(
+            ElfDefinition(
+                elf_id="elf_enemy_new",
+                elf_name="敌方新上场未知血量精灵",
+                avatar="",
+                element_types_json=dumps_json(["火"]),
+                base_hp_talent=100,
+                base_physical_attack_talent=100,
+                base_physical_defense_talent=100,
+                base_magic_attack_talent=100,
+                base_magic_defense_talent=100,
+                base_speed_talent=100,
+            )
+        )
+        session.add(
+            _effect_definition(
+                effect_id="effect_thorn_mark",
+                effect_name="棘刺印记",
+                category="mark",
+                owner_scope="side",
+                hooks=["switch_in_status_damage"],
+                resource_rule={
+                    "settlement_type": "switch_in",
+                    "damage_kind": "true",
+                    "percent_of": "target_max_hp",
+                    "percent_per_layer": 0.06,
+                    "uses_type_effectiveness": False,
+                    "after_settlement": {"layer_change": "unchanged"},
+                },
+            )
+        )
+        session.flush()
+        unknown_state = _elf_state(
+            battle_id="battle_thorn_unknown_hp",
+            side="enemy",
+            elf_id="elf_enemy_new",
+            hp=500,
+            is_active_elf=False,
+        )
+        unknown_state.panel_stats_json = dumps_json(
+            {
+                "hp": None,
+                "physical_attack": None,
+                "physical_defense": None,
+                "magic_attack": None,
+                "magic_defense": None,
+                "speed": None,
+            }
+        )
+        unknown_state.current_hp_value = None
+        session.add(unknown_state)
+        session.add(
+            BattleEffectInstance(
+                instance_id="effect_instance_thorn_unknown",
+                battle_id="battle_thorn_unknown_hp",
+                effect_id="effect_thorn_mark",
+                category="mark",
+                owner_scope="side",
+                owner_side="enemy",
+                layers=2,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_thorn_unknown_hp/switch",
+        json={"side": "enemy", "elf_id": "elf_enemy_new"},
+    )
+
+    assert response.status_code == 200
+    with session_factory() as session:
+        new_state = session.scalar(
+            select(_battle_models.BattleElfState).where(
+                _battle_models.BattleElfState.battle_id == "battle_thorn_unknown_hp",
+                _battle_models.BattleElfState.elf_id == "elf_enemy_new",
+            )
+        )
+        assert new_state is not None
+        assert new_state.current_hp_value is None
+        assert new_state.current_hp_percent == 88.0
+        damage_event = session.scalar(
+            select(DamageEvent).where(DamageEvent.battle_id == "battle_thorn_unknown_hp")
+        )
+        assert damage_event is not None
+        assert damage_event.damage_value is None
+        assert damage_event.hp_percent_delta == 12.0
 
 
 def test_end_turn_blizzard_applies_freeze_to_both_active_elves(
@@ -732,40 +1156,5 @@ def _seed_two_active_elves(
             hp=enemy_hp,
             physical_defense=100,
             magic_defense=150,
-        )
-    )
-
-
-def _seed_candidate(session: Session, *, battle_id: str, elf_id: str) -> None:
-    """为目标敌方精灵构造一个候选，用于验证 Observation 软评分写入。"""
-    session.add(
-        NatureDefinition(
-            nature_id=f"nature_{battle_id}",
-            nature_name="测试性格",
-            positive_stat="physical_attack",
-            positive_multiplier=1.0,
-            negative_stat="physical_defense",
-            negative_multiplier=1.0,
-            neutral_multiplier=1.0,
-        )
-    )
-    session.flush()
-    session.add(
-        BuildCandidate(
-            candidate_id=f"candidate_{battle_id}",
-            battle_id=battle_id,
-            side="enemy",
-            elf_id=elf_id,
-            nature_id=f"nature_{battle_id}",
-            individual_talent_distribution_json=dumps_json({}),
-            final_hp=500,
-            final_physical_attack=100,
-            final_physical_defense=100,
-            final_magic_attack=100,
-            final_magic_defense=150,
-            final_speed=100,
-            match_score=0,
-            confidence=0,
-            is_excluded=False,
         )
     )

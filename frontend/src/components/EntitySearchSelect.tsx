@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { buildEffectLayerSummary } from "@/lib/effectLayerSummary";
 import type { EffectDefinitionOut, ElfDefinitionOut, SkillDefinitionOut } from "@/types/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,20 @@ interface BaseProps<T> {
   value?: string | null;
   onChange: (id: string, item: T) => void;
   placeholder?: string;
+  resultsMode?: "always" | "focus";
 }
 
 interface SkillSearchSelectProps extends BaseProps<SkillDefinitionOut> {
   elfId?: string | null;
 }
 
-export function ElfSearchSelect({ label, value, onChange, placeholder }: BaseProps<ElfDefinitionOut>) {
+export function ElfSearchSelect({
+  label,
+  value,
+  onChange,
+  placeholder,
+  resultsMode = "always",
+}: BaseProps<ElfDefinitionOut>) {
   const [q, setQ] = useState("");
   const { data = [], isLoading } = useQuery({ queryKey: ["elves", q], queryFn: () => api.elves.list({ q, limit: 50 }) });
   const selectedDetail = useQuery({
@@ -32,7 +40,16 @@ export function ElfSearchSelect({ label, value, onChange, placeholder }: BasePro
   const displayItems = filtered.length > 0 ? filtered : data;
   const selected = data.find((item) => item.elf_id === value) ?? selectedDetail.data;
   return (
-    <SearchSelectShell label={label} q={q} setQ={setQ} placeholder={placeholder ?? "搜索精灵名称"} selectedText={selected?.elf_name ?? value ?? "未选择"} loading={isLoading} selected={Boolean(selected)}>
+    <SearchSelectShell
+      label={label}
+      q={q}
+      setQ={setQ}
+      placeholder={placeholder ?? "搜索精灵名称"}
+      selectedText={selected?.elf_name ?? value ?? "未选择"}
+      loading={isLoading}
+      selected={Boolean(selected)}
+      resultsMode={resultsMode}
+    >
       {displayItems.map((elf) => {
         const elements = elfElementTypes(elf);
         const isSelected = elf.elf_id === value;
@@ -60,7 +77,14 @@ export function ElfSearchSelect({ label, value, onChange, placeholder }: BasePro
   );
 }
 
-export function SkillSearchSelect({ label, value, onChange, placeholder, elfId }: SkillSearchSelectProps) {
+export function SkillSearchSelect({
+  label,
+  value,
+  onChange,
+  placeholder,
+  elfId,
+  resultsMode = "always",
+}: SkillSearchSelectProps) {
   const [q, setQ] = useState("");
   const globalSkills = useQuery({ queryKey: ["skills", q], queryFn: () => api.skills.list({ q, limit: 100 }) });
   const learnableSkills = useQuery({
@@ -82,7 +106,16 @@ export function SkillSearchSelect({ label, value, onChange, placeholder, elfId }
   const isLoading = canUseLearnableSkills ? learnableSkills.isLoading : globalSkills.isLoading;
 
   return (
-    <SearchSelectShell label={label} q={q} setQ={setQ} placeholder={placeholder ?? "搜索技能名称"} selectedText={selected?.skill_name ?? value ?? "未选择"} loading={isLoading} selected={Boolean(selected)}>
+    <SearchSelectShell
+      label={label}
+      q={q}
+      setQ={setQ}
+      placeholder={placeholder ?? "搜索技能名称"}
+      selectedText={selected?.skill_name ?? value ?? "未选择"}
+      loading={isLoading}
+      selected={Boolean(selected)}
+      resultsMode={resultsMode}
+    >
       {elfId ? (
         <div className="px-3 py-2 text-xs text-muted-foreground">
           {canUseLearnableSkills ? "当前显示所选精灵的可学习技能。" : "后端未提供精灵可学习技能接口时，会暂时退回全局技能搜索。"}
@@ -116,14 +149,31 @@ export function SkillSearchSelect({ label, value, onChange, placeholder, elfId }
   );
 }
 
-export function EffectSearchSelect({ label, value, onChange, placeholder }: BaseProps<EffectDefinitionOut>) {
+export function EffectSearchSelect({
+  label,
+  value,
+  onChange,
+  placeholder,
+  resultsMode = "always",
+}: BaseProps<EffectDefinitionOut>) {
   const [q, setQ] = useState("");
   const { data = [], isLoading } = useQuery({ queryKey: ["effects", q], queryFn: () => api.effects.list({ q, limit: 50 }) });
   const selected = data.find((item) => item.effect_id === value);
+  const selectedSummary = selected ? buildEffectLayerSummary(selected, selected.default_layers) : null;
   return (
-    <SearchSelectShell label={label} q={q} setQ={setQ} placeholder={placeholder ?? "搜索状态"} selectedText={selected?.effect_name ?? value ?? "未选择"} loading={isLoading} selected={Boolean(selected)}>
+    <SearchSelectShell
+      label={label}
+      q={q}
+      setQ={setQ}
+      placeholder={placeholder ?? "搜索状态"}
+      selectedText={selectedSummary?.displayName ?? selected?.effect_name ?? value ?? "未选择"}
+      loading={isLoading}
+      selected={Boolean(selected)}
+      resultsMode={resultsMode}
+    >
       {data.map((effect) => {
         const isSelected = effect.effect_id === value;
+        const summary = buildEffectLayerSummary(effect, effect.default_layers);
         return (
           <button
             key={effect.effect_id}
@@ -131,8 +181,11 @@ export function EffectSearchSelect({ label, value, onChange, placeholder }: Base
             onClick={() => onChange(effect.effect_id, effect)}
             type="button"
           >
-            <span>{effect.effect_name}</span>
-            <span className="text-xs text-muted-foreground">{effectCategoryName(effect.category)} · {ownerScopeName(effect.owner_scope)}</span>
+            <span>{summary.displayName ?? effect.effect_name}</span>
+            <span className="text-xs text-muted-foreground">
+              {effectCategoryName(effect.category)} · {ownerScopeName(effect.owner_scope)}
+              {summary.finalTexts.length > 0 ? ` · ${summary.layerText} · ${summary.finalTexts.join("；")}` : ""}
+            </span>
           </button>
         );
       })}
@@ -150,6 +203,7 @@ function SearchSelectShell({
   loading,
   children,
   selected,
+  resultsMode = "always",
 }: {
   label: string;
   q: string;
@@ -159,20 +213,58 @@ function SearchSelectShell({
   loading: boolean;
   children: React.ReactNode;
   selected: boolean;
+  resultsMode?: "always" | "focus";
 }) {
+  const [open, setOpen] = useState(resultsMode === "always");
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const mutedSelected = useMemo(() => selectedText === "未选择", [selectedText]);
+  const showResults = resultsMode === "always" || open;
+
+  useEffect(() => {
+    if (resultsMode !== "focus" || !open) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, resultsMode]);
+
   return (
-    <div className="space-y-2">
+    <div ref={rootRef} className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <label className="text-sm font-medium">{label}</label>
         <span className={mutedSelected ? "max-w-[260px] truncate text-xs text-muted-foreground" : "max-w-[260px] truncate rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary"}>{selectedText}</span>
       </div>
       {selected ? <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium text-primary">当前已选：{selectedText}</div> : null}
-      <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder={placeholder} />
-      <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border bg-white p-1">
-        {loading ? <div className="px-3 py-2 text-sm text-muted-foreground">加载中...</div> : children}
-        {!loading && <Button className="mt-1 w-full" variant="ghost" size="sm" type="button" onClick={() => setQ("")}>清空搜索</Button>}
-      </div>
+      <Input
+        value={q}
+        onChange={(event) => setQ(event.target.value)}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        placeholder={placeholder}
+      />
+      {showResults ? (
+        <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border bg-white p-1">
+          {loading ? <div className="px-3 py-2 text-sm text-muted-foreground">加载中...</div> : children}
+          {!loading ? (
+            <div className="mt-1 grid grid-cols-2 gap-1">
+              <Button variant="ghost" size="sm" type="button" onClick={() => setQ("")}>清空搜索</Button>
+              {resultsMode === "focus" ? (
+                <Button variant="ghost" size="sm" type="button" onClick={() => setOpen(false)}>收起</Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

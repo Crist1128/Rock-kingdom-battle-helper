@@ -1,0 +1,2460 @@
+[
+  {
+    "skill_id": "rocom_skill_effcad40dc",
+    "skill_name": "电磁偏转",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.7,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤70%，应对攻击：下回合所选技能使用次数+1。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "next_turn_selected_skill_use_count_modifier",
+        "status": "reserved",
+        "count_delta": 1,
+        "trigger": "response_attack_success"
+      }
+    ],
+    "structure_gaps": [
+      "skill_use_count_modifier",
+      "next_turn_selected_skill_context"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_b4c8cd2b16",
+    "skill_name": "电离爆破",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 3
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_speed_down_layered",
+        "layers": 4,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_3ac8382d8c",
+    "skill_name": "疫病吐息",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_poison_mark",
+        "layers": 1,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_12e41bd785",
+    "skill_name": "疾风刺",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02",
+      "conditional_hit_rule": {
+        "condition": "actor_moves_before_target",
+        "hit_count": 3,
+        "status": "not_executable_yet"
+      }
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "conditional_hit_count",
+        "status": "reserved",
+        "condition": "actor_moves_before_target",
+        "hit_count": 3
+      }
+    ],
+    "structure_gaps": [
+      "conditional_hit_count_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_cb7f7c0e2b",
+    "skill_name": "疾风涡轮",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "auto_skill_use_after_element_count",
+        "status": "reserved",
+        "element_type": "wing",
+        "required_count": 3,
+        "target": "source_skill",
+        "element_name": "翼"
+      }
+    ],
+    "structure_gaps": [
+      "element_skill_use_listener",
+      "auto_skill_use_operation"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_5a566679ad",
+    "skill_name": "疾风连袭",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "replay_used_swift_skills",
+        "status": "reserved"
+      },
+      {
+        "hook_type": "persistent_skill_cost_modifier",
+        "status": "reserved",
+        "target": "source_skill",
+        "cost_delta": 1,
+        "trigger": "after_skill_use"
+      }
+    ],
+    "structure_gaps": [
+      "swift_skill_history",
+      "multi_skill_replay",
+      "dynamic_cost_from_skill_history"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_3030c168eb",
+    "skill_name": "瘴气喷射",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_6fecf205d9",
+    "skill_name": "盐水浴",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_energy_cost_down_layered",
+        "layers": 2,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      },
+      {
+        "op_type": "add_layers",
+        "target": "actor_side",
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_energy_cost_down_layered",
+        "layers": 1,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_a8b8715b58",
+    "skill_name": "盛开",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_skill_power_up_layered",
+        "layers": 3,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      },
+      {
+        "op_type": "add_layers",
+        "target": "actor_side",
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_skill_power_up_layered",
+        "layers": 3,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_dea373f39c",
+    "skill_name": "相位移动",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.5,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤50%，本技能位于1号位或3号位时，额外减伤40%，应对攻击，传动1。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "defense_reduction_by_skill_slot_position",
+        "status": "reserved",
+        "slot_indexes": [
+          1,
+          3
+        ],
+        "extra_reduction": 0.4
+      },
+      {
+        "hook_type": "transmission",
+        "status": "reserved",
+        "value": 1,
+        "trigger": "response_attack_success"
+      }
+    ],
+    "structure_gaps": [
+      "skill_slot_position_condition",
+      "transmission_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_b1a2ddd39b",
+    "skill_name": "瞬间零度",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_energy_cost_up_layered",
+        "layers": 3,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "current_turn_used_skill_cost_modifier",
+        "status": "reserved",
+        "target": "enemy_side",
+        "cost_delta": 3
+      }
+    ],
+    "structure_gaps": [
+      "current_turn_skill_use_listener"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_1524f2ebba",
+    "skill_name": "石肤术",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_physical_defense_up_layered",
+        "layers": 16,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      },
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_magic_defense_down_layered",
+        "layers": 6,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_76271698cf",
+    "skill_name": "石锁",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_switch_lock",
+        "layers": 1,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps.",
+        "remaining_turns": 3
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_8392758730",
+    "skill_name": "砂石冲撞",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "target_switched_this_turn",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_physical_defense_up_layered",
+        "layers": 10,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_7b27f700bc",
+    "skill_name": "砂糖弹球",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_formula",
+        "status": "reserved",
+        "formula_id": "weight_difference_higher_power",
+        "required_inputs": [
+          "attacker.weight",
+          "defender.weight"
+        ]
+      }
+    ],
+    "structure_gaps": [
+      "weight_formula"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_e2846c1287",
+    "skill_name": "破绽",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_dual_defense_down_layered",
+        "layers": 7,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      },
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_physical_attack_up_layered",
+        "layers": 7,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_07577eaf68",
+    "skill_name": "破罐破摔",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_if_has_negative_effect",
+        "status": "reserved",
+        "target": "actor_side",
+        "power_add": 60
+      }
+    ],
+    "structure_gaps": [
+      "condition_has_negative_effect",
+      "conditional_power_add"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_74145ec890",
+    "skill_name": "破防",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_dual_defense_down_layered",
+        "layers": 7,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "responded_skill_cooldown_modifier",
+        "status": "reserved",
+        "cooldown_delta": 2,
+        "trigger": "response_defense_success"
+      }
+    ],
+    "structure_gaps": [
+      "skill_cooldown_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_6b804a4f64",
+    "skill_name": "硬化",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.9,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤90%，若上次使用攻击技则本技能能耗-2，应对攻击。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "skill_cost_modifier_from_previous_action",
+        "status": "reserved",
+        "required_previous_action": "attack_skill",
+        "cost_delta": -2
+      }
+    ],
+    "structure_gaps": [
+      "previous_action_condition",
+      "conditional_skill_cost_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_a5f03a8809",
+    "skill_name": "硬门",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "interrupt_responded_skill",
+        "status": "reserved",
+        "trigger": "response_attack_success"
+      },
+      {
+        "hook_type": "counter_damage",
+        "status": "reserved",
+        "power": 90,
+        "skill_category": "physical",
+        "trigger": "response_attack_success"
+      }
+    ],
+    "structure_gaps": [
+      "interrupt_operation",
+      "counter_damage_operation"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_7e5d8bf2b5",
+    "skill_name": "碎冰冰",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_from_effect_layers",
+        "status": "reserved",
+        "source_effect_id": "effect_freeze",
+        "target": "enemy_side",
+        "power_add_per_layer": 20
+      }
+    ],
+    "structure_gaps": [
+      "power_add_from_effect_layers"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_c586536e0f",
+    "skill_name": "碰爪",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_42570c3270",
+    "skill_name": "磁干扰",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_e0cfdb4ec2",
+    "skill_name": "磁暴",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_by_skill_slot_position",
+        "status": "reserved",
+        "slot_indexes": [
+          1,
+          3
+        ],
+        "power_add": 30
+      },
+      {
+        "hook_type": "transmission",
+        "status": "reserved",
+        "value": 1
+      }
+    ],
+    "structure_gaps": [
+      "skill_slot_position_condition",
+      "transmission_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_d095b4dc3a",
+    "skill_name": "示弱",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "apply_cute_effect",
+        "status": "reserved",
+        "target": "actor_side"
+      },
+      {
+        "hook_type": "persistent_speed_modifier",
+        "status": "reserved",
+        "target": "actor_elf",
+        "speed_delta": 150
+      }
+    ],
+    "structure_gaps": [
+      "missing_cute_effect_definition",
+      "persistent_stat_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_6bbfb2323b",
+    "skill_name": "离子火花",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_680be05a6f",
+    "skill_name": "离子震荡",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_by_skill_slot_position",
+        "status": "reserved",
+        "slot_indexes": [
+          3
+        ],
+        "power_add": 40
+      },
+      {
+        "hook_type": "transmission",
+        "status": "reserved",
+        "value": 1
+      }
+    ],
+    "structure_gaps": [
+      "skill_slot_position_condition",
+      "transmission_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_b033440f84",
+    "skill_name": "种子弹",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "target": "actor_side",
+        "resource_type": "energy",
+        "change_type": "gain",
+        "value_type": "value",
+        "value": 1,
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_eacb56a1fc",
+    "skill_name": "种皮爆裂",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 2
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_cfdb31ebc2",
+    "skill_name": "移花接木",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "target": "actor_side",
+        "resource_type": "hp",
+        "change_type": "heal",
+        "value_type": "percent",
+        "value": 0.15,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "force_switch_out",
+        "status": "reserved",
+        "target": "actor_side",
+        "mode": "retreat_after_heal"
+      }
+    ],
+    "structure_gaps": [
+      "force_switch_out_operation"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_922471c2f8",
+    "skill_name": "空间压迫",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_starfall_mark",
+        "layers": 1,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_9e9b2ea952",
+    "skill_name": "穿膛",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "raw_description": "造成物伤，若敌方能量小于等于2，造成5倍伤害。",
+      "source": "manual_review_20260612_02",
+      "attack_stat": "physical_attack",
+      "defense_stat": "physical_defense",
+      "response_rule": {
+        "target": "energy_threshold",
+        "condition": "defender_energy_lte_2",
+        "success_multiplier": 5,
+        "modifier": "power_multiplier"
+      }
+    },
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_multiplier_from_defender_energy",
+        "status": "reserved",
+        "threshold_lte": 2,
+        "power_multiplier": 5
+      }
+    ],
+    "structure_gaps": [
+      "defender_energy_condition_in_power_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_5933e4eaf2",
+    "skill_name": "突袭",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "raw_description": "造成魔伤，应对状态：本次技能威力变为3倍。",
+      "source": "manual_review_20260612_02",
+      "attack_stat": "magic_attack",
+      "defense_stat": "magic_defense",
+      "response_rule": {
+        "target": "status",
+        "condition": "response_status_success",
+        "success_multiplier": 3,
+        "modifier": "power_multiplier"
+      }
+    },
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_43b4ab6c2b",
+    "skill_name": "等价交换",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.9,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤90%，应对攻击：自己获得50%吸血。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "lifesteal_buff",
+        "status": "reserved",
+        "ratio": 0.5,
+        "trigger": "response_attack_success"
+      }
+    ],
+    "structure_gaps": [
+      "lifesteal_status_listener"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_9b132d403a",
+    "skill_name": "筛管奔流",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_from_actor_hp_percent",
+        "status": "reserved",
+        "condition": "actor_hp_percent_above_80",
+        "power_add": 75
+      }
+    ],
+    "structure_gaps": [
+      "hp_percent_condition_in_power_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_9577b541d2",
+    "skill_name": "粒子对撞",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_4acc1727ed",
+    "skill_name": "精神扰乱",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_energy_cost_up_layered",
+        "layers": 1,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      },
+      {
+        "op_type": "add_layers",
+        "target": "enemy_side",
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_energy_cost_up_layered",
+        "layers": 2,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_7a57125bbc",
+    "skill_name": "纤维化",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.8,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤80%，应对攻击：自己获得物防+70%。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_physical_defense_up_layered",
+        "layers": 7,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_7ffbbd5892",
+    "skill_name": "绵里藏针",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "persistent_skill_power_modifier",
+        "status": "reserved",
+        "target": "source_skill",
+        "power_add": 20,
+        "condition": "previous_turn_no_attack_skill"
+      }
+    ],
+    "structure_gaps": [
+      "previous_turn_action_condition",
+      "persistent_skill_slot_power_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_e5cf51e24d",
+    "skill_name": "缠丝劲",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 2
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_9d8813c21c",
+    "skill_name": "网缚",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_physical_defense_down_layered",
+        "layers": 3,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_ecd935f5f6",
+    "skill_name": "羽刃",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "delayed_force_switch_out",
+        "status": "reserved",
+        "target": "enemy_side",
+        "timing": "end_turn",
+        "trigger": "response_status_success",
+        "mode": "emergency"
+      }
+    ],
+    "structure_gaps": [
+      "delayed_force_switch_out",
+      "attacking_skill_response_rule_auto_load"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_efbdede3a1",
+    "skill_name": "羽化加速",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_skill_power_up_layered",
+        "layers": 2,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "swift_action_modifier",
+        "status": "reserved",
+        "target": "actor_side"
+      }
+    ],
+    "structure_gaps": [
+      "swift_action_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_5541e469a0",
+    "skill_name": "羽翼庇护",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.7,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤70%，应对攻击：自己获得连击数+2。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_hit_count_up_layered",
+        "layers": 2,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_19af45fdd5",
+    "skill_name": "翅刃",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "clear_effects",
+        "target": "enemy_side",
+        "categories": [
+          "mark"
+        ],
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "steal_effects",
+        "status": "reserved",
+        "categories": [
+          "mark"
+        ],
+        "target": "enemy_side",
+        "trigger": "response_status_success"
+      }
+    ],
+    "structure_gaps": [
+      "steal_effect_operation"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_2ae21df728",
+    "skill_name": "翼击",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "swift_action_modifier",
+        "status": "reserved",
+        "target": "actor_side"
+      }
+    ],
+    "structure_gaps": [
+      "swift_action_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_4ae4a6827d",
+    "skill_name": "耀眼",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_hit_count_down_layered",
+        "layers": 4,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_180eb99ab5",
+    "skill_name": "聒噪",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "attack_skill_cost_modifier",
+        "status": "reserved",
+        "target": "enemy_side",
+        "cost_delta": 2,
+        "duration_turns": 3
+      }
+    ],
+    "structure_gaps": [
+      "skill_category_filtered_cost_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_6bb722f6d0",
+    "skill_name": "联动装置",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "adjacent_skill_slot_power_modifier",
+        "status": "reserved",
+        "power_add": 20
+      },
+      {
+        "hook_type": "adjacent_skill_slot_power_modifier",
+        "status": "reserved",
+        "power_add": 30,
+        "trigger": "response_defense_success"
+      }
+    ],
+    "structure_gaps": [
+      "adjacent_skill_slot_modifier",
+      "persistent_skill_slot_power_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_f235a826b4",
+    "skill_name": "聚盐",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 2
+    },
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "target": "actor_side",
+        "resource_type": "hp",
+        "change_type": "heal",
+        "value_type": "percent",
+        "value": 0.16,
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "persistent_skill_hit_count_modifier",
+        "status": "reserved",
+        "target": "source_skill",
+        "hit_count_delta": 1,
+        "trigger": "after_skill_use"
+      }
+    ],
+    "structure_gaps": [
+      "persistent_skill_slot_hit_count_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_e8e134829a",
+    "skill_name": "肥皂泡",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_dddc6c0e01",
+    "skill_name": "背袭",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "raw_description": "造成魔伤，若敌方能量等于0，造成20倍伤害。",
+      "source": "manual_review_20260612_02",
+      "attack_stat": "magic_attack",
+      "defense_stat": "magic_defense",
+      "response_rule": {
+        "target": "energy_threshold",
+        "condition": "defender_energy_eq_0",
+        "success_multiplier": 20,
+        "modifier": "power_multiplier"
+      }
+    },
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_multiplier_from_defender_energy",
+        "status": "reserved",
+        "equals": 0,
+        "power_multiplier": 20
+      }
+    ],
+    "structure_gaps": [
+      "defender_energy_condition_in_power_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_620dc1fd3d",
+    "skill_name": "能量刃",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "persistent_skill_power_modifier",
+        "status": "reserved",
+        "target": "source_skill",
+        "power_add": 90,
+        "trigger": "response_success"
+      }
+    ],
+    "structure_gaps": [
+      "persistent_skill_slot_power_modifier",
+      "response_success_listener"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_065d4b049f",
+    "skill_name": "能量守恒",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.8,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤80%，应对攻击：两侧技能能耗永久-1。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "adjacent_skill_slot_cost_modifier",
+        "status": "reserved",
+        "cost_delta": -1,
+        "trigger": "response_attack_success"
+      }
+    ],
+    "structure_gaps": [
+      "adjacent_skill_slot_modifier",
+      "persistent_skill_slot_cost_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_bbdd599ed2",
+    "skill_name": "能量炮",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 2
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_633cdb76b5",
+    "skill_name": "脉冲光线",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_5eb5133fd3",
+    "skill_name": "腐化",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "stat_modifier_from_effect_layers",
+        "status": "reserved",
+        "source_effect_id": "effect_poison",
+        "target": "enemy_side",
+        "effect_id": "effect_dual_attack_down_layered",
+        "layers_per_source_layer": 3
+      }
+    ],
+    "structure_gaps": [
+      "dynamic_effect_layers_with_multiplier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_4bba99bf89",
+    "skill_name": "腐蚀酸液",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_poison",
+        "layers": 2,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_350c39c6ad",
+    "skill_name": "色散",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "damage_multiplier_if_mixed_element_defender",
+        "status": "reserved",
+        "multiplier": 1.5
+      }
+    ],
+    "structure_gaps": [
+      "defender_mixed_element_condition"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_feb29d2c03",
+    "skill_name": "花炮",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 2
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_magic_attack_up_layered",
+        "layers": 12,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_6eadbe471d",
+    "skill_name": "花香",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_ec330cbc11",
+    "skill_name": "芳香诱引",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_hit_count_up_layered",
+        "layers": 2,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "interrupt_responded_skill",
+        "status": "reserved",
+        "trigger": "response_defense_success"
+      },
+      {
+        "hook_type": "apply_effect_next_turn",
+        "status": "reserved",
+        "effect_alias": "reserved_effect_alias",
+        "target": "enemy_side",
+        "trigger": "response_defense_success"
+      }
+    ],
+    "structure_gaps": [
+      "interrupt_operation",
+      "missing_stun_effect_definition",
+      "delayed_effect_operation"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_e9e882db2a",
+    "skill_name": "荆棘爪",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_491a6bd40d",
+    "skill_name": "草虫冲击",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_and_ignore_resistance_if_target_switched",
+        "status": "reserved",
+        "power_add": 50,
+        "condition": "target_switched_this_turn"
+      }
+    ],
+    "structure_gaps": [
+      "current_turn_switch_listener",
+      "type_resistance_override"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_c53df4ea0c",
+    "skill_name": "落井下毒",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "multiply_layers_by_polarity",
+        "target": "enemy_side",
+        "polarity": "negative",
+        "multiplier": 2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_51ddf7cb00",
+    "skill_name": "落星",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_8f01ef7e71",
+    "skill_name": "落石",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_39736afad7",
+    "skill_name": "落雨",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "change_weather",
+        "target": "field",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "weather_rain",
+        "layers": 1,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps.",
+        "remaining_turns": 8
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_dbd1198885",
+    "skill_name": "落雷",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "persistent_skill_power_modifier",
+        "status": "reserved",
+        "target": "source_skill",
+        "power_add": 40,
+        "trigger": "actor_switch_in"
+      }
+    ],
+    "structure_gaps": [
+      "switch_in_listener",
+      "persistent_skill_slot_power_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_2e37d05cfb",
+    "skill_name": "蓄势待发",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "apply_effect",
+        "status": "reserved",
+        "effect_alias": "reserved_effect_alias",
+        "target": "actor_side"
+      }
+    ],
+    "structure_gaps": [
+      "missing_charge_mark_definition"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_df50ec35d6",
+    "skill_name": "蓄水",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "next_skill_cost_modifier_once",
+        "status": "reserved",
+        "target": "actor_side",
+        "cost_delta": -6,
+        "remaining_uses": 1
+      }
+    ],
+    "structure_gaps": [
+      "consume_remaining_uses_on_skill_use",
+      "next_skill_cost_modifier_once"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_5937ae7c7b",
+    "skill_name": "蓄能轰击",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "persistent_skill_cost_modifier",
+        "status": "reserved",
+        "target": "source_skill",
+        "cost_delta": -2,
+        "trigger": "normal_skill_use"
+      }
+    ],
+    "structure_gaps": [
+      "element_skill_use_listener",
+      "persistent_skill_slot_cost_modifier"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_62ad1bd8df",
+    "skill_name": "藤绞",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "target": "actor_side",
+        "resource_type": "energy",
+        "change_type": "gain",
+        "value_type": "value",
+        "value": 5,
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_957ef6cddb",
+    "skill_name": "虚假破产",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.8,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤80%，能量不足时，消耗5%生命代替1能量，应对攻击。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "hp_substitute_for_energy_cost",
+        "status": "reserved",
+        "hp_percent_per_energy": 0.05,
+        "trigger": "insufficient_energy"
+      }
+    ],
+    "structure_gaps": [
+      "resource_substitute_cost_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_74f8226d41",
+    "skill_name": "虚化",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.8,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤80%，应对攻击：自己获得魔防+70%。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_magic_defense_up_layered",
+        "layers": 7,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_bf025cb94b",
+    "skill_name": "虫击",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "raw_description": "造成物伤，应对状态：本次技能威力变为2倍，无视敌方系别抵抗。",
+      "source": "manual_review_20260612_02",
+      "attack_stat": "physical_attack",
+      "defense_stat": "physical_defense",
+      "response_rule": {
+        "target": "status",
+        "condition": "response_status_success",
+        "success_multiplier": 2,
+        "modifier": "power_multiplier"
+      }
+    },
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "ignore_type_resistance",
+        "status": "reserved",
+        "trigger": "response_status_success"
+      }
+    ],
+    "structure_gaps": [
+      "type_resistance_override"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_60362fa40a",
+    "skill_name": "虫刺",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 3
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_95b8e619a5",
+    "skill_name": "虫结阵",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.8,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤80%，应对攻击：己方队伍获得1次随机奉献。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "dedication_gain",
+        "status": "reserved",
+        "target": "self_side",
+        "count": 1,
+        "random": true,
+        "trigger": "response_attack_success"
+      }
+    ],
+    "structure_gaps": [
+      "dedication_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_819a65279c",
+    "skill_name": "虫网",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "target": "actor_side",
+        "resource_type": "energy",
+        "change_type": "gain",
+        "value_type": "value",
+        "value": 1,
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_1fb5537e2f",
+    "skill_name": "虫群",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "dedication_interaction",
+        "status": "reserved",
+        "target": "source_skill"
+      }
+    ],
+    "structure_gaps": [
+      "dedication_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_fb095c13c8",
+    "skill_name": "虫群智慧",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "dedication_gain",
+        "status": "reserved",
+        "target": "self_side",
+        "count": 2,
+        "random": true
+      }
+    ],
+    "structure_gaps": [
+      "dedication_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_01890fc45e",
+    "skill_name": "虫群过境",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 2
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "dedication_gain",
+        "status": "reserved",
+        "target": "self_side",
+        "count": 1,
+        "effect": {
+          "hook_type": "hit_count_modifier",
+          "layers": 1
+        }
+      }
+    ],
+    "structure_gaps": [
+      "dedication_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_46c0406983",
+    "skill_name": "虫茧",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "target": "actor_side",
+        "resource_type": "hp",
+        "change_type": "heal",
+        "value_type": "percent",
+        "value": 0.2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "dedication_gain",
+        "status": "reserved",
+        "target": "self_side",
+        "count": 1,
+        "effect": {
+          "hook_type": "lifesteal_buff",
+          "ratio": 0.1
+        }
+      }
+    ],
+    "structure_gaps": [
+      "dedication_mechanic"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_ca04cf0b94",
+    "skill_name": "虫蛊",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_1377598619",
+    "skill_name": "虫鸣",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "source": "manual_review_20260612_02",
+      "hit_count": 1,
+      "dynamic_hit_rule": {
+        "source": "team_skill_count",
+        "skill_name": "虫鸣",
+        "hit_count_add_per_skill": 1,
+        "status": "not_executable_yet"
+      }
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "hit_count_from_team_skill_count",
+        "status": "reserved",
+        "skill_name": "虫鸣",
+        "hit_count_add_per_skill": 1
+      }
+    ],
+    "structure_gaps": [
+      "team_skill_set_condition",
+      "dynamic_hit_count_from_team_skills"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_82be66c9d3",
+    "skill_name": "虹光冲击",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_ed3c906dad",
+    "skill_name": "蛰针",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_362bc005c2",
+    "skill_name": "蜡质膜",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.8,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤80%，应对攻击：回复3能量。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "target": "actor_side",
+        "resource_type": "energy",
+        "change_type": "gain",
+        "value_type": "value",
+        "value": 3,
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_3450842334",
+    "skill_name": "蝙蝠",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "lifesteal_from_damage_dealt",
+        "status": "reserved",
+        "ratio": 1.0,
+        "trigger": "after_damage"
+      }
+    ],
+    "structure_gaps": [
+      "lifesteal_from_damage_result"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_fa3a85e55d",
+    "skill_name": "血气",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.6,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤60%，应对攻击：本回合受到致命伤害时，保留1生命值。",
+      "source": "manual_review_20260612_02"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "survive_fatal_damage",
+        "status": "reserved",
+        "hp_after": 1,
+        "trigger": "response_attack_success",
+        "duration": "current_turn"
+      }
+    ],
+    "structure_gaps": [
+      "fatal_damage_intercept"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_dd1a00cb13",
+    "skill_name": "裂石",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "enemy_side",
+        "condition": "response_status_success",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_physical_defense_down_layered",
+        "layers": 8,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_68c4b49175",
+    "skill_name": "见招拆招",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_from_previous_turn_skill_category",
+        "status": "reserved",
+        "skill_category": "status",
+        "power_add": 55
+      }
+    ],
+    "structure_gaps": [
+      "previous_turn_action_condition",
+      "conditional_power_add"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_f700f621d9",
+    "skill_name": "角击",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_1e5c273495",
+    "skill_name": "触底强击",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "power_add_if_energy_exhausted_after_cost",
+        "status": "reserved",
+        "power_add": 120
+      }
+    ],
+    "structure_gaps": [
+      "post_cost_energy_condition_in_power_rule"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_c3c2a70574",
+    "skill_name": "触电",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_283d6339dc",
+    "skill_name": "许愿星",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_f8fdd21d80",
+    "skill_name": "诋毁",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_a47c4ce64b",
+    "skill_name": "诡刺",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_02"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_b6bd984a1f",
+    "skill_name": "贪婪",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "lifesteal_buff",
+        "status": "reserved",
+        "target": "actor_side",
+        "ratio": 1.0
+      }
+    ],
+    "structure_gaps": [
+      "lifesteal_status_listener"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_f4f84680a4",
+    "skill_name": "贮藏",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "effect_id": "effect_dual_attack_up_layered",
+        "layers": 5,
+        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+      }
+    ],
+    "future_hooks": [
+      {
+        "hook_type": "stat_modifier_from_carried_zero_cost_skill_count",
+        "status": "reserved",
+        "target": "actor_side",
+        "effect_id": "effect_dual_attack_up_layered",
+        "layers_per_skill": 5
+      }
+    ],
+    "structure_gaps": [
+      "skill_set_composition_rule"
+    ]
+  }
+]

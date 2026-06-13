@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAppStore } from "@/store/useAppStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
-import { SkillSearchSelect } from "@/components/EntitySearchSelect";
+import { ElfSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { ElfCard } from "@/components/ElfCard";
 import { StatGrid } from "@/components/StatGrid";
 import { EstimatePanel, type EstimatePanelSelection } from "@/components/EstimatePanel";
 import { EventTimeline } from "@/components/EventTimeline";
 import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
-import { phaseName, sideName } from "@/lib/utils";
-import type { BattleElfStateDict, BattleEventOut, DamageEventCreateResult, EndTurnResult, Side, SkillDefinitionOut, StatBlock } from "@/types/api";
+import { cn, elementTypeName, phaseName, sideName, skillCategoryName } from "@/lib/utils";
+import type { BattleElfStateDict, BattleEventOut, BattleSkillSlotDict, BattleSpeedPreview, DamageEventCreateResult, EndTurnResult, Side, SkillDefinitionOut, SpeedPreviewRow, SpeedPreviewTarget, StatBlock } from "@/types/api";
 
 type PlannedActionKind = "unknown" | "attack_skill" | "defense_skill" | "status_skill" | "switch";
 
@@ -99,6 +100,53 @@ export function BattleWorkbenchPage() {
     },
   });
 
+  const returnToField = useMutation({
+    mutationFn: ({ side, elfId }: { side: Side; elfId: string }) =>
+      api.battles.switchElf(currentBattleId!, {
+        side,
+        elf_id: elfId,
+        turn_number: state?.battle.turn_number,
+        notes: "手动返场：离场清除后立即入场",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["battle-state", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate-evidence"] });
+    },
+  });
+
+  const switchActiveElf = useMutation({
+    mutationFn: ({ side, elfId }: { side: Side; elfId: string }) =>
+      api.battles.switchElf(currentBattleId!, {
+        side,
+        elf_id: elfId,
+        turn_number: state?.battle.turn_number,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["battle-state", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate-evidence"] });
+    },
+  });
+
+  const changeRuntimeForm = useMutation({
+    mutationFn: ({ stateId, effectiveElfId }: { stateId: string; effectiveElfId: string | null }) =>
+      api.battles.changeRuntimeForm(currentBattleId!, stateId, {
+        effective_elf_id: effectiveElfId,
+        hp_policy: "keep_percent",
+        reason: effectiveElfId ? "manual_runtime_form_change" : "restore_original_form",
+        notes: "手动调整当前有效形态；不触发切换/返场副作用",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["battle-state", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", currentBattleId] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate-evidence"] });
+    },
+  });
+
   const requestEndTurn = () => {
     if (!currentBattleId || !state) return;
     if (!window.confirm(`确认结束第 ${state.battle.turn_number} 回合并执行回合末结算？`)) return;
@@ -109,6 +157,32 @@ export function BattleWorkbenchPage() {
     if (!currentBattleId) return;
     if (!window.confirm("确认结束当前战斗？结束后仍可查看事件和实时估计记录。")) return;
     finishBattle.mutate();
+  };
+
+  const requestReturnToField = (side: Side, elfId: string) => {
+    if (!currentBattleId || !state) return;
+    const sideLabel = sideName(side);
+    if (!window.confirm(`确认让${sideLabel}当前精灵执行返场？这会触发切换清除、入场结算和首回合机制。`)) return;
+    returnToField.mutate({ side, elfId });
+  };
+
+  const requestSwitchActiveElf = (side: Side, elfId: string) => {
+    if (!currentBattleId || !state) return;
+    const currentActiveId = side === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
+    if (elfId === currentActiveId) return;
+    switchActiveElf.mutate({ side, elfId });
+  };
+
+  const quickSelectSkillAction = (side: Side, skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => {
+    setPlannedActions((current) => ({
+      ...current,
+      [side]: {
+        ...createEmptyAction(),
+        kind: plannedKindFromSkillCategory(skill.skill_category),
+        skillId: skill.skill_id,
+        skillName: skill.skill_name ?? skill.skill_id,
+      },
+    }));
   };
 
   return (
@@ -145,10 +219,10 @@ export function BattleWorkbenchPage() {
       {stateQuery.isLoading ? <Card><CardContent className="pt-5 text-sm text-muted-foreground">正在读取战斗状态...</CardContent></Card> : null}
 
       {state ? (
-        <div className="grid grid-cols-[280px_1fr_360px] gap-6">
+        <div className="grid grid-cols-[220px_minmax(0,1fr)_280px] gap-4">
           <div className="space-y-4">
-            <TeamPanel title="我方队伍" elves={selfElves} activeElfId={state.battle.self_active_elf_id} onSwitch={() => { setEstimatePanelElfId(null); openDrawer("switch", "self"); }} />
-            <TeamPanel title="敌方队伍" elves={enemyElves} activeElfId={state.battle.enemy_active_elf_id} onSwitch={() => openDrawer("switch", "enemy")} onSelectEstimate={setEstimatePanelElfId} />
+            <TeamPanel title="我方队伍" elves={selfElves} activeElfId={state.battle.self_active_elf_id} onSwitch={(elfId) => { setEstimatePanelElfId(null); requestSwitchActiveElf("self", elfId); }} onReturn={(elfId) => requestReturnToField("self", elfId)} />
+            <TeamPanel title="敌方队伍" elves={enemyElves} activeElfId={state.battle.enemy_active_elf_id} onSwitch={(elfId) => requestSwitchActiveElf("enemy", elfId)} onReturn={(elfId) => requestReturnToField("enemy", elfId)} onSelectEstimate={setEstimatePanelElfId} />
           </div>
 
           <div className="space-y-4">
@@ -156,16 +230,38 @@ export function BattleWorkbenchPage() {
               <CardHeader>
                 <CardTitle>当前对位</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <ActiveSide title="我方上场" elf={selfActive} />
-                <ActiveSide
-                  title="敌方上场"
-                  elf={enemyActive}
-                  estimatedStats={enemyEstimatedStats}
-                  estimateSource={activeEnemyEstimate?.source ?? "unknown"}
-                  estimateMatchedCount={activeEnemyEstimate?.matchedCount ?? 0}
-                  estimateNatureName={activeEnemyEstimate?.natureName}
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <ActiveSide
+                    title="我方上场"
+                    elf={selfActive}
+                    skillSlots={state.skill_slots.filter(
+                      (slot) => slot.side === "self" && slot.elf_id === state.battle.self_active_elf_id,
+                    )}
+                  onRuntimeFormChange={(stateId, effectiveElfId) =>
+                    changeRuntimeForm.mutate({ stateId, effectiveElfId })
+                  }
+                  runtimeFormChanging={changeRuntimeForm.isPending}
+                  onSkillQuickSelect={(skill) => quickSelectSkillAction("self", skill)}
                 />
+                  <ActiveSide
+                    title="敌方上场"
+                    elf={enemyActive}
+                    skillSlots={state.skill_slots.filter(
+                      (slot) => slot.side === "enemy" && slot.elf_id === state.battle.enemy_active_elf_id,
+                    )}
+                    estimatedStats={enemyEstimatedStats}
+                    estimateSource={activeEnemyEstimate?.source ?? "unknown"}
+                    estimateMatchedCount={activeEnemyEstimate?.matchedCount ?? 0}
+                    estimateNatureName={activeEnemyEstimate?.natureName}
+                  onRuntimeFormChange={(stateId, effectiveElfId) =>
+                    changeRuntimeForm.mutate({ stateId, effectiveElfId })
+                  }
+                  runtimeFormChanging={changeRuntimeForm.isPending}
+                  onSkillQuickSelect={(skill) => quickSelectSkillAction("enemy", skill)}
+                />
+                </div>
+                <SpeedPreviewPanel preview={state.speed_preview} />
               </CardContent>
             </Card>
 
@@ -185,14 +281,20 @@ export function BattleWorkbenchPage() {
               onRefresh={() => stateQuery.refetch()}
             />
 
+            <Card>
+              <CardHeader><CardTitle>统一状态系统</CardTitle></CardHeader>
+              <CardContent>
+                <ActiveEffectsPanel
+                  battleId={currentBattleId!}
+                  effects={state.active_effects}
+                  turnNumber={state.battle.turn_number}
+                />
+              </CardContent>
+            </Card>
+
             {lastEndTurnResult ? <EndTurnSummary result={lastEndTurnResult} /> : null}
             {lastSkillEvent ? <SkillOperationSummary event={lastSkillEvent} /> : null}
             {lastDamageEventResult ? <DamageEventSummary result={lastDamageEventResult} /> : null}
-
-            <Card>
-              <CardHeader><CardTitle>统一状态系统</CardTitle></CardHeader>
-              <CardContent><ActiveEffectsPanel battleId={currentBattleId!} effects={state.active_effects} /></CardContent>
-            </Card>
 
             <EventTimeline battleId={currentBattleId} compact />
           </div>
@@ -371,6 +473,7 @@ function ActionDraftEditor({
           value={action.skillId}
           onChange={updateSkill}
           elfId={activeElfId}
+          resultsMode="focus"
         />
       ) : null}
 
@@ -572,6 +675,11 @@ function plannedActionKindName(kind: PlannedActionKind) {
   return "未知";
 }
 
+function plannedKindFromSkillCategory(category?: string | null): PlannedActionKind {
+  if (category === "physical" || category === "magic") return "attack_skill";
+  return "status_skill";
+}
+
 function plannedActionSummary(action: PlannedAction) {
   if (action.kind === "switch") return action.switchElfName ?? action.switchElfId ?? "计划切换，目标未选";
   if (action.kind === "attack_skill" || action.kind === "defense_skill" || action.kind === "status_skill") {
@@ -585,6 +693,7 @@ function SkillOperationSummary({ event }: { event: BattleEventOut }) {
   const results = Array.isArray(payload.effect_operation_results)
     ? payload.effect_operation_results.filter(isRecord)
     : [];
+  const skillRuntime = asRecord(payload.skill_runtime);
 
   return (
     <Card>
@@ -602,6 +711,13 @@ function SkillOperationSummary({ event }: { event: BattleEventOut }) {
           <Metric label="行动方" value={sideName(event.actor_side)} />
           <Metric label="事件" value={compactEventValue(event.event_id)} />
         </div>
+        {skillRuntime ? (
+          <div className="grid grid-cols-3 gap-2">
+            <Metric label="运行费用" value={String(skillRuntime.effective_energy_cost ?? "--")} />
+            <Metric label="静态费用" value={String(skillRuntime.static_energy_cost ?? "--")} />
+            <Metric label="技能槽" value={compactEventValue(skillRuntime.slot_id)} />
+          </div>
+        ) : null}
         {results.length > 0 ? (
           <div className="space-y-2">
             {results.map((item, index) => (
@@ -630,6 +746,10 @@ function DamageEventSummary({ result }: { result: DamageEventCreateResult }) {
   const defenseSkillId = payload.defense_skill_id ?? formulaContext.defense_skill_id;
   const defenseEventId = payload.defense_response_event_id ?? formulaContext.defense_response_event_id;
   const responseAttackSuccess = payload.response_attack_success ?? formulaContext.response_attack_success;
+  const responseMultiplier = asRecord(ruleDetails?.response_multiplier);
+  const powerMultiplier = asRecord(ruleDetails?.power_multiplier);
+  const attackResponseRule = asRecord(ruleDetails?.attack_skill_response_rule);
+  const conditionFlags = asRecord(payload.condition_flags) ?? asRecord(ruleDetails?.condition_flags);
 
   return (
     <Card>
@@ -652,6 +772,16 @@ function DamageEventSummary({ result }: { result: DamageEventCreateResult }) {
           <Metric label="来源事件" value={compactEventValue(defenseEventId)} />
           <Metric label="应对攻击" value={formatOptionalBool(responseAttackSuccess)} />
         </div>
+        {attackResponseRule || responseMultiplier || powerMultiplier ? (
+          <div className="grid grid-cols-3 gap-2">
+            <Metric label="攻击应对" value={String(attackResponseRule?.target ?? "--")} />
+            <Metric label="应对倍数" value={String(responseMultiplier?.value ?? "--")} />
+            <Metric label="威力倍数" value={String(powerMultiplier?.value ?? "--")} />
+          </div>
+        ) : null}
+        {conditionFlags ? (
+          <FlagList title="条件标记" flags={conditionFlags} />
+        ) : null}
         {reductionItems.length > 0 ? (
           <div className="space-y-2">
             {reductionItems.map((item, index) => (
@@ -679,6 +809,25 @@ function DamageEventSummary({ result }: { result: DamageEventCreateResult }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function FlagList({ title, flags }: { title: string; flags: Record<string, unknown> }) {
+  const enabledFlags = Object.entries(flags).filter(([, value]) => value === true);
+  if (enabledFlags.length === 0) {
+    return null;
+  }
+  return (
+    <div className="rounded-xl border bg-slate-50 p-3">
+      <div className="text-xs font-medium text-muted-foreground">{title}</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {enabledFlags.map(([key]) => (
+          <Badge key={key} variant="secondary">
+            {formatConditionFlagName(key)}
+          </Badge>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -711,6 +860,15 @@ function SkillOperationItem({ item }: { item: Record<string, unknown> }) {
           替换移除：{item.removed_effects.filter(isRecord).map((effect) => String(effect.effect_id ?? "--")).join("、")}
         </div>
       ) : null}
+      {Array.isArray(item.changed_effects) && item.changed_effects.length > 0 ? (
+        <div className="mt-2 text-xs text-muted-foreground">
+          层数变更：
+          {item.changed_effects
+            .filter(isRecord)
+            .map((effect) => `${String(effect.effect_id ?? "--")} ${String(effect.layers_before ?? "--")}→${String(effect.layers_after ?? "--")}`)
+            .join("、")}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -737,6 +895,19 @@ function formatOptionalBool(value: unknown) {
   if (value === true) return "成功";
   if (value === false) return "失败";
   return "未指定";
+}
+
+function formatConditionFlagName(value: string) {
+  const names: Record<string, string> = {
+    actor_moves_before_target: "先于目标行动",
+    actor_moves_after_target: "后于目标行动",
+    target_switched_this_turn: "目标本回合切换",
+    defender_switched_this_turn: "防御方本回合切换",
+    self_switched_this_turn: "我方本回合切换",
+    enemy_switched_this_turn: "敌方本回合切换",
+    post_damage_defeat_condition: "本次击败目标",
+  };
+  return names[value] ?? value;
 }
 
 function formatOperationStatus(status: string) {
@@ -843,33 +1014,441 @@ function Capability({ label, value, muted = false }: { label: string; value: str
   );
 }
 
-function TeamPanel({ title, elves, activeElfId, onSwitch, onSelectEstimate }: { title: string; elves: Array<any>; activeElfId?: string | null; onSwitch: (elfId: string) => void; onSelectEstimate?: (elfId: string) => void }) {
+function TeamPanel({
+  title,
+  elves,
+  activeElfId,
+  onSwitch,
+  onReturn,
+  onSelectEstimate,
+}: {
+  title: string;
+  elves: BattleElfStateDict[];
+  activeElfId?: string | null;
+  onSwitch: (elfId: string) => void;
+  onReturn?: (elfId: string) => void;
+  onSelectEstimate?: (elfId: string) => void;
+}) {
   return (
     <Card>
       <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        {elves.map((elf) => <ElfCard key={elf.elf_id} elf={elf} active={elf.elf_id === activeElfId} onSwitch={() => onSwitch(elf.elf_id)} onSelectEstimate={onSelectEstimate ? () => onSelectEstimate(elf.elf_id) : undefined} />)}
+        {elves.map((elf) => (
+          <ElfCard
+            key={elf.elf_id}
+            elf={elf}
+            active={elf.elf_id === activeElfId}
+            onSwitch={() => onSwitch(elf.elf_id)}
+            onReturn={onReturn ? () => onReturn(elf.elf_id) : undefined}
+            onSelectEstimate={onSelectEstimate ? () => onSelectEstimate(elf.elf_id) : undefined}
+          />
+        ))}
       </CardContent>
     </Card>
+  );
+}
+
+function SkillSlotRuntimeList({
+  ownerSide,
+  skillSlots,
+  onSkillQuickSelect,
+}: {
+  ownerSide?: Side;
+  skillSlots: BattleSkillSlotDict[];
+  onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
+}) {
+  const [extraSkillId, setExtraSkillId] = useState<string | null>(null);
+  const [extraSkill, setExtraSkill] = useState<SkillDefinitionOut | null>(null);
+  const isEnemy = ownerSide === "enemy";
+  const sortedSlots = [...skillSlots].sort((a, b) => a.slot_index - b.slot_index);
+  const primarySlots = Array.from({ length: 4 }, (_, index) => {
+    return sortedSlots.find((slot) => slot.slot_index === index) ?? null;
+  });
+  const runtimeExtraSlots = sortedSlots.filter((slot) => slot.slot_index >= 4);
+  const attackerElementTypes = skillSlots.find((slot) => slot.attacker_element_types)?.attacker_element_types ?? [];
+  const extraPreview = extraSkill ? buildStaticSkillPreview(extraSkill, attackerElementTypes) : null;
+  const emptyText = isEnemy ? "开局未知；录入敌方使用技能或敌方伤害事件后会自动填入。" : "未配置携带技能";
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold">{isEnemy ? "敌方技能槽" : "携带技能"}</span>
+        {isEnemy ? <Badge variant="outline">开局未知</Badge> : null}
+      </div>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+        {primarySlots.map((slot, index) => (
+          <SkillSlotCard
+            key={slot?.slot_id ?? `empty-${index}`}
+            label={isEnemy ? (slot ? `已发现 ${index + 1}` : `未知 ${index + 1}`) : `携带 ${index + 1}`}
+            slot={slot}
+            emptyText={emptyText}
+            onSkillQuickSelect={onSkillQuickSelect}
+          />
+        ))}
+      </div>
+      <div className="rounded-xl border bg-white p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold">{isEnemy ? "敌方额外技能" : "临时技能"}</span>
+          <Badge variant="outline">第 5 槽</Badge>
+        </div>
+        {runtimeExtraSlots.length > 0 ? (
+          <div className="mb-3 space-y-2">
+            {runtimeExtraSlots.map((slot, index) => (
+              <SkillSlotCard
+                key={slot.slot_id}
+                label={`${isEnemy ? "已发现额外" : "已确认额外"} ${index + 1}`}
+                slot={slot}
+                emptyText={emptyText}
+                onSkillQuickSelect={onSkillQuickSelect}
+              />
+            ))}
+          </div>
+        ) : null}
+        <SkillSearchSelect
+          label={isEnemy ? "选择敌方额外技能" : "选择临时技能"}
+          value={extraSkillId}
+          onChange={(id, item) => {
+            setExtraSkillId(id);
+            setExtraSkill(item);
+          }}
+          placeholder={isEnemy ? "搜索敌方战斗中额外获得或变换出的技能" : "搜索战斗中额外获得或变换出的技能"}
+          resultsMode="focus"
+        />
+        {extraPreview ? (
+          <div className="mt-2 space-y-2">
+            <SkillPowerPreviewLine preview={extraPreview} />
+            {onSkillQuickSelect ? (
+              <Button
+                className="h-7 w-full"
+                size="sm"
+                variant="outline"
+                type="button"
+                onClick={() => {
+                  if (!extraSkill) return;
+                  onSkillQuickSelect({
+                    skill_id: extraSkill.skill_id,
+                    skill_name: extraSkill.skill_name,
+                    skill_category: extraSkill.skill_category,
+                  });
+                }}
+              >
+                选为本回合行动
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-2 text-xs text-muted-foreground">
+            {isEnemy
+              ? "这里只用于手动预览敌方额外技能；真正记录请在敌方使用技能或造成伤害时录入技能。"
+              : "用于记录变换、复制或额外获得的技能；当前仅作为工作台选择槽，不写入战斗状态。"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SkillSlotCard({
+  label,
+  slot,
+  emptyText = "未配置携带技能",
+  onSkillQuickSelect,
+}: {
+  label: string;
+  slot: BattleSkillSlotDict | null;
+  emptyText?: string;
+  onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
+}) {
+  if (!slot) {
+    return (
+      <div className="min-h-28 rounded-xl border border-dashed bg-slate-50 p-3 text-xs text-muted-foreground">
+        <div className="font-medium text-slate-700">{label}</div>
+        <div className="mt-4">{emptyText}</div>
+      </div>
+    );
+  }
+  return (
+    <div
+      className={cn(
+        "min-h-28 rounded-xl border bg-slate-50 p-3 text-xs",
+        onSkillQuickSelect
+          && "cursor-pointer transition hover:scale-[1.015] hover:border-primary/60 hover:bg-primary/10 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40",
+      )}
+      role={onSkillQuickSelect ? "button" : undefined}
+      tabIndex={onSkillQuickSelect ? 0 : undefined}
+      onClick={() => onSkillQuickSelect?.(slot)}
+      onKeyDown={(event) => {
+        if (!onSkillQuickSelect) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSkillQuickSelect(slot);
+        }
+      }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-medium text-slate-700">{label}</div>
+          <div className="mt-1 truncate text-sm font-semibold text-slate-950">
+            {slot.skill_name ?? compactEventValue(slot.skill_id)}
+          </div>
+        </div>
+        <Badge variant={slot.is_virtual ? "warning" : "outline"}>{slot.is_virtual ? "补齐" : "运行"}</Badge>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1 text-muted-foreground">
+        <Badge variant="outline">{elementTypeName(slot.element_type)}</Badge>
+        <Badge variant="outline">{skillCategoryName(slot.skill_category)}</Badge>
+        {slot.cooldown_remaining ? <Badge variant="outline">冷却 {slot.cooldown_remaining}</Badge> : null}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-muted-foreground">
+        <span>费用 {slot.effective_energy_cost ?? slot.current_energy_cost ?? slot.base_energy_cost ?? "--"}</span>
+        <span>基础 {slot.static_base_power ?? "--"}</span>
+      </div>
+      <SkillDamagePreviewPanel slot={slot} />
+    </div>
+  );
+}
+
+function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
+  const [expanded, setExpanded] = useState(false);
+  const preview = slot.damage_preview;
+  const currentTarget = preview?.current_target ?? null;
+  const targets = preview?.targets ?? [];
+  const canExpand = targets.length > 1;
+
+  if (!preview || preview.status === "skill_definition_missing") {
+    return <div className="mt-2 text-xs text-muted-foreground">理论伤害 --</div>;
+  }
+  if (preview.status === "not_attack_skill") {
+    return <div className="mt-2 text-xs text-muted-foreground">非攻击技能，暂无理论伤害</div>;
+  }
+  if (!currentTarget) {
+    return (
+      <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs text-muted-foreground">
+        理论伤害 --{preview.reason ? `（${preview.reason}）` : ""}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground">理论伤害</span>
+        <span className="font-semibold text-emerald-700">{damageTargetText(currentTarget)}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
+        <span>{currentTarget.elf_name ?? compactEventValue(currentTarget.elf_id)}</span>
+        <span>HP {currentTarget.defender_max_hp ?? "--"}</span>
+        <span>克制 x{String(currentTarget.multipliers?.type ?? "1")}</span>
+        <span>本系 x{String(currentTarget.multipliers?.stab ?? "1")}</span>
+      </div>
+      {currentTarget.unknown_factors?.length ? (
+        <div className="mt-1 text-amber-700">未纳入：{currentTarget.unknown_factors.join("、")}</div>
+      ) : null}
+      {canExpand ? (
+        <Button
+          className="mt-2 h-7 w-full justify-center gap-1"
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((value) => !value);
+          }}
+        >
+          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {expanded ? "收起全队伤害" : "展开全队伤害"}
+        </Button>
+      ) : null}
+      {expanded ? (
+        <div className="mt-2 space-y-1 border-t pt-2">
+          {targets.map((target) => (
+            <div key={target.elf_id} className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate">
+                {target.elf_name ?? compactEventValue(target.elf_id)}
+                {target.is_active_target ? "（上场）" : ""}
+              </span>
+              <span className="shrink-0 font-medium text-slate-900">{damageTargetText(target)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function damageTargetText(target: NonNullable<BattleSkillSlotDict["damage_preview"]>["current_target"]) {
+  if (!target || target.status !== "calculated") {
+    const missing = target?.missing_parts?.length ? `缺 ${target.missing_parts.join("/")}` : "无法计算";
+    return missing;
+  }
+  const percent = typeof target.damage_percent === "number" ? `${target.damage_percent}%` : "--";
+  return `${target.damage_value ?? "--"} / ${percent}`;
+}
+
+function SkillPowerPreviewLine({
+  preview,
+  fallbackPower,
+}: {
+  preview?: BattleSkillSlotDict["power_preview"];
+  fallbackPower?: number | null;
+}) {
+  if (!preview || preview.status === "skill_definition_missing") {
+    return <div className="mt-2 text-xs text-muted-foreground">威力预览 --</div>;
+  }
+  if (preview.status === "no_power") {
+    return <div className="mt-2 text-xs text-muted-foreground">变化/状态技能，暂无威力</div>;
+  }
+  const multipliers = preview.multipliers ?? {};
+  const effectivePower = preview.effective_display_power_text ?? preview.effective_display_power ?? fallbackPower ?? "--";
+  return (
+    <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground">估算威力</span>
+        <span className="font-semibold text-emerald-700">{effectivePower}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
+        <span>本系 x{multipliers.stab ?? "1"}</span>
+        <span>攻防状态 x{multipliers.stat_stage ?? "1"}</span>
+        <span>天气 x{multipliers.weather ?? "1"}</span>
+        <span>威力状态 x{multipliers.skill_power ?? "1"}</span>
+      </div>
+    </div>
+  );
+}
+
+function buildStaticSkillPreview(
+  skill: SkillDefinitionOut,
+  attackerElementTypes: string[],
+): BattleSkillSlotDict["power_preview"] {
+  if (skill.base_power == null) {
+    return {
+      status: "no_power",
+      base_power: null,
+      effective_display_power: null,
+      preview_scope: "temporary_skill_static_only",
+    };
+  }
+  const stabMultiplier = skill.element_type && attackerElementTypes.includes(skill.element_type) ? 1.25 : 1;
+  const effectivePower = skill.base_power * stabMultiplier;
+  return {
+    status: "resolved",
+    base_power: skill.base_power,
+    static_base_power: skill.base_power,
+    effective_display_power: effectivePower,
+    effective_display_power_text: String(effectivePower),
+    preview_scope: "temporary_skill_static_only",
+    multipliers: {
+      stab: String(stabMultiplier),
+      stat_stage: "1",
+      weather: "1",
+      skill_power: "1",
+    },
+  };
+}
+
+function RuntimeFormControl({
+  elf,
+  disabled,
+  onRuntimeFormChange,
+}: {
+  elf: BattleElfStateDict;
+  disabled?: boolean;
+  onRuntimeFormChange?: (stateId: string, effectiveElfId: string | null) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [selectedElfId, setSelectedElfId] = useState<string | null>(
+    typeof elf.runtime_form_elf_id === "string" ? elf.runtime_form_elf_id : null,
+  );
+  useEffect(() => {
+    setSelectedElfId(typeof elf.runtime_form_elf_id === "string" ? elf.runtime_form_elf_id : null);
+  }, [elf.state_id, elf.runtime_form_elf_id]);
+  if (!elf.state_id || !onRuntimeFormChange) return null;
+
+  const isRuntimeForm = elf.effective_form_source === "runtime_form";
+  const currentEffective = isRuntimeForm
+    ? `${elf.effective_elf_name ?? elf.effective_elf_id}（原：${elf.elf_name ?? elf.elf_id}）`
+    : "原始形态";
+
+  return (
+    <div className="text-xs">
+      <Button
+        className="h-7 gap-1 px-2"
+        size="sm"
+        variant={isRuntimeForm ? "outline" : "ghost"}
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+      >
+        {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        有效形态：{currentEffective}
+      </Button>
+      {expanded ? (
+        <div className="mt-2 rounded-xl border bg-slate-50 p-2">
+          <ElfSearchSelect
+            label="选择有效形态"
+            value={selectedElfId}
+            onChange={(id) => setSelectedElfId(id)}
+            placeholder="搜索退化或临时结算形态"
+            resultsMode="focus"
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={disabled || !selectedElfId}
+              onClick={() => onRuntimeFormChange(elf.state_id!, selectedElfId)}
+            >
+              应用
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={disabled || !isRuntimeForm}
+              onClick={() => {
+                setSelectedElfId(null);
+                onRuntimeFormChange(elf.state_id!, null);
+              }}
+            >
+              恢复原始
+            </Button>
+          </div>
+          <div className="mt-1 text-muted-foreground">
+            保留性格和六维培养，只重算有效形态面板；不触发切换或返场。
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 function ActiveSide({
   title,
   elf,
+  skillSlots = [],
   estimatedStats,
   estimateSource = "unknown",
   estimateMatchedCount = 0,
   estimateNatureName,
+  onRuntimeFormChange,
+  runtimeFormChanging = false,
+  onSkillQuickSelect,
 }: {
   title: string;
   elf?: any;
+  skillSlots?: BattleSkillSlotDict[];
   estimatedStats?: StatBlock | null;
   estimateSource?: "default_config" | "expanded_config" | "base_talent" | "unknown";
   estimateMatchedCount?: number;
   estimateNatureName?: string | null;
+  onRuntimeFormChange?: (stateId: string, effectiveElfId: string | null) => void;
+  runtimeFormChanging?: boolean;
+  onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
 }) {
   const hasRuntimeStats = hasPanelStats(elf?.panel_stats_json);
+  const backendEffectiveStats = statBlockFromUnknown(elf?.effective_panel_stats);
+  const displayEstimatedStats = !hasRuntimeStats ? estimatedStats ?? backendEffectiveStats : undefined;
+  const natureName =
+    typeof elf?.nature_name === "string" && elf.nature_name
+      ? elf.nature_name
+      : estimateNatureName;
   return (
     <div className="rounded-2xl border bg-white p-4">
       <div className="mb-2 flex items-center justify-between"><div className="font-semibold">{title}</div><Badge variant="outline">{sideName(elf?.side)}</Badge></div>
@@ -877,13 +1456,22 @@ function ActiveSide({
         <div className="space-y-3">
           <div className="text-lg font-semibold">{elf.elf_name ?? elf.elf_id}</div>
           <div className="text-sm text-muted-foreground">HP {elf.current_hp_percent ?? "--"}% · 能量 {elf.energy ?? 0}</div>
-          {!hasRuntimeStats && estimateNatureName ? (
-            <div className="rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
-              当前选择性格：<span className="font-medium text-slate-900">{estimateNatureName}</span>
-            </div>
-          ) : null}
-          <StatGrid statsJson={hasRuntimeStats ? elf.panel_stats_json : undefined} stats={!hasRuntimeStats ? estimatedStats : undefined} />
-          {!hasRuntimeStats && estimatedStats ? (
+          <div className="rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
+            性格：<span className="font-medium text-slate-900">{natureName ?? "未知"}</span>
+            {elf.nature_source ? <span className="ml-2">来源：{natureSourceName(String(elf.nature_source))}</span> : null}
+          </div>
+          <RuntimeFormControl
+            elf={elf}
+            disabled={runtimeFormChanging}
+            onRuntimeFormChange={onRuntimeFormChange}
+          />
+          <StatGrid statsJson={hasRuntimeStats ? elf.panel_stats_json : undefined} stats={displayEstimatedStats} compact />
+          <SkillSlotRuntimeList
+            ownerSide={elf.side}
+            skillSlots={skillSlots}
+            onSkillQuickSelect={onSkillQuickSelect}
+          />
+          {!hasRuntimeStats && displayEstimatedStats ? (
             <div className="text-xs text-amber-700">
               {estimateSource === "expanded_config"
                 ? `显示你选择的默认配置，命中 ${estimateMatchedCount} 项约束。`
@@ -894,13 +1482,156 @@ function ActiveSide({
                     : "显示实时估计面板，敌方真实六维尚未确认。"}
             </div>
           ) : null}
-          {!hasRuntimeStats && !estimatedStats ? (
+          {!hasRuntimeStats && !displayEstimatedStats ? (
             <div className="text-xs text-muted-foreground">敌方真实六维未知，设置默认配置后可显示估计面板；后端会按当前推导约束校验保存。</div>
           ) : null}
         </div>
       ) : <div className="text-sm text-muted-foreground">未选择上场精灵。</div>}
     </div>
   );
+}
+
+function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!preview || preview.status !== "resolved" || !preview.self) {
+    return (
+      <div className="rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
+        速度观察：当前信息不足。
+      </div>
+    );
+  }
+
+  const activeRows = preview.active_enemy?.rows ?? [];
+  const activeSummary = activeRows.length > 0
+    ? activeRows
+        .filter((row) =>
+          row.source === "assumption_neutral_speed_10"
+          || row.source === "assumption_positive_speed_10"
+          || row.source === "enemy_default_panel"
+          || row.source === "enemy_estimated_panel"
+          || row.source === "runtime_state",
+        )
+        .slice(0, 2)
+        .map((row) => `${row.label}：${speedRelationText(row)}`)
+        .join("；")
+    : "暂无敌方速度档位";
+
+  return (
+    <div className="rounded-xl border bg-slate-50 p-2 text-xs">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-auto w-full justify-start gap-1 px-1 py-1 text-left"
+        onClick={() => setExpanded((value) => !value)}
+      >
+        {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        <span className="font-medium text-slate-900">
+          速度观察：我方 {preview.self.current_speed ?? "--"}
+        </span>
+        <span className="truncate text-muted-foreground">{activeSummary}</span>
+      </Button>
+
+      {expanded ? (
+        <div className="mt-2 space-y-3">
+          <div className="flex flex-wrap gap-2 text-muted-foreground">
+            <span>基础 {preview.self.base_speed ?? "--"}</span>
+            <span>状态修正 {formatSigned(preview.self.speed_modifier ?? 0)}</span>
+            <span>当前 {preview.self.current_speed ?? "--"}</span>
+            {preview.self.unknown_factors?.length ? (
+              <span className="text-amber-700">存在未计入速度因素</span>
+            ) : null}
+          </div>
+
+          {preview.active_enemy ? (
+            <SpeedPreviewTargetBlock title="当前敌方" target={preview.active_enemy} compact />
+          ) : (
+            <div className="text-muted-foreground">暂无当前敌方速度对比。</div>
+          )}
+
+          {(preview.enemy_team ?? []).length > 0 ? (
+            <div className="space-y-2">
+              <div className="font-medium text-slate-900">敌方全队</div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {(preview.enemy_team ?? []).map((target) => (
+                  <SpeedPreviewTargetBlock key={target.elf_id} target={target} compact />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="text-muted-foreground">
+            默认按敌方速度资质 10，分别比较未加速性格和加速性格；这里只做观察，不写入速度反推。
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SpeedPreviewTargetBlock({
+  title,
+  target,
+  compact = false,
+}: {
+  title?: string;
+  target: SpeedPreviewTarget;
+  compact?: boolean;
+}) {
+  const rows = compact
+    ? target.rows.filter((row) =>
+        row.source === "enemy_default_panel"
+        || row.source === "enemy_estimated_panel"
+        || row.source === "runtime_state"
+        || row.source === "assumption_neutral_speed_10"
+        || row.source === "assumption_positive_speed_10",
+      )
+    : target.rows;
+  return (
+    <div className="rounded-lg border bg-white p-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="font-medium text-slate-900">
+          {title ? `${title}：` : ""}
+          {target.effective_elf_name ?? target.elf_name ?? target.elf_id}
+        </div>
+        {target.is_active_target ? <Badge variant="secondary">上场</Badge> : null}
+      </div>
+      <div className="space-y-1">
+        {rows.map((row) => (
+          <div key={`${target.elf_id}-${row.source}`} className="flex justify-between gap-2">
+            <span className="truncate text-muted-foreground">
+              {row.label}
+              {row.enemy_speed_modifier ? `（修正${formatSigned(row.enemy_speed_modifier)}）` : ""}
+            </span>
+            <span className={speedRelationClassName(row)}>{speedRelationText(row)}</span>
+          </div>
+        ))}
+      </div>
+      {target.unknown_factors?.length ? (
+        <div className="mt-1 text-amber-700">有未计入速度因素</div>
+      ) : null}
+    </div>
+  );
+}
+
+function speedRelationText(row: SpeedPreviewRow) {
+  const closeText = row.is_close ? "（接近）" : "";
+  if (row.relation === "speed_tie") return `同速 ${row.enemy_current_speed}`;
+  if (row.relation === "self_faster") return `我方快 ${formatSigned(row.delta)}${closeText}`;
+  if (row.relation === "enemy_faster") return `敌方快 ${formatSigned(row.delta)}${closeText}`;
+  return `未知 ${row.enemy_current_speed}`;
+}
+
+function speedRelationClassName(row: SpeedPreviewRow) {
+  if (row.relation === "self_faster") return "font-medium text-emerald-700";
+  if (row.relation === "enemy_faster") return "font-medium text-rose-700";
+  if (row.relation === "speed_tie") return "font-medium text-amber-700";
+  return "font-medium text-slate-700";
+}
+
+function formatSigned(value: number) {
+  if (!Number.isFinite(value)) return "--";
+  return value > 0 ? `+${value}` : String(value);
 }
 
 function hasPanelStats(rawJson?: string | null): boolean {
@@ -918,4 +1649,35 @@ function hasPanelStats(rawJson?: string | null): boolean {
   } catch {
     return false;
   }
+}
+
+function statBlockFromUnknown(value: unknown): StatBlock | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const stats = value as Partial<StatBlock>;
+  if (
+    Number.isFinite(stats.hp)
+    && Number.isFinite(stats.physical_attack)
+    && Number.isFinite(stats.physical_defense)
+    && Number.isFinite(stats.magic_attack)
+    && Number.isFinite(stats.magic_defense)
+    && Number.isFinite(stats.speed)
+  ) {
+    return {
+      hp: Number(stats.hp),
+      physical_attack: Number(stats.physical_attack),
+      physical_defense: Number(stats.physical_defense),
+      magic_attack: Number(stats.magic_attack),
+      magic_defense: Number(stats.magic_defense),
+      speed: Number(stats.speed),
+    };
+  }
+  return undefined;
+}
+
+function natureSourceName(value: string) {
+  const names: Record<string, string> = {
+    matched_player_build: "己方配置",
+    enemy_default_config: "敌方估计",
+  };
+  return names[value] ?? value;
 }

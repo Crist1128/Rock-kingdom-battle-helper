@@ -1,7 +1,7 @@
 """管理端战斗清理 Schema。
 
 这些 Schema 只用于归档战斗的清理管理接口。物理删除会移除战斗关联的
-运行时、事件、快照、候选和缓存数据，因此默认要求先 dry-run 预览。
+运行时、事件、快照、实时估计和状态实例数据，因此默认要求先 dry-run 预览。
 """
 
 from pydantic import BaseModel, Field

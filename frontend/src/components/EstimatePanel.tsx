@@ -53,6 +53,7 @@ export function EstimatePanel({
   const [defaultNatureId, setDefaultNatureId] = useState("");
   const [defaultTalents, setDefaultTalents] = useState<IndividualTalentInput>(EMPTY_TALENTS);
   const [defaultFormTouched, setDefaultFormTouched] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const enabled = Boolean(battleId && elfId);
   const estimateQuery = useQuery({
     queryKey: ["enemy-estimate", battleId, elfId],
@@ -62,7 +63,7 @@ export function EstimatePanel({
   const estimateEvidenceQuery = useQuery({
     queryKey: ["enemy-estimate-evidence", battleId, elfId],
     queryFn: () => api.estimates.evidence(battleId!, elfId!),
-    enabled,
+    enabled: enabled && advancedOpen,
   });
   const natures = useQuery({ queryKey: ["natures", "estimate-panel"], queryFn: () => api.natures.list({ limit: 100 }) });
   const natureMap = useMemo(() => new Map((natures.data ?? []).map((nature) => [nature.nature_id, nature.nature_name])), [natures.data]);
@@ -132,16 +133,29 @@ export function EstimatePanel({
     setDefaultNatureId("");
     setDefaultTalents(EMPTY_TALENTS);
     setDefaultFormTouched(false);
+    setAdvancedOpen(false);
   }, [battleId, elfId]);
 
   useEffect(() => {
     if (!defaultNatureId) return;
     if (!natures.data) return;
     if (!defaultNatureAllowed) {
-      setDefaultNatureId("");
-      setDefaultFormTouched(true);
+      const estimateNatureId = estimate?.default_config
+        && typeof estimate.default_config.nature_id === "string"
+        ? estimate.default_config.nature_id
+        : "";
+      const repairedNature = availableNatures.find(
+        (nature) => nature.nature_id === estimateNatureId,
+      );
+      setDefaultNatureId(repairedNature?.nature_id ?? "");
+      setDefaultTalents(
+        repairedNature
+          ? parseDefaultTalents(estimate?.default_config?.individual_talent_distribution)
+          : EMPTY_TALENTS,
+      );
+      setDefaultFormTouched(false);
     }
-  }, [defaultNatureAllowed, defaultNatureId, natures.data]);
+  }, [availableNatures, defaultNatureAllowed, defaultNatureId, estimate?.default_config, natures.data]);
 
   useEffect(() => {
     if (!preferredDefaultStat) return;
@@ -157,10 +171,14 @@ export function EstimatePanel({
     const natureId = defaultConfig && typeof defaultConfig.nature_id === "string"
       ? defaultConfig.nature_id
       : "";
+    const natureAllowedByCurrentConstraints =
+      !natureId
+      || !natures.data
+      || availableNatures.some((nature) => nature.nature_id === natureId);
     const talents = parseDefaultTalents(defaultConfig?.individual_talent_distribution);
-    setDefaultNatureId(natureId);
-    setDefaultTalents(talents);
-  }, [defaultFormTouched, estimate]);
+    setDefaultNatureId(natureAllowedByCurrentConstraints ? natureId : "");
+    setDefaultTalents(natureAllowedByCurrentConstraints ? talents : EMPTY_TALENTS);
+  }, [availableNatures, defaultFormTouched, estimate, natures.data]);
 
   useEffect(() => {
     if (!elfId || !onEstimateChange) return;
@@ -183,9 +201,9 @@ export function EstimatePanel({
   if (!battleId || !elfId) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>实时面板估计</CardTitle>
-          <CardDescription>选择一只敌方精灵后查看实时面板估计。</CardDescription>
+        <CardHeader className="space-y-1 p-3">
+          <CardTitle className="text-base">敌方默认配置</CardTitle>
+          <CardDescription className="text-xs">选择敌方精灵后设置默认展示配置。</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -193,58 +211,19 @@ export function EstimatePanel({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="space-y-1 p-3">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <CardTitle>实时面板估计</CardTitle>
-            <CardDescription>{compactId(elfId)}</CardDescription>
+          <div className="min-w-0">
+            <CardTitle className="text-base">敌方默认配置</CardTitle>
+            <CardDescription className="truncate text-xs">{compactId(elfId)}</CardDescription>
           </div>
-          <Badge variant="success">realtime_estimate</Badge>
+          <Badge variant={estimate?.default_config ? "success" : "outline"}>
+            {estimate?.default_config ? "已设置" : "未设置"}
+          </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-2">
-          <Metric label="推导约束" value={constraintItems.length} />
-          <Metric label="未知因素" value={estimate?.unknown_factors?.length ?? 0} />
-          <Metric label="已确认技能" value={estimate?.confirmed_skill_ids?.length ?? 0} />
-        </div>
-
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          当前主流程使用实时面板估计；旧候选空间和配置展开不再参与前端主展示。
-        </div>
-
-        <div className="rounded-2xl border bg-white p-3">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">实时推导范围</div>
-            <Badge variant={constraintItems.length > 0 ? "success" : "outline"}>
-              {constraintItems.length > 0 ? `${constraintItems.length} 项约束` : "等待观测"}
-            </Badge>
-          </div>
-          {constraintItems.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              暂无可展示的属性范围。录入包含完整上下文的普通攻击伤害后，会在这里显示低置信推导结果。
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {constraintItems.map((item) => (
-                <ConstraintItem key={item.statKey} item={item} />
-              ))}
-            </div>
-          )}
-          {estimate?.unknown_factors?.length ? (
-            <div className="mt-3 rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
-              未确定因素：{estimate.unknown_factors.slice(-4).join("；")}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="rounded-2xl border bg-white p-3">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">默认展示配置</div>
-            <Badge variant={estimate?.default_config ? "success" : "outline"}>
-              {estimate?.default_config ? "已设置" : "未设置"}
-            </Badge>
-          </div>
+      <CardContent className="space-y-3 p-3 pt-0">
+        <div className="rounded-xl border bg-white p-3">
           <div className="grid gap-3">
             <div>
               <label className="text-sm font-medium">默认性格</label>
@@ -274,12 +253,12 @@ export function EstimatePanel({
               </Select>
               {disallowedPositiveStats.size > 0 ? (
                 <div className="mt-1 text-xs text-muted-foreground">
-                  已按当前 HP/防御推导排除明显冲突的正修性格；保存时后端会再次校验完整面板。
+                  已隐藏明显冲突性格；保存时后端会校验。
                 </div>
               ) : null}
               {preferredDefaultStat ? (
                 <div className="mt-1 text-xs text-emerald-700">
-                  已限制为正修{statName(preferredDefaultStat)}，且该资质至少投入 7；默认填 10，可手动调为 7-9。
+                  建议正修{statName(preferredDefaultStat)}，该资质至少 7。
                 </div>
               ) : null}
             </div>
@@ -318,7 +297,7 @@ export function EstimatePanel({
               </div>
             ) : (
               <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
-                默认配置保存后会显示后端计算出的临时六维面板；它只用于未知时展示，不作为排除依据。
+                保存后显示默认六维面板，仅用于展示。
               </div>
             )}
             <Button
@@ -336,22 +315,77 @@ export function EstimatePanel({
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-3">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">最近 evidence</div>
-            <Badge variant="outline">estimate</Badge>
-          </div>
-          {evidenceItems.length === 0 ? <div className="text-sm text-muted-foreground">暂无实时估计 evidence。</div> : null}
-          <div className="space-y-2">
-            {evidenceItems.map((item, index) => (
-              <EvidenceItem key={`${String(item.evidence_id ?? "event")}-${index}`} item={item as unknown as Record<string, unknown>} />
-            ))}
-          </div>
-        </div>
+        <details
+          className="rounded-xl border bg-slate-50 p-3 text-sm"
+          open={advancedOpen}
+          onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+        >
+          <summary className="cursor-pointer text-xs font-medium text-slate-700">
+            高级信息：推导范围 / evidence
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <Metric label="约束" value={constraintItems.length} />
+              <Metric label="未知" value={estimate?.unknown_factors?.length ?? 0} />
+              <Metric label="技能" value={estimate?.confirmed_skill_ids?.length ?? 0} />
+            </div>
 
-        <Button variant="outline" onClick={() => { estimateQuery.refetch(); estimateEvidenceQuery.refetch(); }}>
-          刷新实时估计
-        </Button>
+            <div className="rounded-xl border bg-white p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold">实时推导范围</div>
+                <Badge variant={constraintItems.length > 0 ? "success" : "outline"}>
+                  {constraintItems.length > 0 ? `${constraintItems.length} 项` : "等待观测"}
+                </Badge>
+              </div>
+              {constraintItems.length === 0 ? (
+                <div className="text-xs text-muted-foreground">
+                  暂无可展示的属性范围。
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {constraintItems.map((item) => (
+                    <ConstraintItem key={item.statKey} item={item} />
+                  ))}
+                </div>
+              )}
+              {estimate?.unknown_factors?.length ? (
+                <div className="mt-2 rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
+                  未确定因素：{estimate.unknown_factors.slice(-4).join("；")}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-xl border bg-white p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold">最近 evidence</div>
+                <Badge variant="outline">estimate</Badge>
+              </div>
+              {advancedOpen && estimateEvidenceQuery.isLoading ? (
+                <div className="text-xs text-muted-foreground">读取 evidence 中...</div>
+              ) : null}
+              {advancedOpen && evidenceItems.length === 0 && !estimateEvidenceQuery.isLoading ? (
+                <div className="text-xs text-muted-foreground">暂无实时估计 evidence。</div>
+              ) : null}
+              <div className="space-y-2">
+                {evidenceItems.map((item, index) => (
+                  <EvidenceItem key={`${String(item.evidence_id ?? "event")}-${index}`} item={item as unknown as Record<string, unknown>} />
+                ))}
+              </div>
+            </div>
+
+            <Button
+              className="w-full"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                estimateQuery.refetch();
+                estimateEvidenceQuery.refetch();
+              }}
+            >
+              刷新高级信息
+            </Button>
+          </div>
+        </details>
       </CardContent>
     </Card>
   );
@@ -360,6 +394,22 @@ export function EstimatePanel({
 function EvidenceItem({ item }: { item: Record<string, unknown> }) {
   const confidence = String(item.confidence ?? item.status ?? "recorded");
   const badgeVariant = confidence === "formula_constraint_derived" ? "success" : "warning";
+  const explanation = asRecord(item.explanation);
+  const formula = asRecord(explanation?.formula);
+  const modifiers = asRecord(explanation?.modifiers);
+  const event = asRecord(explanation?.event);
+  const keyMultipliers = asRecord(formula?.key_multipliers);
+  const constraintChanges = Array.isArray(explanation?.constraint_changes)
+    ? explanation.constraint_changes.filter(isRecord)
+    : [];
+  const whyNoConstraint = Array.isArray(explanation?.why_no_constraint)
+    ? explanation.why_no_constraint.map(String)
+    : [];
+  const conflict = asRecord(explanation?.conflict) ?? asRecord(item.conflict);
+  const snapshotEffects = asRecord(modifiers?.snapshot_effects);
+  const missingInputs = Array.isArray(formula?.missing_inputs) ? formula.missing_inputs : [];
+  const unknownFactors = Array.isArray(item.unknown_factors) ? item.unknown_factors : [];
+  const summary = typeof explanation?.summary === "string" ? explanation.summary : null;
   return (
     <div className="rounded-xl border bg-slate-50 p-2 text-xs">
       <div className="flex items-center justify-between gap-2">
@@ -368,15 +418,177 @@ function EvidenceItem({ item }: { item: Record<string, unknown> }) {
       </div>
       <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
         <span className="truncate">事件 {compactId(String(item.source_event_id ?? ""))}</span>
+        <span>快照 {compactId(String(event?.snapshot_id ?? "")) || "--"}</span>
         <span>推导 {formatEvidenceValue(item.inferred_stats)}</span>
-        <span>未知 {Array.isArray(item.unknown_factors) ? item.unknown_factors.length : 0}</span>
-        <span>上下文 {item.formula_context ? "有" : "无"}</span>
+        <span>未知 {unknownFactors.length}</span>
       </div>
+      {summary ? <div className="mt-1 text-slate-700">{summary}</div> : null}
+      {formula ? (
+        <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
+          <span>公式 {String(formula.type ?? "--")}</span>
+          <span>技能 {compactId(String(formula.skill_id ?? "")) || "--"}</span>
+          <span>分类 {String(formula.skill_category ?? "--")}</span>
+          <span>缺项 {missingInputs.length}</span>
+        </div>
+      ) : null}
+      {keyMultipliers ? <KeyMultiplierExplanation multipliers={keyMultipliers} /> : null}
+      {modifiers ? (
+        <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
+          <span>快照状态 {String(snapshotEffects?.active_effect_count ?? 0)}</span>
+          <span>防守相关 {String(snapshotEffects?.defender_effect_count ?? 0)}</span>
+          <span>场地/天气 {String(snapshotEffects?.field_effect_count ?? 0)}</span>
+          <span>未映射 {String(modifiers.unmapped_effect_modifier_count ?? 0)}</span>
+        </div>
+      ) : null}
+      {modifiers ? <ModifierExplanation modifiers={modifiers} /> : null}
+      {constraintChanges.length ? <ConstraintChangeExplanation changes={constraintChanges} /> : null}
+      {conflict ? <ConflictExplanation conflict={conflict} /> : null}
+      {whyNoConstraint.length ? (
+        <div className="mt-1 truncate text-amber-700">
+          未收窄：{whyNoConstraint.slice(0, 3).join("；")}
+        </div>
+      ) : null}
+      {unknownFactors.length ? (
+        <div className="mt-1 truncate text-amber-700">
+          未知：{unknownFactors.slice(0, 3).map(String).join("；")}
+        </div>
+      ) : null}
       <div className="mt-1 truncate text-muted-foreground">
         约束 {formatEvidenceValue(item.constraint_delta)}
       </div>
     </div>
   );
+}
+
+function KeyMultiplierExplanation({ multipliers }: { multipliers: Record<string, unknown> }) {
+  const items = [
+    ["威力", multipliers.base_power ?? multipliers.display_power],
+    ["本系", multipliers.stab_multiplier],
+    ["克制", multipliers.type_multiplier],
+    ["天气", multipliers.weather_multiplier],
+    ["应对", multipliers.response_multiplier],
+    ["因子", multipliers.formula_factor],
+  ]
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([label, value]) => `${label} ${String(value)}`);
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-1 truncate text-muted-foreground">
+      倍率：{items.join(" / ")}
+    </div>
+  );
+}
+
+function ModifierExplanation({ modifiers }: { modifiers: Record<string, unknown> }) {
+  const lines = buildModifierExplanationLines(modifiers);
+  if (lines.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1 rounded-lg border bg-white p-2 text-slate-700">
+      {lines.map((line) => (
+        <div key={line}>{line}</div>
+      ))}
+    </div>
+  );
+}
+
+function ConstraintChangeExplanation({ changes }: { changes: Record<string, unknown>[] }) {
+  const lines = changes
+    .map((change) => {
+      const statKey = asString(change.stat_key);
+      const outcome = asString(change.outcome);
+      const merged = asRecord(change.merged);
+      if (!statKey) return null;
+      return `${statName(statKey)} ${formatConstraintOutcome(outcome)} ${formatConstraintRange(merged ?? {})}`;
+    })
+    .filter((line): line is string => Boolean(line));
+  if (lines.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1 rounded-lg border bg-white p-2 text-slate-700">
+      {lines.slice(0, 4).map((line) => (
+        <div key={line}>{line}</div>
+      ))}
+    </div>
+  );
+}
+
+function ConflictExplanation({ conflict }: { conflict: Record<string, unknown> }) {
+  const conflicts = Array.isArray(conflict.conflicts) ? conflict.conflicts.filter(isRecord) : [];
+  if (conflicts.length === 0) return null;
+  const first = conflicts[0];
+  const statKey = asString(first.stat_key);
+  const reason = asString(first.reason);
+  return (
+    <div className="mt-1 text-red-700">
+      冲突：{statKey ? statName(statKey) : "属性约束"} {reason ?? "需要人工复核"}
+    </div>
+  );
+}
+
+function buildModifierExplanationLines(modifiers: Record<string, unknown>): string[] {
+  const lines: string[] = [];
+  const weather = asRecord(modifiers.weather);
+  if (weather) {
+    const effectName = asString(weather.effect_name) ?? asString(weather.effect_id) ?? "天气";
+    const value = asString(weather.value);
+    const source = asString(weather.source);
+    if (source === "weather_skill_modifier" && value) {
+      lines.push(`${effectName}：本次技能天气倍率 ${value}`);
+    } else if (source === "weather_effect_no_damage_bonus") {
+      lines.push(`${effectName}：已识别天气，本次不修改攻击伤害`);
+    } else if (value) {
+      lines.push(`${effectName}：天气倍率 ${value}`);
+    }
+  }
+
+  const statStage = asRecord(modifiers.stat_stage_multiplier);
+  if (statStage) {
+    const value = asString(statStage.value);
+    const items = Array.isArray(statStage.items) ? statStage.items.filter(isRecord) : [];
+    const itemText = items
+      .map((item) => {
+        const name = asString(item.effect_name) ?? asString(item.effect_id) ?? "属性状态";
+        const stat = asString(item.stat);
+        const modifierValue = asString(item.value);
+          return `${name}${stat ? ` ${statName(stat)}` : ""}${modifierValue ? ` ${formatSignedPercentModifier(modifierValue)}` : ""}`;
+      })
+      .join("；");
+    lines.push(`${itemText || "属性修正"}：能力等级倍率 ${value ?? "--"}`);
+  }
+
+  const reductions = asRecord(modifiers.damage_reductions);
+  if (reductions) {
+    const items = Array.isArray(reductions.items) ? reductions.items.filter(isRecord) : [];
+    if (items.length > 0) {
+      const text = items
+        .map((item) => {
+          const name = asString(item.source_name) ?? asString(item.source_id) ?? "减伤";
+          const reduction = asString(item.reduction);
+          return `${name}${reduction ? ` 减伤 ${formatPercentValue(reduction)}` : ""}`;
+        })
+        .join("；");
+      lines.push(text);
+    }
+  }
+  return lines;
+}
+
+function formatSignedPercentModifier(value: string) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  const percent = numeric * 100;
+  const sign = percent > 0 ? "+" : "";
+  return `${sign}${Number.isInteger(percent) ? percent : percent.toFixed(1)}%`;
+}
+
+function formatPercentValue(value: string) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  const percent = numeric * 100;
+  return `${Number.isInteger(percent) ? percent : percent.toFixed(1)}%`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
 interface ConstraintDisplayItem {
@@ -441,7 +653,17 @@ function formatConstraintRange(entry: Record<string, unknown>) {
 function formatConstraintStatus(status: string) {
   if (status === "formula_constraint_derived") return "已推导";
   if (status === "observed_pending_formula") return "待公式";
+  if (status === "constraint_conflict") return "冲突";
   return status || "--";
+}
+
+function formatConstraintOutcome(outcome: string | undefined) {
+  if (outcome === "new_constraint") return "新增";
+  if (outcome === "narrowed_constraint") return "收窄为";
+  if (outcome === "confirmed_existing_constraint") return "确认";
+  if (outcome === "conflict") return "冲突";
+  if (outcome === "recorded_without_numeric_constraint") return "记录待公式";
+  return outcome ?? "记录";
 }
 
 function formatConstraintConfidence(confidence: string) {

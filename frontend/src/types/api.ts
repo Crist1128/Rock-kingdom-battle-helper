@@ -39,6 +39,53 @@ export interface SkillDefinitionOut {
   effect_operations_json?: string | null;
 }
 
+export type SkillRuleReviewStatus =
+  | "unreviewed"
+  | "structured"
+  | "partial"
+  | "needs_review"
+  | "ambiguous";
+
+export interface SkillRuleReviewOut extends SkillDefinitionOut {
+  review_status: SkillRuleReviewStatus | string;
+  review_notes?: string | null;
+  has_damage_rule: boolean;
+  has_hit_rule: boolean;
+  has_effect_operations: boolean;
+  rule_source: string;
+}
+
+export interface SkillRuleCapabilityItem {
+  key: string;
+  label: string;
+  implemented: boolean;
+  tested: boolean;
+  count: number;
+  examples: string[];
+  notes?: string | null;
+}
+
+export interface SkillRuleCapabilityAuditOut {
+  total_skills: number;
+  review_status_counts: Record<string, number>;
+  executable_operation_counts: Record<string, number>;
+  unsupported_operation_counts: Record<string, number>;
+  future_hook_counts: Record<string, number>;
+  supported_future_hook_counts: Record<string, number>;
+  reserved_future_hook_counts: Record<string, number>;
+  implemented_capabilities: SkillRuleCapabilityItem[];
+  pending_capabilities: SkillRuleCapabilityItem[];
+  risk_notes: string[];
+}
+
+export interface SkillRuleManualUpdate {
+  damage_rule?: Record<string, unknown> | null;
+  hit_rule?: Record<string, unknown> | null;
+  effect_operations?: Record<string, unknown>[] | null;
+  review_status?: SkillRuleReviewStatus;
+  review_notes?: string | null;
+}
+
 export interface NatureDefinitionOut {
   nature_id: string;
   nature_name: string;
@@ -163,6 +210,7 @@ export interface EnemyPanelEstimateEvidenceOut {
   inferred_stats?: Record<string, unknown> | null;
   constraint_delta?: Record<string, unknown> | null;
   formula_context?: Record<string, unknown> | null;
+  explanation?: Record<string, unknown> | null;
   unknown_factors: string[];
   conflict?: Record<string, unknown> | null;
   confidence?: string | null;
@@ -235,6 +283,14 @@ export interface BattleElfStateDict {
   elf_id: string;
   elf_name?: string | null;
   avatar?: string | null;
+  runtime_form_elf_id?: string | null;
+  runtime_form_elf_name?: string | null;
+  runtime_form_avatar?: string | null;
+  runtime_form_reason?: string | null;
+  effective_elf_id?: string | null;
+  effective_elf_name?: string | null;
+  effective_avatar?: string | null;
+  effective_form_source?: "runtime_form" | "original" | string;
   panel_stats_json?: string | null;
   current_hp_value?: number | null;
   current_hp_percent?: number | null;
@@ -246,6 +302,11 @@ export interface BattleElfStateDict {
   is_defeated?: boolean;
   last_switch_turn?: number | null;
   manual_override?: boolean;
+  nature_id?: string | null;
+  nature_name?: string | null;
+  nature_source?: string | null;
+  effective_panel_stats?: StatBlock | null;
+  effective_panel_source?: string | null;
   [key: string]: unknown;
 }
 
@@ -273,10 +334,129 @@ export interface BattleEffectInstanceDict {
   [key: string]: unknown;
 }
 
+export interface BattleSkillSlotDict {
+  slot_id: string;
+  battle_id: string;
+  side: Side;
+  elf_id: string;
+  slot_index: number;
+  skill_id: string;
+  current_energy_cost?: number | null;
+  current_power?: number | null;
+  cooldown_remaining?: number | null;
+  active_effect_instance_ids_json?: string | null;
+  manual_override?: boolean;
+  slot_kind?: "carried" | "extra" | "confirmed_virtual" | string;
+  is_virtual?: boolean;
+  skill_name?: string | null;
+  skill_icon?: string | null;
+  element_type?: string | null;
+  skill_category?: string | null;
+  static_base_power?: number | null;
+  base_energy_cost?: number | null;
+  effective_energy_cost?: number | null;
+  priority_modifier?: number | null;
+  attacker_element_types?: string[];
+  power_preview?: {
+    status?: string;
+    base_power?: number | null;
+    static_base_power?: number | null;
+    effective_display_power?: number | null;
+    effective_display_power_text?: string | null;
+    preview_scope?: string;
+    multipliers?: Record<string, string>;
+    flat_power_bonus?: string;
+    details?: Record<string, unknown>;
+    unknown_factors?: string[];
+  };
+  damage_preview?: SkillDamagePreview;
+  [key: string]: unknown;
+}
+
+export interface SkillDamageTargetPreview {
+  status: string;
+  side: Side;
+  elf_id: string;
+  elf_name?: string | null;
+  is_active_target?: boolean;
+  current_hp_percent?: number | null;
+  damage_value?: number | null;
+  damage_percent?: number | null;
+  damage_percent_text?: string | null;
+  confidence?: number | null;
+  missing_parts?: string[];
+  unknown_factors?: string[];
+  attacker_panel_source?: string | null;
+  defender_panel_source?: string | null;
+  defender_max_hp?: number | null;
+  single_damage?: number | null;
+  hit_count?: number | null;
+  total_damage?: number | null;
+  multipliers?: Record<string, unknown>;
+}
+
+export interface SkillDamagePreview {
+  status: string;
+  preview_scope?: string;
+  reason?: string;
+  current_target?: SkillDamageTargetPreview | null;
+  targets?: SkillDamageTargetPreview[];
+}
+
+export interface SpeedPreviewRow {
+  label: string;
+  source: string;
+  enemy_base_speed: number;
+  enemy_speed_modifier: number;
+  enemy_current_speed: number;
+  self_current_speed: number;
+  delta: number;
+  relation: "self_faster" | "enemy_faster" | "speed_tie" | string;
+  is_close?: boolean;
+  unknown_factors?: string[];
+}
+
+export interface SpeedPreviewTarget {
+  side: Side;
+  elf_id: string;
+  elf_name?: string | null;
+  effective_elf_id?: string | null;
+  effective_elf_name?: string | null;
+  is_active_target?: boolean;
+  speed_modifier?: number;
+  modifier_items?: Array<Record<string, unknown>>;
+  unknown_factors?: string[];
+  rows: SpeedPreviewRow[];
+}
+
+export interface BattleSpeedPreview {
+  status: string;
+  preview_scope?: string;
+  notes?: string;
+  self?: {
+    side: Side;
+    elf_id: string;
+    elf_name?: string | null;
+    effective_elf_id?: string | null;
+    effective_elf_name?: string | null;
+    panel_source?: string;
+    base_speed?: number;
+    speed_modifier?: number;
+    current_speed?: number;
+    modifier_items?: Array<Record<string, unknown>>;
+    unknown_factors?: string[];
+  };
+  active_enemy?: SpeedPreviewTarget | null;
+  enemy_team?: SpeedPreviewTarget[];
+  assumptions?: Record<string, unknown>;
+}
+
 export interface BattleStateOut {
   battle: BattleOut;
   elves: BattleElfStateDict[];
   active_effects: BattleEffectInstanceDict[];
+  skill_slots: BattleSkillSlotDict[];
+  speed_preview?: BattleSpeedPreview | null;
   latest_snapshot_id?: string | null;
 }
 
@@ -294,7 +474,6 @@ export interface LineupInput {
 export interface LineupOut {
   battle_id: string;
   created_elf_state_count: number;
-  generated_candidate_count: number;
   self_active_elf_id?: string | null;
   enemy_active_elf_id?: string | null;
 }
@@ -308,6 +487,13 @@ export interface SwitchElfInput {
   side: Side;
   elf_id: string;
   turn_number?: number | null;
+  notes?: string | null;
+}
+
+export interface RuntimeFormChangeInput {
+  effective_elf_id?: string | null;
+  hp_policy?: "keep_percent" | string;
+  reason?: string | null;
   notes?: string | null;
 }
 
@@ -333,10 +519,15 @@ export interface DamageEventCreate {
   defender_elf_id?: string | null;
   skill_id?: string | null;
   skill_confirmed?: boolean;
+  formula_type?: "attack" | "status" | string;
+  effect_id?: string | null;
+  effect_layers?: number | null;
+  skill_element_type?: string | null;
   defense_skill_id?: string | null;
   response_attack_success?: boolean | null;
   response_defense_success?: boolean | null;
   response_status_success?: boolean | null;
+  condition_flags?: Record<string, boolean> | null;
   damage_display_type: DamageDisplayType;
   damage_value?: number | null;
   final_total_damage_value?: number | null;
@@ -350,7 +541,6 @@ export interface DamageEventCreate {
   hp_value_after?: number | null;
   enemy_hp_percent_damage?: number | null;
   sync_observation?: boolean;
-  allow_hard_exclude?: boolean;
   damage_tolerance?: number;
   percent_tolerance?: number;
   notes?: string | null;
@@ -486,7 +676,6 @@ export interface ObservationCreate {
   observed_value?: number | string | null;
   payload?: ObservationPayloadV1 | Record<string, unknown>;
   event_weight?: number | null;
-  allow_hard_exclude?: boolean;
 }
 
 export interface ObservationProcessResult {
@@ -499,7 +688,6 @@ export interface ObservationProcessResult {
   inferred_stat_count: number;
   affected_stats: string[];
   unknown_factor_count: number;
-  hard_filter_applied: boolean;
 }
 
 export interface BattleEventOut {
@@ -600,6 +788,23 @@ export interface BattleReplayResult {
   battle_id: string;
   from_event_id: string;
   status: string;
+  replay_scope?: string;
+  rebuilt_estimate_count?: number;
+  replayed_event_count?: number;
+  replayed_observation_count?: number;
+  skipped_event_count?: number;
+  runtime_replay_status?: string;
+  runtime_state_updated_count?: number;
+  runtime_switch_event_count?: number;
+  runtime_resource_event_count?: number;
+  runtime_effect_change_event_count?: number;
+  runtime_active_effect_count?: number;
+  runtime_snapshot_id?: string | null;
+  runtime_snapshot_rebuilt_count?: number;
+  runtime_snapshot_effect_count?: number;
+  runtime_damage_fallback_count?: number;
+  runtime_skipped_event_count?: number;
+  runtime_unsupported_event_types?: string[];
   message: string;
 }
 
@@ -675,6 +880,8 @@ export interface RocomDataUpdateRequest {
   data_version?: string | null;
   /** 是否写 raw/cleaned JSON 文件便于审阅。 */
   write_artifacts?: boolean;
+  /** 是否按全量刷新 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项。 */
+  refresh_static?: boolean;
 }
 
 export interface RocomLocalImportRequest {
@@ -684,6 +891,8 @@ export interface RocomLocalImportRequest {
   commit?: boolean;
   /** 可选：覆盖 cleaned 数据中的 data_version。 */
   data_version?: string | null;
+  /** 是否按全量刷新 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项。 */
+  refresh_static?: boolean;
 }
 
 export interface RocomDataUpdateAccepted {

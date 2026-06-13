@@ -14,10 +14,12 @@ from app.calculation.stat_calculator import (
     StatCalculator,
 )
 from app.core.enums import Side, StatKey
+from app.inference.observation_event import ObservationEventInput
 from app.inference.observation_payload import normalize_observation_payload
 from app.inference.observation_types import ObservationType
 from app.models.battle import BattleElfState
 from app.models.estimate import EnemyPanelEstimate, EnemyPanelEstimateEvidence
+from app.models.event import BattleEvent, DamageEvent
 from app.models.static import ElfDefinition, NatureDefinition
 from app.schemas.estimate import (
     EnemyDefaultConfigInput,
@@ -184,6 +186,90 @@ class EstimateService:
         ).all()
         return [self._evidence_to_out(row) for row in rows]
 
+    def rebuild_battle_estimates_from_events(
+        self,
+        battle_id: str,
+        *,
+        from_event_id: str | None = None,
+        commit: bool = True,
+    ) -> dict[str, Any]:
+        """从当前非作废事件流重建本场战斗的敌方面板估计。
+
+        这是估计层重放，不回滚或重演 BattleElfState、状态实例、资源变化等战斗运行时
+        副作用。为了避免半量约束不可逆，当前会重建整场战斗的 estimate/evidence，
+        `from_event_id` 仅作为触发与审计标识返回。
+        """
+        preserved_defaults = self._preserved_default_configs(battle_id)
+        self.db.execute(
+            delete(EnemyPanelEstimateEvidence).where(
+                EnemyPanelEstimateEvidence.battle_id == battle_id
+            )
+        )
+        self.db.execute(delete(EnemyPanelEstimate).where(EnemyPanelEstimate.battle_id == battle_id))
+
+        enemy_states = list(
+            self.db.scalars(
+                select(BattleElfState)
+                .where(
+                    BattleElfState.battle_id == battle_id,
+                    BattleElfState.side == Side.ENEMY.value,
+                )
+                .order_by(BattleElfState.created_at)
+            ).all()
+        )
+        for state in enemy_states:
+            estimate = self.create_for_enemy_state(battle_id, state, commit=False)
+            preserved = preserved_defaults.get(state.elf_id)
+            if preserved is not None:
+                estimate.default_config_json = preserved.get("default_config_json")
+                estimate.default_panel_json = preserved.get("default_panel_json")
+                estimate.estimated_panel_json = preserved.get("default_panel_json")
+
+        events = list(
+            self.db.scalars(
+                select(BattleEvent)
+                .where(BattleEvent.battle_id == battle_id, BattleEvent.is_voided.is_(False))
+                .order_by(BattleEvent.turn_number, BattleEvent.action_order, BattleEvent.created_at)
+            ).all()
+        )
+        damage_by_battle_event_id = {
+            item.battle_event_id: item
+            for item in self.db.scalars(
+                select(DamageEvent).where(DamageEvent.battle_id == battle_id)
+            ).all()
+        }
+
+        replayed_observation_count = 0
+        skipped_event_count = 0
+        for event in events:
+            observations = self._replay_observations_for_event(
+                event,
+                damage_by_battle_event_id.get(event.event_id),
+            )
+            if not observations:
+                skipped_event_count += 1
+                continue
+            for observation in observations:
+                if self.record_observation(observation, commit=False) is not None:
+                    replayed_observation_count += 1
+
+        if commit:
+            self.db.commit()
+
+        return {
+            "battle_id": battle_id,
+            "from_event_id": from_event_id,
+            "status": "estimate_rebuilt",
+            "replay_scope": "full_estimate_rebuild",
+            "rebuilt_estimate_count": len(enemy_states),
+            "replayed_event_count": len(events),
+            "replayed_observation_count": replayed_observation_count,
+            "skipped_event_count": skipped_event_count,
+            "message": (
+                "已重建实时面板估计和 evidence；本次未重演战斗状态、资源和状态实例副作用。"
+            ),
+        }
+
     def record_observation(
         self,
         observation: Any,
@@ -302,6 +388,156 @@ class EstimateService:
             self.db.commit()
             self.db.refresh(estimate)
         return self._to_out(estimate)
+
+    def _preserved_default_configs(self, battle_id: str) -> dict[str, dict[str, str | None]]:
+        """重建 estimate 前保留玩家当前选择的默认展示配置。"""
+        result: dict[str, dict[str, str | None]] = {}
+        rows = self.db.scalars(
+            select(EnemyPanelEstimate).where(EnemyPanelEstimate.battle_id == battle_id)
+        ).all()
+        for row in rows:
+            if row.default_config_json is None and row.default_panel_json is None:
+                continue
+            result[row.elf_id] = {
+                "default_config_json": row.default_config_json,
+                "default_panel_json": row.default_panel_json,
+            }
+        return result
+
+    def _replay_observations_for_event(
+        self,
+        event: BattleEvent,
+        damage_event: DamageEvent | None,
+    ) -> list[ObservationEventInput]:
+        """把已落库战斗事件转换为估计层可消费的 observation。"""
+        observations: list[ObservationEventInput] = []
+        if event.event_type == "skill_use" and event.actor_side == Side.ENEMY.value:
+            if event.actor_elf_id and event.skill_id:
+                observations.append(
+                    ObservationEventInput(
+                        battle_id=event.battle_id,
+                        enemy_elf_id=event.actor_elf_id,
+                        event_id=f"replay:{event.event_id}:skill_seen",
+                        observation_type=ObservationType.SKILL_SEEN,
+                        observed_value=event.skill_id,
+                        payload={
+                            "skill_id": event.skill_id,
+                            "source_battle_event_id": event.event_id,
+                            "replay_source": "battle_event",
+                        },
+                    )
+                )
+        if damage_event is not None:
+            observations.extend(self._replay_observations_for_damage_event(event, damage_event))
+        return observations
+
+    def _replay_observations_for_damage_event(
+        self,
+        event: BattleEvent,
+        damage_event: DamageEvent,
+    ) -> list[ObservationEventInput]:
+        event_payload = loads_json(event.payload_json, {}) or {}
+        if isinstance(event_payload, dict) and event_payload.get("sync_observation") is False:
+            return []
+        total_damage = self._replay_damage_value(damage_event)
+        if total_damage is None or not damage_event.skill_id:
+            return []
+
+        enemy_role, enemy_elf_id = self._replay_enemy_observation_target(damage_event)
+        if enemy_role is None or enemy_elf_id is None:
+            return []
+
+        formula_context = loads_json(damage_event.formula_context_json, {}) or {}
+        if not isinstance(formula_context, dict):
+            formula_context = {}
+        damage_tolerance = self._non_negative_int(
+            event_payload.get("damage_tolerance") if isinstance(event_payload, dict) else None,
+            default=0,
+        )
+        percent_tolerance = self._decimal(
+            event_payload.get("percent_tolerance") if isinstance(event_payload, dict) else None,
+            default=Decimal("1"),
+        )
+        base_payload = {
+            **formula_context,
+            "enemy_role": enemy_role,
+            "skill_confirmed": event.skill_confirmed,
+            "damage_display_type": damage_event.damage_display_type,
+            "damage_tolerance": damage_tolerance or 0,
+            "percent_tolerance": float(percent_tolerance or Decimal("1")),
+            "source_damage_event_id": damage_event.event_id,
+            "source_battle_event_id": event.event_id,
+            "replay_source": "battle_event",
+        }
+
+        observations = [
+            ObservationEventInput(
+                battle_id=event.battle_id,
+                enemy_elf_id=enemy_elf_id,
+                event_id=f"replay:{event.event_id}:damage_value",
+                observation_type=ObservationType.DAMAGE_VALUE,
+                observed_value=total_damage,
+                payload=base_payload,
+            )
+        ]
+        hp_percent_delta = damage_event.hp_percent_delta or damage_event.enemy_hp_percent_damage
+        if enemy_role == "defender" and hp_percent_delta is not None:
+            percent_payload = {
+                **base_payload,
+                "observed_hp_percent_before": damage_event.hp_percent_before,
+                "observed_hp_percent_after": damage_event.hp_percent_after,
+                "percent_display_mode": (
+                    "floor_remaining_percent"
+                    if self._is_integer_percent_pair(
+                        damage_event.hp_percent_before,
+                        damage_event.hp_percent_after,
+                    )
+                    else None
+                ),
+                "percent_tolerance": (
+                    0
+                    if self._is_integer_percent_pair(
+                        damage_event.hp_percent_before,
+                        damage_event.hp_percent_after,
+                    )
+                    else float(percent_tolerance or Decimal("1"))
+                ),
+            }
+            observations.append(
+                ObservationEventInput(
+                    battle_id=event.battle_id,
+                    enemy_elf_id=enemy_elf_id,
+                    event_id=f"replay:{event.event_id}:hp_percent_delta",
+                    observation_type=ObservationType.HP_PERCENT_DELTA,
+                    observed_value=hp_percent_delta,
+                    payload=percent_payload,
+                )
+            )
+        return observations
+
+    @staticmethod
+    def _replay_damage_value(damage_event: DamageEvent) -> int | None:
+        return (
+            damage_event.damage_value
+            or damage_event.computed_total_damage_value
+            or damage_event.final_total_damage_value
+        )
+
+    @staticmethod
+    def _replay_enemy_observation_target(
+        damage_event: DamageEvent,
+    ) -> tuple[str | None, str | None]:
+        if damage_event.attacker_side == Side.ENEMY.value and damage_event.attacker_elf_id:
+            return "attacker", damage_event.attacker_elf_id
+        if damage_event.defender_side == Side.ENEMY.value and damage_event.defender_elf_id:
+            return "defender", damage_event.defender_elf_id
+        return None, None
+
+    @staticmethod
+    def _is_integer_percent_pair(before: float | None, after: float | None) -> bool:
+        if before is None or after is None:
+            return False
+        return float(before).is_integer() and float(after).is_integer()
 
     def _base_talent_panel_json(self, elf_id: str) -> str:
         elf = self.db.get(ElfDefinition, elf_id)
@@ -481,6 +717,7 @@ class EstimateService:
             inferred_stats=loads_json(evidence.inferred_stats_json, None),
             constraint_delta=loads_json(evidence.constraint_delta_json, None),
             formula_context=loads_json(evidence.formula_context_json, None),
+            explanation=EstimateService._build_evidence_explanation(evidence),
             unknown_factors=loads_json(evidence.unknown_factors_json, []) or [],
             conflict=loads_json(evidence.conflict_json, None),
             confidence=evidence.confidence,
@@ -553,6 +790,7 @@ class EstimateService:
         constraint_delta: dict[str, Any],
     ) -> list[dict[str, Any]]:
         conflicts: list[dict[str, Any]] = []
+        constraint_effects: list[dict[str, Any]] = []
         history = stat_constraints.setdefault("observation_history", [])
         if isinstance(history, list):
             history.append(constraint_delta)
@@ -569,7 +807,9 @@ class EstimateService:
             inferred_entry = (
                 inferred_stats.get(str(stat_key)) if isinstance(inferred_stats, dict) else None
             )
+            before = cls._constraint_range_snapshot(stat_entry)
             if isinstance(inferred_entry, dict):
+                incoming = cls._constraint_range_snapshot(inferred_entry)
                 conflict = cls._merge_numeric_range(stat_entry, inferred_entry)
                 stat_entry.update(inferred_entry)
                 if conflict is not None:
@@ -577,12 +817,59 @@ class EstimateService:
                     conflicts.append(conflict)
                     stat_entry["status"] = "constraint_conflict"
                     stat_entry["latest_conflict"] = conflict
+                    outcome = "conflict"
                 else:
                     stat_entry["status"] = "formula_constraint_derived"
+                    outcome = cls._constraint_change_outcome(before, stat_entry)
             else:
                 stat_entry["status"] = "observed_pending_formula"
+                incoming = None
+                outcome = "recorded_without_numeric_constraint"
             stat_entry["last_observation_type"] = constraint_delta["observation_type"]
+            constraint_effects.append(
+                {
+                    "stat_key": str(stat_key),
+                    "outcome": outcome,
+                    "previous": before,
+                    "incoming": incoming,
+                    "merged": cls._constraint_range_snapshot(stat_entry),
+                    "source_event_ids": list(event_ids) if isinstance(event_ids, list) else [],
+                }
+            )
+        constraint_delta["constraint_effects"] = constraint_effects
         return conflicts
+
+    @staticmethod
+    def _constraint_range_snapshot(entry: dict[str, Any] | None) -> dict[str, Any]:
+        """抽取前端解释需要的约束快照，避免展示整段内部 JSON。"""
+        if not isinstance(entry, dict):
+            return {}
+        keys = (
+            "status",
+            "integer_min",
+            "integer_max",
+            "min",
+            "max",
+            "confidence",
+            "source",
+            "relation",
+        )
+        return {key: entry[key] for key in keys if key in entry}
+
+    @staticmethod
+    def _constraint_change_outcome(
+        before: dict[str, Any],
+        merged: dict[str, Any],
+    ) -> str:
+        if not before:
+            return "new_constraint"
+        before_min = before.get("integer_min")
+        before_max = before.get("integer_max")
+        merged_min = merged.get("integer_min")
+        merged_max = merged.get("integer_max")
+        if before_min == merged_min and before_max == merged_max:
+            return "confirmed_existing_constraint"
+        return "narrowed_constraint"
 
     @classmethod
     def _merge_numeric_range(
@@ -634,6 +921,7 @@ class EstimateService:
                 unknowns.extend(reverse_unknowns)
             if not has_inferred_stats and not reverse_unknowns:
                 unknowns.append("damage_formula_reverse_inference_context_incomplete")
+            unknowns.extend(cls._modifier_unknown_factors(payload))
         if observation_type == ObservationType.SPEED_ORDER.value:
             unknowns.append("speed_tie_and_priority_rule_not_confirmed")
         return cls._append_unique_items([], unknowns)
@@ -654,6 +942,12 @@ class EstimateService:
             return {}, []
 
         formula_type = str(payload.get("formula_type", "attack") or "attack")
+        if formula_type == "status":
+            return cls._infer_stats_from_status_observation(
+                observation_type=observation_type,
+                payload=payload,
+                observed_value=observed_value,
+            )
         if formula_type != "attack":
             return {}, ["reverse_inference_only_supports_attack_formula"]
 
@@ -684,6 +978,151 @@ class EstimateService:
                 inferred[StatKey.HP.value] = hp_range
 
         return inferred, cls._append_unique_items([], unknowns)
+
+    @classmethod
+    def _infer_stats_from_status_observation(
+        cls,
+        *,
+        observation_type: str,
+        payload: dict[str, Any],
+        observed_value: Any,
+    ) -> tuple[dict[str, Any], list[str]]:
+        """用状态结算的伤害值、层数、克制倍率和血条百分比反推敌方 HP。"""
+        damage_value = cls._observed_damage_value(
+            observation_type=observation_type,
+            payload=payload,
+            observed_value=observed_value,
+        )
+        if damage_value is None:
+            return {}, ["observed_damage_value_missing_for_status_reverse_inference"]
+
+        unknowns: list[str] = []
+        formula_range, formula_unknowns = cls._infer_status_formula_hp_range(
+            payload=payload,
+            observed_damage=damage_value,
+        )
+        unknowns.extend(formula_unknowns)
+        percent_range = cls._infer_hp_range(
+            observation_type=observation_type,
+            payload=payload,
+            observed_value=observed_value,
+            observed_damage=damage_value,
+        )
+        hp_range = cls._intersect_hp_ranges(
+            formula_range,
+            percent_range,
+            observed_damage=damage_value,
+        )
+        inferred = {StatKey.HP.value: hp_range} if hp_range is not None else {}
+        return inferred, cls._append_unique_items([], unknowns)
+
+    @classmethod
+    def _infer_status_formula_hp_range(
+        cls,
+        *,
+        payload: dict[str, Any],
+        observed_damage: int,
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        percent_per_layer = cls._status_percent_per_layer(payload)
+        if percent_per_layer is None or percent_per_layer <= 0:
+            return None, ["status_percent_per_layer_missing_for_reverse_inference"]
+        layers = cls._positive_int(payload.get("effect_layers"), default=1)
+        type_multiplier = cls._decimal(payload.get("type_multiplier"), default=Decimal("1"))
+        factor = percent_per_layer * Decimal(layers) * (type_multiplier or Decimal("1"))
+        if factor <= 0:
+            return None, ["status_damage_factor_invalid_for_reverse_inference"]
+
+        lower = Decimal(observed_damage) / factor
+        upper_exclusive = Decimal(observed_damage + 1) / factor
+        result = cls._range_payload(
+            lower=lower,
+            upper=upper_exclusive,
+            source="status_damage_formula_reverse",
+            relation="hp_range_from_status_damage_formula",
+            observed_damage=observed_damage,
+            hit_count=1,
+            formula_factor=factor,
+        )
+        result["integer_max"] = cls._ceil_decimal(upper_exclusive) - 1
+        result["max_exclusive"] = str(upper_exclusive.quantize(Decimal("0.0001")))
+        result["effect_id"] = payload.get("effect_id")
+        result["effect_layers"] = layers
+        result["status_percent_per_layer"] = str(percent_per_layer)
+        result["type_multiplier"] = str(type_multiplier or Decimal("1"))
+        return result, []
+
+    @staticmethod
+    def _status_percent_per_layer(payload: dict[str, Any]) -> Decimal | None:
+        value = payload.get("status_percent_per_layer")
+        if value is None:
+            value = payload.get("percent_per_layer")
+        if value is None:
+            defaults = {
+                "effect_burn": "0.02",
+                "burn": "0.02",
+                "effect_poison": "0.03",
+                "poison": "0.03",
+                "effect_poison_mark": "0.03",
+                "poison_mark": "0.03",
+                "effect_thorn_mark": "0.06",
+                "thorn_mark": "0.06",
+                "thorn": "0.06",
+            }
+            value = defaults.get(str(payload.get("effect_id") or ""))
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    @classmethod
+    def _intersect_hp_ranges(
+        cls,
+        first: dict[str, Any] | None,
+        second: dict[str, Any] | None,
+        *,
+        observed_damage: int,
+    ) -> dict[str, Any] | None:
+        if first is None:
+            return second
+        if second is None:
+            return first
+        lower = max(
+            cls._decimal(first.get("min"), default=Decimal("0")) or Decimal("0"),
+            cls._decimal(second.get("min"), default=Decimal("0")) or Decimal("0"),
+        )
+        first_upper = cls._decimal(
+            first.get("max_exclusive") or first.get("max"),
+            default=None,
+        )
+        second_upper = cls._decimal(
+            second.get("max_exclusive") or second.get("max"),
+            default=None,
+        )
+        if first_upper is None:
+            upper = second_upper
+        elif second_upper is None:
+            upper = first_upper
+        else:
+            upper = min(first_upper, second_upper)
+        if upper is None or upper <= lower:
+            return first
+        result = cls._range_payload(
+            lower=lower,
+            upper=upper,
+            source="status_damage_formula_and_percent_reverse",
+            relation="hp_range_intersection_from_status_damage_and_hp_percent",
+            observed_damage=observed_damage,
+            hit_count=1,
+            formula_factor=cls._decimal(first.get("formula_factor"), default=None),
+        )
+        result["integer_max"] = min(
+            int(first.get("integer_max", result["integer_max"])),
+            int(second.get("integer_max", result["integer_max"])),
+        )
+        result["components"] = [first.get("source"), second.get("source")]
+        return result
 
     @classmethod
     def _infer_attack_or_defense_range(
@@ -1026,8 +1465,9 @@ class EstimateService:
     def _floor_decimal(value: Decimal) -> int:
         return int(value.to_integral_value(rounding=ROUND_FLOOR))
 
-    @staticmethod
+    @classmethod
     def _extract_formula_context(
+        cls,
         payload: dict[str, Any],
         inference_result: dict[str, Any],
     ) -> dict[str, Any]:
@@ -1044,14 +1484,331 @@ class EstimateService:
             "observed_hp_percent_delta",
             "observed_order",
             "self_speed",
+            "snapshot_id",
+            "rule_resolution_enabled",
         }
         context = {key: payload.get(key) for key in keys if key in payload}
+        if "rule_resolution_details" in payload:
+            context["rule_resolution_details"] = payload.get("rule_resolution_details")
+        context["modifier_summary"] = cls._build_modifier_summary(payload)
+        context["key_multipliers"] = cls._build_key_multiplier_summary(payload)
+        context["formula_inputs"] = cls._formula_input_summary(payload)
         context["estimate_summary"] = {
             "status": inference_result.get("status"),
             "inferred_stat_count": inference_result.get("inferred_stat_count"),
             "affected_stats": inference_result.get("affected_stats"),
         }
         return context
+
+    @classmethod
+    def _build_evidence_explanation(
+        cls,
+        evidence: EnemyPanelEstimateEvidence,
+    ) -> dict[str, Any]:
+        inferred_stats = loads_json(evidence.inferred_stats_json, {}) or {}
+        constraint_delta = loads_json(evidence.constraint_delta_json, {}) or {}
+        formula_context = loads_json(evidence.formula_context_json, {}) or {}
+        unknown_factors = loads_json(evidence.unknown_factors_json, []) or []
+        conflict = loads_json(evidence.conflict_json, None)
+        affected_stats = constraint_delta.get("affected_stats", [])
+        status = evidence.confidence or constraint_delta.get("status") or "recorded"
+        formula_inputs = (
+            formula_context.get("formula_inputs", {})
+            if isinstance(formula_context, dict)
+            else {}
+        )
+        modifier_summary = (
+            formula_context.get("modifier_summary", {})
+            if isinstance(formula_context, dict)
+            else {}
+        )
+        key_multipliers = (
+            formula_context.get("key_multipliers", {})
+            if isinstance(formula_context, dict)
+            else {}
+        )
+        constraint_effects = (
+            constraint_delta.get("constraint_effects", [])
+            if isinstance(constraint_delta, dict)
+            else []
+        )
+        if inferred_stats:
+            summary = "已根据本次观测生成属性约束。"
+        elif unknown_factors:
+            summary = "本次观测已记录，但仍有未知因素，暂不能形成完整属性约束。"
+        else:
+            summary = "本次观测已记录为实时估计证据。"
+        if conflict:
+            summary = "本次观测与已有约束存在冲突，需要人工复核。"
+        return {
+            "summary": summary,
+            "status": status,
+            "event": {
+                "source_event_id": evidence.source_event_id,
+                "snapshot_id": (
+                    formula_context.get("snapshot_id")
+                    if isinstance(formula_context, dict)
+                    else None
+                ),
+            },
+            "observation_type": evidence.observation_type,
+            "affected_stats": affected_stats,
+            "inferred_stat_keys": (
+                list(inferred_stats.keys()) if isinstance(inferred_stats, dict) else []
+            ),
+            "formula": {
+                "type": (
+                    formula_context.get("formula_type")
+                    if isinstance(formula_context, dict)
+                    else None
+                ),
+                "skill_id": (
+                    formula_context.get("skill_id")
+                    if isinstance(formula_context, dict)
+                    else None
+                ),
+                "skill_category": (
+                    formula_context.get("skill_category")
+                    if isinstance(formula_context, dict)
+                    else None
+                ),
+                "observed_damage_value": (
+                    formula_context.get("observed_damage_value")
+                    if isinstance(formula_context, dict)
+                    else None
+                ),
+                "observed_hp_percent_delta": (
+                    formula_context.get("observed_hp_percent_delta")
+                    if isinstance(formula_context, dict)
+                    else None
+                ),
+                "present_inputs": formula_inputs.get("present", []),
+                "missing_inputs": formula_inputs.get("missing", []),
+                "key_multipliers": key_multipliers,
+            },
+            "constraint_changes": (
+                constraint_effects if isinstance(constraint_effects, list) else []
+            ),
+            "modifiers": modifier_summary,
+            "unknown_factors": [str(item) for item in unknown_factors],
+            "why_no_constraint": cls._why_no_constraint(
+                inferred_stats=inferred_stats,
+                formula_inputs=formula_inputs,
+                unknown_factors=unknown_factors,
+            ),
+            "conflict": conflict,
+        }
+
+    @staticmethod
+    def _why_no_constraint(
+        *,
+        inferred_stats: dict[str, Any],
+        formula_inputs: dict[str, Any],
+        unknown_factors: list[Any],
+    ) -> list[str]:
+        if inferred_stats:
+            return []
+        reasons = [str(item) for item in unknown_factors]
+        missing = formula_inputs.get("missing", []) if isinstance(formula_inputs, dict) else []
+        if isinstance(missing, list):
+            reasons.extend(f"missing_input:{item}" for item in missing)
+        return list(dict.fromkeys(reasons))
+
+    @classmethod
+    def _build_key_multiplier_summary(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        factor = cls._attack_formula_factor(payload)
+        reduction_items = cls._damage_reduction_summary(payload)
+        return {
+            "base_power": cls._string_decimal(payload.get("base_power")),
+            "display_power": cls._string_decimal(payload.get("display_power")),
+            "response_multiplier": cls._string_decimal(payload.get("response_multiplier"), "1"),
+            "power_multiplier": cls._string_decimal(payload.get("power_multiplier"), "1"),
+            "flat_power_bonus": cls._string_decimal(payload.get("flat_power_bonus"), "0"),
+            "stat_stage_multiplier": cls._string_decimal(
+                payload.get("stat_stage_multiplier"),
+                "1",
+            ),
+            "stab_multiplier": cls._string_decimal(payload.get("stab_multiplier"), "1"),
+            "type_multiplier": cls._string_decimal(payload.get("type_multiplier"), "1"),
+            "weather_multiplier": cls._string_decimal(payload.get("weather_multiplier"), "1"),
+            "unstable_multiplier": cls._string_decimal(payload.get("unstable_multiplier"), "1"),
+            "damage_reductions": reduction_items,
+            "formula_factor": (
+                str(factor.quantize(Decimal("0.0001"))) if factor is not None else None
+            ),
+        }
+
+    @classmethod
+    def _damage_reduction_summary(cls, payload: dict[str, Any]) -> list[dict[str, str]]:
+        result: list[dict[str, str]] = []
+        for index, item in enumerate(payload.get("damage_reductions", []) or []):
+            reduction = cls._decimal(item, default=None)
+            if reduction is None:
+                result.append({"index": str(index), "value": str(item), "status": "invalid"})
+            else:
+                result.append(
+                    {
+                        "index": str(index),
+                        "value": str(reduction),
+                        "remaining_multiplier": str(Decimal("1") - reduction),
+                    }
+                )
+        return result
+
+    @classmethod
+    def _string_decimal(cls, value: Any, default: str | None = None) -> str | None:
+        fallback = Decimal(default) if default is not None else None
+        decimal_value = cls._decimal(value, default=fallback)
+        return str(decimal_value) if decimal_value is not None else None
+
+    @classmethod
+    def _build_modifier_summary(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        details = payload.get("rule_resolution_details")
+        if not isinstance(details, dict):
+            details = {}
+        snapshot_summary = cls._snapshot_effect_summary(payload)
+        damage_reductions = details.get("damage_reductions")
+        stat_stage_multiplier = details.get("stat_stage_multiplier")
+        weather = details.get("weather_multiplier")
+        if weather is None and "weather_multiplier" in payload:
+            weather = {
+                "source": "payload_or_context",
+                "value": str(payload.get("weather_multiplier")),
+            }
+        return {
+            "rule_resolution_enabled": bool(payload.get("rule_resolution_enabled")),
+            "weather": weather,
+            "stat_stage_multiplier": stat_stage_multiplier,
+            "damage_reductions": damage_reductions,
+            "snapshot_effects": snapshot_summary,
+            "unmapped_effect_modifier_count": cls._unmapped_snapshot_modifier_count(
+                payload,
+                details,
+            ),
+        }
+
+    @classmethod
+    def _formula_input_summary(cls, payload: dict[str, Any]) -> dict[str, list[str]]:
+        required = [
+            "skill_category",
+            "base_power",
+            "attacker_panel_stats",
+            "defender_panel_stats",
+            "observed_damage_value",
+        ]
+        present = [key for key in required if payload.get(key) is not None]
+        missing = [key for key in required if payload.get(key) is None]
+        return {"present": present, "missing": missing}
+
+    @classmethod
+    def _modifier_unknown_factors(cls, payload: dict[str, Any]) -> list[str]:
+        unknowns: list[str] = []
+        details = payload.get("rule_resolution_details")
+        if not isinstance(details, dict):
+            details = {}
+        snapshot_summary = cls._snapshot_effect_summary(payload)
+        if snapshot_summary["field_effect_count"] and not details.get("weather_multiplier"):
+            unknowns.append("weather_modifier_rule_unmapped")
+        if cls._unmapped_snapshot_modifier_count(payload, details):
+            unknowns.append("active_effect_modifier_rules_unmapped")
+        return unknowns
+
+    @classmethod
+    def _unmapped_snapshot_modifier_count(
+        cls,
+        payload: dict[str, Any],
+        details: dict[str, Any],
+    ) -> int:
+        snapshot_payload = payload.get("snapshot_payload")
+        if not isinstance(snapshot_payload, list):
+            return 0
+        mapped_effect_ids = cls._mapped_modifier_effect_ids(details)
+        defender_side = payload.get("defender_side")
+        defender_elf_id = payload.get("defender_elf_id")
+        count = 0
+        for item in snapshot_payload:
+            if not isinstance(item, dict):
+                continue
+            effect_id = item.get("effect_id")
+            if effect_id is not None and str(effect_id) in mapped_effect_ids:
+                continue
+            owner_scope = item.get("owner_scope")
+            owner_side = item.get("owner_side")
+            owner_elf_id = item.get("owner_elf_id")
+            if owner_scope == "field":
+                count += 1
+            elif owner_scope in {"side", "elf"} and owner_side == defender_side:
+                if (
+                    owner_scope == "side"
+                    or defender_elf_id is None
+                    or owner_elf_id == defender_elf_id
+                ):
+                    count += 1
+        return count
+
+    @staticmethod
+    def _mapped_modifier_effect_ids(details: dict[str, Any]) -> set[str]:
+        mapped: set[str] = set()
+        weather = details.get("weather_multiplier")
+        if isinstance(weather, dict) and weather.get("effect_id") is not None:
+            mapped.add(str(weather["effect_id"]))
+        stat_stage = details.get("stat_stage_multiplier")
+        if isinstance(stat_stage, dict) and isinstance(stat_stage.get("items"), list):
+            for item in stat_stage["items"]:
+                if isinstance(item, dict) and item.get("effect_id") is not None:
+                    mapped.add(str(item["effect_id"]))
+        reductions = details.get("damage_reductions")
+        if isinstance(reductions, dict) and isinstance(reductions.get("items"), list):
+            for item in reductions["items"]:
+                if (
+                    isinstance(item, dict)
+                    and item.get("source_type") == "effect_snapshot"
+                    and item.get("source_id") is not None
+                ):
+                    mapped.add(str(item["source_id"]))
+        return mapped
+
+    @staticmethod
+    def _snapshot_effect_summary(payload: dict[str, Any]) -> dict[str, Any]:
+        snapshot_payload = payload.get("snapshot_payload")
+        if not isinstance(snapshot_payload, list):
+            return {
+                "active_effect_count": 0,
+                "field_effect_count": 0,
+                "defender_effect_count": 0,
+                "effect_ids": [],
+            }
+        defender_side = payload.get("defender_side")
+        defender_elf_id = payload.get("defender_elf_id")
+        effect_ids: list[str] = []
+        field_effect_count = 0
+        defender_effect_count = 0
+        for item in snapshot_payload:
+            if not isinstance(item, dict):
+                continue
+            effect_id = item.get("effect_id")
+            if effect_id is not None:
+                effect_ids.append(str(effect_id))
+            owner_scope = item.get("owner_scope")
+            owner_side = item.get("owner_side")
+            owner_elf_id = item.get("owner_elf_id")
+            if owner_scope == "field":
+                field_effect_count += 1
+            elif owner_scope in {"side", "elf"} and owner_side == defender_side:
+                if (
+                    owner_scope == "side"
+                    or defender_elf_id is None
+                    or owner_elf_id == defender_elf_id
+                ):
+                    defender_effect_count += 1
+        return {
+            "active_effect_count": len(
+                [item for item in snapshot_payload if isinstance(item, dict)]
+            ),
+            "field_effect_count": field_effect_count,
+            "defender_effect_count": defender_effect_count,
+            "effect_ids": effect_ids[:8],
+        }
 
     @staticmethod
     def _append_unique_items(items: list[Any], new_items: list[Any]) -> list[Any]:

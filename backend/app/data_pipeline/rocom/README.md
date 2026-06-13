@@ -22,6 +22,7 @@ project-root/
     └── rocom/
         ├── raw/
         │   ├── sprites_raw.json
+        │   ├── skills_raw.json
         │   └── image_urls.json
         └── cleaned/
             ├── elves.json
@@ -43,15 +44,26 @@ ROCOM_DATA_DIR=../data/rocom
 
 | 文件 | 作用 |
 |---|---|
-| `scraper.py` | 爬取 BWIKI，输出 `sprites_raw.json` 和 `image_urls.json`。默认不下载图片。 |
-| `cleaner.py` | 从 raw JSON 清洗出 `elves.json`、`skills.json`、`elf_learnable_skills.json`、`type_effectiveness_rules.json`。 |
+| `scraper.py` | 爬取 BWIKI，输出 `sprites_raw.json`、`skills_raw.json` 和 `image_urls.json`。默认不下载图片。 |
+| `cleaner.py` | 从 raw JSON 清洗出 `elves.json`、`skills.json`、`elf_learnable_skills.json`、`type_effectiveness_rules.json`。技能图鉴详情会优先覆盖精灵详情页中的同名技能。 |
 | `importer.py` | 把 cleaned JSON 或 raw JSON 导入数据库；默认 dry-run。 |
 
 历史 CSV 入口在 `cleaner.py` / `importer.py` 中保留，仅用于兼容旧数据，不作为新流程使用。
 
+新版爬虫同时读取精灵图鉴和技能图鉴。精灵详情页中的技能用于生成
+`elf_learnable_skill` 关系；技能图鉴详情页用于生成权威 `skill_definition`，
+因此版本更新后技能威力、耗能和描述调整以 `skills_raw.json` 为准。BWIKI 威力字段为数字时会
+清洗为 `base_power: int`；`-`、空值或无威力状态技会保留为 `null`，避免把无威力技能伪装成
+0 威力伤害技能。
+
 重新导入 cleaned JSON 时，`skill_definition` 是运行时主来源；如果数据库里已有结构化
 `effect_operations_json`，而 cleaned 基线只提供空值或 `unparsed` 占位，导入器会保留数据库中的
 结构化操作，避免覆盖星陨等人工整理规则。新的结构化 cleaned 规则仍会正常写入数据库。
+
+如果 BWIKI 详情页暂时缺少六维种族值，cleaner 会在 `import_summary.json` 中输出 warning。
+正式导入时，importer 不会用这些缺六维记录覆盖现有 `elf_definition`；全量刷新可学习技能关系时也会保留这些精灵旧有的 BWIKI
+技能关系。这样可以避免线上空页把实时面板反推依赖的种族值污染成 0。当前版本中这类需要保留旧数据的记录应在导入摘要里体现为
+`elves_skipped_incomplete` 和 `incomplete_elf_links_preserved`。
 
 ## 主动接口
 
@@ -73,7 +85,8 @@ GET  /api/v1/admin/data-updates/rocom/jobs
   "delay": 1.5,
   "with_images": false,
   "data_version": null,
-  "write_artifacts": true
+  "write_artifacts": true,
+  "refresh_static": false
 }
 ```
 
@@ -86,10 +99,16 @@ GET  /api/v1/admin/data-updates/rocom/jobs
   "limit": 0,
   "delay": 1.5,
   "with_images": false,
-  "data_version": "rocom_bwiki_20260516",
-  "write_artifacts": true
+  "data_version": "rocom_bwiki_20260609",
+  "write_artifacts": true,
+  "refresh_static": true
 }
 ```
+
+参数含义：
+
+- `refresh_static=true`：按全量刷新处理 rocom 静态数据。导入前会重建 BWIKI
+  `elf_learnable_skill` 关系；导入后会把本次数据集中已经不存在的 rocom 精灵、技能和属性克制规则软删除。
 
 如果配置了 `ADMIN_UPDATE_TOKEN`，请求需要带：
 
@@ -128,6 +147,7 @@ python -m app.data_pipeline.rocom.scraper \
 ```bash
 python -m app.data_pipeline.rocom.cleaner \
   --raw-json ../data/rocom/raw/sprites_raw.json \
+  --skills-raw-json ../data/rocom/raw/skills_raw.json \
   --image-urls-json ../data/rocom/raw/image_urls.json \
   --output-dir ../data/rocom/cleaned
 ```
@@ -136,7 +156,8 @@ python -m app.data_pipeline.rocom.cleaner \
 
 ```bash
 python -m app.data_pipeline.rocom.importer \
-  --cleaned-dir ../data/rocom/cleaned
+  --cleaned-dir ../data/rocom/cleaned \
+  --refresh-static
 ```
 
 确认后提交：
@@ -144,8 +165,32 @@ python -m app.data_pipeline.rocom.importer \
 ```bash
 python -m app.data_pipeline.rocom.importer \
   --cleaned-dir ../data/rocom/cleaned \
+  --refresh-static \
   --commit
 ```
+
+版本更新时建议使用独立目录先全量重爬、审阅、dry-run，再提交：
+
+```bash
+python -m app.data_pipeline.rocom.scraper \
+  --force \
+  --delay 1.5 \
+  --output ../data/rocom/raw_20260609/sprites_raw.json \
+  --clean-output-dir ../data/rocom/cleaned_20260609 \
+  --data-version rocom_bwiki_20260609
+
+python -m app.data_pipeline.rocom.importer \
+  --cleaned-dir ../data/rocom/cleaned_20260609 \
+  --refresh-static
+
+python -m app.data_pipeline.rocom.importer \
+  --cleaned-dir ../data/rocom/cleaned_20260609 \
+  --refresh-static \
+  --commit
+```
+
+提交写库前应先备份 `data/app.db`，如果 SQLite 处于 WAL 模式，还要一并备份
+`data/app.db-wal` 和 `data/app.db-shm`。如需回收 SQLite 文件体积，可在确认服务停止、备份完成后执行 `VACUUM`。
 
 ## 图片策略
 

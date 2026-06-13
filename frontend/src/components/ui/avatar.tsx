@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function AvatarImage({
@@ -14,6 +14,10 @@ export function AvatarImage({
 }) {
   const [failed, setFailed] = useState(false);
   const text = (fallback || alt || "?").trim().slice(0, 2) || "?";
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
 
   if (src && !failed) {
     return (

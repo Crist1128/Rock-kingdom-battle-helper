@@ -1,0 +1,129 @@
+[
+  {
+    "skill_id": "rocom_skill_713feb9cf0",
+    "skill_name": "龙吼",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_04"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_a1748f4231",
+    "skill_name": "龙威",
+    "review_status": "needs_review",
+    "review_notes": "Manual review: mechanism is unclear or unsupported; no executable rule is written.",
+    "reviewed_at": "2026-06-12",
+    "clear_damage_rule": true,
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "apply_effect",
+        "status": "reserved",
+        "effect_alias": "龙噬印记",
+        "target": "actor_side",
+        "layers": 1
+      }
+    ],
+    "structure_gaps": [
+      "missing_dragon_bite_mark_effect_definition"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_550d14c511",
+    "skill_name": "龙息环爆",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_04"
+    },
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "next_skill_charge_requirement_override",
+        "status": "reserved",
+        "target": "actor_side",
+        "require_charge": false,
+        "trigger": "response_status_success"
+      }
+    ],
+    "structure_gaps": [
+      "charge_turn_mechanic",
+      "next_skill_charge_override"
+    ]
+  },
+  {
+    "skill_id": "rocom_skill_3eb35813de",
+    "skill_name": "龙炮",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_04"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_97bd918a14",
+    "skill_name": "龙爪",
+    "review_status": "structured",
+    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
+    "reviewed_at": "2026-06-12",
+    "hit_rule": {
+      "damage_display_type": "single_damage",
+      "runtime_record_strategy": "single_value",
+      "source": "manual_review_20260612_04"
+    },
+    "effect_operations": null
+  },
+  {
+    "skill_id": "rocom_skill_d2d34ac91f",
+    "skill_name": "龙血",
+    "review_status": "partial",
+    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "reviewed_at": "2026-06-12",
+    "damage_rule": {
+      "status": "parsed_defense_reduction",
+      "damage_type": "defense_modifier",
+      "damage_reduction": 0.7,
+      "active": true,
+      "response_rule": {
+        "target": "attack",
+        "condition": "response_attack_success"
+      },
+      "raw_description": "减伤70%，本技能可以在蓄力状态下使用，应对攻击：下次技能无需蓄力。",
+      "source": "manual_review_20260612_04"
+    },
+    "hit_rule": null,
+    "effect_operations": null,
+    "future_hooks": [
+      {
+        "hook_type": "usable_while_charging",
+        "status": "reserved",
+        "target": "source_skill"
+      },
+      {
+        "hook_type": "next_skill_charge_requirement_override",
+        "status": "reserved",
+        "target": "actor_side",
+        "require_charge": false,
+        "trigger": "response_attack_success"
+      }
+    ],
+    "structure_gaps": [
+      "charge_turn_mechanic",
+      "next_skill_charge_override",
+      "defense_skill_usable_while_charging"
+    ]
+  }
+]

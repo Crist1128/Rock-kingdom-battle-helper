@@ -78,6 +78,11 @@ class BattleStateOut(BaseModel):
     battle: BattleOut
     elves: list[dict] = Field(default_factory=list, description="精灵状态列表")
     active_effects: list[dict] = Field(default_factory=list, description="生效状态效果列表")
+    skill_slots: list[dict] = Field(default_factory=list, description="战斗技能槽运行时状态列表")
+    speed_preview: dict | None = Field(
+        default=None,
+        description="速度观察预览：我方当前上场对敌方当前/全队的假设速度对比",
+    )
     latest_snapshot_id: str | None = Field(default=None, description="最新快照 ID")
 
 
@@ -137,6 +142,25 @@ class SwitchElfInput(BaseModel):
     notes: str | None = Field(default=None, description="备注")
 
 
+class RuntimeFormChangeInput(BaseModel):
+    """手动调整战斗中的有效形态。
+
+    effective_elf_id 传入目标精灵表示退化/形态回退到该种族；传 null 表示恢复为原始精灵。
+    该操作只重算面板，不触发切换清除、返场、入场结算或首回合机制。
+    """
+
+    effective_elf_id: str | None = Field(
+        default=None,
+        description="运行时有效形态精灵 ID；null 表示恢复原始形态",
+    )
+    hp_policy: str = Field(
+        default="keep_percent",
+        description="生命处理策略；当前仅支持 keep_percent（保留当前 HP 百分比）",
+    )
+    reason: str | None = Field(default=None, description="形态调整原因，例如退化/萌化面板回退")
+    notes: str | None = Field(default=None, description="备注")
+
+
 class EndTurnInput(BaseModel):
     """结束当前回合请求。
 
@@ -168,12 +192,10 @@ class LineupOut(BaseModel):
     """
     阵容录入响应。
 
-    返回本次生成的战斗精灵状态数量。`generated_candidate_count` 为历史兼容字段；
-    实时反推主流程不再默认生成旧候选配置。
+    返回本次生成的战斗精灵状态数量。
     """
 
     battle_id: str
     created_elf_state_count: int
-    generated_candidate_count: int
     self_active_elf_id: str | None = None
     enemy_active_elf_id: str | None = None

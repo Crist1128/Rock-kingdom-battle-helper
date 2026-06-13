@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Server } from "lucide-react";
+import { Plus, Server, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +16,17 @@ export function DashboardPage() {
   const [battleName, setBattleName] = useState(`PVP ${new Date().toLocaleDateString()}`);
   const [notes, setNotes] = useState("");
   const [manualBattleId, setManualBattleId] = useState("");
-  const { currentBattleId, recentBattles, addRecentBattle, removeRecentBattle, setCurrentBattleId } = useAppStore();
+  const {
+    currentBattleId,
+    recentBattles,
+    addRecentBattle,
+    removeRecentBattle,
+    clearRecentBattles,
+    setCurrentBattleId,
+  } = useAppStore();
   const health = useQuery({ queryKey: ["health"], queryFn: api.health });
   const battlesQuery = useQuery({ queryKey: ["battles", "recent"], queryFn: () => api.battles.list({ limit: 50 }) });
+  const displayedBattles = battlesQuery.data ?? recentBattles;
   const createBattle = useMutation({
     mutationFn: () => api.battles.create({ battle_name: battleName, notes }),
     onSuccess: (battle) => {
@@ -54,8 +62,27 @@ export function DashboardPage() {
     },
   });
 
+  const archiveAllBattles = useMutation({
+    mutationFn: async (battleIds: string[]) => {
+      if (!battlesQuery.data) return [];
+      return Promise.all(battleIds.map((battleId) => api.battles.archive(battleId)));
+    },
+    onSuccess: (_archived, battleIds) => {
+      clearRecentBattles();
+      if (currentBattleId && battleIds.includes(currentBattleId)) {
+        setCurrentBattleId(null);
+      }
+      queryClient.setQueryData(["battles", "recent"], []);
+      queryClient.invalidateQueries({ queryKey: ["battles"] });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "批量归档失败";
+      window.alert(`批量移除战斗失败：${message}`);
+    },
+  });
+
   const removeBattle = (battleId: string) => {
-    if (!window.confirm("确认从最近战斗中移除？该操作会归档战斗，但不会删除历史事件和候选数据。")) {
+    if (!window.confirm("确认从最近战斗中移除？该操作会归档战斗，但不会删除历史事件和实时估计数据。")) {
       return;
     }
     if (battlesQuery.data) {
@@ -64,6 +91,22 @@ export function DashboardPage() {
     }
     removeRecentBattle(battleId);
     if (currentBattleId === battleId) {
+      setCurrentBattleId(null);
+    }
+  };
+
+  const removeAllBattles = () => {
+    if (displayedBattles.length === 0) return;
+    if (!window.confirm("确认移除全部最近战斗？后端战斗会被归档，历史事件和实时估计数据仍会保留。")) {
+      return;
+    }
+    const battleIds = displayedBattles.map((battle) => battle.battle_id);
+    if (battlesQuery.data) {
+      archiveAllBattles.mutate(battleIds);
+      return;
+    }
+    clearRecentBattles();
+    if (currentBattleId && battleIds.includes(currentBattleId)) {
       setCurrentBattleId(null);
     }
   };
@@ -113,17 +156,30 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>最近战斗</CardTitle>
-            <CardDescription>优先显示后端战斗列表；网络异常时仍可手动添加 battle_id。</CardDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>最近战斗</CardTitle>
+                <CardDescription>优先显示后端战斗列表；网络异常时仍可手动添加 battle_id。</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={displayedBattles.length === 0 || archiveAllBattles.isPending}
+                onClick={removeAllBattles}
+              >
+                <Trash2 className="h-4 w-4" />
+                {archiveAllBattles.isPending ? "移除中..." : "全部移除"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <form className="flex gap-2" onSubmit={addManualBattle}>
               <Input value={manualBattleId} onChange={(e) => setManualBattleId(e.target.value)} placeholder="手动输入 battle_id" />
               <Button variant="outline" type="submit">添加</Button>
             </form>
-            {(battlesQuery.data ?? recentBattles).length === 0 ? <div className="rounded-2xl border bg-slate-50 p-4 text-sm text-muted-foreground">暂无战斗记录。</div> : null}
+            {displayedBattles.length === 0 ? <div className="rounded-2xl border bg-slate-50 p-4 text-sm text-muted-foreground">暂无战斗记录。</div> : null}
             {battlesQuery.isError ? <div className="rounded-2xl border bg-amber-50 p-3 text-sm text-amber-900">后端战斗列表读取失败，已显示本地记录。</div> : null}
-            {(battlesQuery.data ?? recentBattles).map((battle) => (
+            {displayedBattles.map((battle) => (
               <div key={battle.battle_id} className="flex items-center justify-between rounded-2xl border bg-white p-4">
                 <div>
                   <div className="font-medium">{battle.battle_name ?? compactId(battle.battle_id)}</div>
@@ -150,7 +206,7 @@ export function DashboardPage() {
         <QuickLink to="/builds" title="己方配置" desc="录入确定面板与技能组" />
         <QuickLink to="/preparation" title="准备阶段" desc="录入双方 6 只精灵" />
         <QuickLink to="/battle" title="战斗工作台" desc="快速手动录入事件" />
-        <QuickLink to="/rules" title="规则库" desc="只读查看精灵/技能/状态" />
+        <QuickLink to="/rules" title="规则库" desc="查看规则并维护技能效果" />
       </div>
     </div>
   );

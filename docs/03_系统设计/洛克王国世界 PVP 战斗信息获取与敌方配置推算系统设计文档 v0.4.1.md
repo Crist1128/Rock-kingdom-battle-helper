@@ -6,7 +6,7 @@
 > 后端技术栈：Python + FastAPI + SQLite  
 > 说明：本文件只描述系统架构、模块、流程、接口、部署和阶段计划；详细数据库表结构另见《SQLite 数据库设计文档 v0.4.1-local》。
 
-> 当前落地状态：本文件早期版本以“准备阶段生成候选空间 + 逐候选筛选”为核心。该路线已废弃，当前主线改为 `EnemyPanelEstimate` 实时面板反推、默认配置校验和事件 evidence。旧 `BuildCandidate` 表仅作为遗留数据等待后续迁移删除，新的状态、天气、速度和伤害反推不得回到旧候选空间落库筛选方案。
+> 当前落地状态：本文件早期版本以“准备阶段生成候选空间 + 逐候选筛选”为核心。该路线已废弃，当前主线改为 `EnemyPanelEstimate` 实时面板反推、默认配置校验和事件 evidence。旧候选相关表已由 Alembic `0006_drop_legacy_candidate_tables` 删除，新的状态、天气、速度和伤害反推不得回到旧候选空间落库筛选方案。
 
 ---
 
@@ -54,7 +54,7 @@
 - 统一维护 `BattleEffectInstance`。
 - 伤害、治疗、能量变化、切换事件均绑定 `BattleEffectSnapshot`。
 - 使用 `DamageFormulaContext` 进行伤害计算和敌方面板实时反推。
-- 展示双方技能伤害、生命百分比、速度先手概率、当前估计面板和按需展开的可能配置。
+- 展示双方技能伤害、生命百分比、速度先手信息、当前估计面板、默认配置和属性约束。
 - 支持历史事件修正，并从修正点重放重算。
 
 第一阶段暂不实现：
@@ -308,7 +308,8 @@ SpeedJudgeEngine 更新速度区间和先手概率
 - `BattleElfState`：本场战斗中每只精灵的当前生命、能量、技能、状态关联等。
 - `BattleEffectInstance`：当前存在的状态实例。
 - `EnemyPanelEstimate`：敌方实时面板估计档案，保存默认配置、估计面板、属性约束、unknown factors 和 evidence 摘要。
-- `BuildCandidate`：已废弃旧候选空间表，仅保留到后续数据库迁移清理。
+- `EnemyPanelEstimate`：当前敌方面板反推主状态。
+- `EnemyPanelEstimateEvidence`：当前估计证据链。
 
 ### 5.4 事件日志数据
 
@@ -596,7 +597,7 @@ else:
 约束策略：
 
 - 公式完整时写入低/中/高置信整数范围。
-- 同一属性多次观测取约束交集；交集为空时记录 conflict，不回退旧候选硬排除。
+- 同一属性多次观测取约束交集；交集为空时记录 conflict，不回退旧筛选流程。
 - 状态、天气、应对、防御或特殊公式未知时写入 unknown factors。
 - 玩家默认配置必须满足当前约束；不满足的性格/资质不可选。
 
@@ -791,7 +792,7 @@ side / field 状态不受普通切换影响
 - 当前估计状态：未知、低置信度、中置信度、高置信度、存在冲突。
 - 玩家默认性格/资质与默认面板。
 - 当前推导出的 HP、物攻、物防、魔攻、魔防、速度范围。
-- 按需展开得到的可能性格和个体资质分布。
+- 当前默认配置、可选性格/资质约束和属性范围。
 - 面板属性区间。
 - 速度区间。
 - 可能技能和已确认技能。
@@ -942,8 +943,8 @@ backend/
       combo_engine.py
       speed_judge_engine.py
       battle_effect_engine.py
-      estimate_expansion.py
-      observation_matcher.py
+      panel_estimate_engine.py
+      observation_event.py
       explanation_engine.py
     migrations/
       env.py
@@ -961,19 +962,19 @@ backend/
 ### 11.1 主要性能压力
 
 - 单次观测需要解析伤害公式、状态快照和天气/应对上下文。
-- 用户主动按需展开 `full` 配置时，内存枚举仍可能较慢。
+- 默认配置校验和属性约束解释复杂时，前端需要清晰展示冲突来源。
 - 每次事件后可能触发伤害、速度和实时估计展示刷新。
 - 快照和事件日志持续增长。
 
 ### 11.2 优化策略
 
 1. Observation 默认只更新一条 `EnemyPanelEstimate` 和少量 evidence，不逐候选写库。
-2. 按需展开只在用户打开面板或切换模式时执行，结果不落库。
+2. 默认配置保存只做当前约束校验，不生成或缓存候选空间。
 3. 只对当前上场敌方精灵做高频实时计算。
 4. 伤害计算结果按 `skill_id + attacker_stats_hash + defender_stats_hash + snapshot_hash` 做进程内缓存。
 5. 快照生成 `snapshot_hash`，状态未变时复用结果。
 6. SQLite 开启 WAL 模式。
-7. UI 对展开结果分页或限制数量，只展示可解释摘要。
+7. UI 对 evidence、约束和冲突摘要做分页或折叠展示。
 8. 重放重算时可显示进度，不阻塞主 UI。
 
 ---
@@ -1088,7 +1089,7 @@ LOG_LEVEL=INFO
 - 我方攻击敌方时反推敌方 HP / 物防 / 魔防。
 - 敌方攻击我方时反推敌方物攻 / 魔攻。
 - 技能、状态或天气未知时记录 unknown factors，不落库生成候选空间。
-- 按需展开可能配置，仅用于展示可选性格/资质。
+- 可选性格/资质由当前实时约束直接决定。
 
 ### M5：伤害、连击与速度展示
 

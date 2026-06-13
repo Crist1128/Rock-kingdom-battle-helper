@@ -4,6 +4,7 @@
 目标: https://wiki.biligame.com/rocom/精灵图鉴
 输出:
   - data/rocom/raw/sprites_raw.json      原始爬取数据（精灵基础数据 + 技能 + 克制关系）
+  - data/rocom/raw/skills_raw.json       技能图鉴详情数据（技能威力、耗能、描述）
   - data/rocom/raw/image_urls.json       图片 URL 元数据；MVP 默认仅记录 URL，不下载图片
   - data/rocom/cleaned/*.json            后端数据库可导入的清洗数据
   - data/rocom/raw/images/               可选下载图片目录，默认不下载
@@ -39,7 +40,7 @@ import re
 import shutil
 import time
 from pathlib import Path
-from urllib.parse import unquote, urljoin
+from urllib.parse import quote, unquote, urljoin
 
 # ==================== 第三方库导入 ====================
 import requests
@@ -50,6 +51,7 @@ from bs4 import BeautifulSoup
 # 基础URL配置
 BASE_URL = "https://wiki.biligame.com"
 LIST_URL = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4"
+SKILL_LIST_URL = "https://wiki.biligame.com/rocom/%E6%8A%80%E8%83%BD%E5%9B%BE%E9%89%B4"
 
 # HTTP请求头，模拟浏览器访问
 HEADERS = {
@@ -313,20 +315,21 @@ def _add_url(
         _debug_image(f"图片URL已转绝对路径: {original_url} -> {url}")
 
     if not download:
+        normalized_url = url
         row = {
             "name": name,
             "type": img_type,
-            "url": url,
+            "url": normalized_url,
             "local_path": "",
             "status": "skipped",
             "bytes": "",
             "content_type": "",
             "error": "image_download_disabled",
         }
-        _urls_cache[url] = row
+        _urls_cache[normalized_url] = row
         _flush_urls()
-        _debug_image(f"MVP 默认不下载图片，仅记录 URL: {url}")
-        return ""
+        _debug_image(f"MVP 默认不下载图片，仅记录 URL: {normalized_url}")
+        return normalized_url
 
     subdir = data_dir / IMAGE_DIRS[img_type]
     subdir.mkdir(parents=True, exist_ok=True)
@@ -512,6 +515,84 @@ def img_alt_to_attr(alt: str) -> str:
     return m.group(1) if m else alt.strip()
 
 
+def _clean_text(value: str | None) -> str:
+    """Normalize scraped text while keeping Chinese punctuation."""
+    if not value:
+        return ""
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _optional_int(value: str | int | None) -> int | None:
+    """Parse an optional integer. Non-numeric values such as '-' become None."""
+    if isinstance(value, int):
+        return value
+    text = _clean_text(value)
+    if not text or text in {"-", "—", "无"}:
+        return None
+    m = re.search(r"-?\d+", text)
+    return int(m.group(0)) if m else None
+
+
+def _split_cn_values(value: str) -> list[str]:
+    """Split Chinese comma-like value lists from BWIKI title text."""
+    text = _clean_text(value)
+    if not text or text in {"-", "无"}:
+        return []
+    return [item.strip() for item in re.split(r"[,，、/]", text) if item.strip()]
+
+
+def _category_from_icon_alt(alt: str) -> str:
+    match = re.search(r"类别\s+(\S+?)(?:\.png)?$", alt)
+    return match.group(1) if match else ""
+
+
+def extract_sprite_image_url(content: BeautifulSoup) -> str:
+    """从当前 BWIKI 精灵详情页提取主立绘 URL。"""
+    # 当前新版页面的真实本体立绘在“全部图片”页签内，旧 grament 区域经常是占位图。
+    for selector in (
+        ".allImgTab .tab-content.active img.imgAll-sprite-img",
+        ".allImgTab img.imgAll-sprite-img",
+    ):
+        for img in content.select(selector):
+            alt = _clean_text(img.get("alt", ""))
+            if alt.startswith(("Egg ", "Fruit ")):
+                continue
+            url = _best_img_src(img)
+            if url:
+                return url
+
+    grament_div = content.find("div", class_="rocom_sprite_grament_img")
+    if grament_div:
+        for img in grament_div.find_all("img"):
+            alt = _clean_text(img.get("alt", ""))
+            if "立绘" in alt or "宠物" in alt:
+                url = _best_img_src(img)
+                if url:
+                    return url
+        sprite_img = grament_div.find("img")
+        if sprite_img:
+            return _best_img_src(sprite_img)
+    return ""
+
+
+def _parse_unlock_text(text: str) -> dict:
+    """Parse skill unlock text like '解锁：（默认）Lv.1'."""
+    raw_text = _clean_text(text)
+    level = 0
+    level_match = re.search(r"Lv\.?\s*(\d+)|LV\.?\s*(\d+)", raw_text, re.I)
+    if level_match:
+        level = int(next(group for group in level_match.groups() if group))
+    method = ""
+    method_match = re.search(r"[（(]([^（）()]+)[）)]", raw_text)
+    if method_match:
+        method = _clean_text(method_match.group(1))
+    return {
+        "raw_unlock_text": raw_text,
+        "unlock_method": method,
+        "level": level,
+    }
+
+
 # ==================== 列表页解析 ====================
 
 
@@ -592,6 +673,25 @@ def parse_stat_block(soup: BeautifulSoup) -> dict:
         "魔防": "sp_def",
         "速度": "spd",
     }
+
+    # Current BWIKI layout: .sprite-info-attr contains a Chinese stat name and value.
+    for item in soup.select(".sprite-info-attr"):
+        name_node = item.select_one(".sprite-info-attrname")
+        value_node = item.select_one(".sprite-info-attrnum")
+        if not name_node or not value_node:
+            continue
+        stat_name = _clean_text(
+            _clean_text(name_node.get_text(" ", strip=True)).replace(":", "").replace("：", "")
+        )
+        value = _optional_int(value_node.get_text(" ", strip=True))
+        if stat_name in stat_map and value is not None:
+            stats[stat_map[stat_name]] = value
+
+    if len(stats) == 6:
+        stats["total"] = sum(stats.values())
+        return stats
+
+    # Legacy BWIKI layout fallback.
     seen = set()
     for li in soup.find_all("li"):
         name_p = li.find("p", attrs={"class": "rocom_sprite_info_qualification_name"})
@@ -608,7 +708,9 @@ def parse_stat_block(soup: BeautifulSoup) -> dict:
     return stats
 
 
-def parse_ability(soup: BeautifulSoup) -> dict | None:
+def parse_ability(
+    soup: BeautifulSoup, data_dir: Path | None = None, force: bool = False
+) -> dict | None:
     """
     解析特性。
 
@@ -620,6 +722,29 @@ def parse_ability(soup: BeautifulSoup) -> dict | None:
     Returns:
         dict | None: 特性信息，不存在则返回 None
     """
+    trait = soup.select_one(".sprite-info-trait")
+    if trait:
+        name_node = trait.select_one(".sprite-trait-name")
+        desc_node = trait.select_one(".sprite-trait-desc")
+        img = trait.find("img")
+        ability_name = _clean_text(name_node.get_text(" ", strip=True) if name_node else "")
+        ability_desc = _clean_text(desc_node.get_text(" ", strip=True) if desc_node else "")
+        ability_icon_path = ""
+        if data_dir and img and ability_name:
+            ability_icon_path = _add_url(
+                ability_name,
+                "ability",
+                _best_img_src(img),
+                data_dir,
+                force,
+            )
+        if ability_name:
+            return {
+                "name": ability_name,
+                "description": ability_desc,
+                "icon": ability_icon_path,
+            }
+
     ability_header = soup.find(string=re.compile(r"^特性$"))
     if not ability_header:
         return None
@@ -635,7 +760,7 @@ def parse_ability(soup: BeautifulSoup) -> dict | None:
     img = container.find_next("img", alt=re.compile(r"^(?!图标|界面|页面)"))
     if img:
         ability_name = img.get("alt", ability_name).replace(".png", "")
-    return {"name": ability_name, "description": ability_desc} if ability_name else None
+    return {"name": ability_name, "description": ability_desc, "icon": ""} if ability_name else None
 
 
 def parse_type_matchup(soup: BeautifulSoup) -> dict:
@@ -656,6 +781,46 @@ def parse_type_matchup(soup: BeautifulSoup) -> dict:
         "resists": [],  # 抵抗
         "resisted_by": [],  # 被抵抗
     }
+
+    # Current BWIKI layout puts the full type relation text in the title of sprite type badges.
+    title_label_map = {
+        "克制": "strong_against",
+        "被克制": "weak_to",
+        "抵抗": "resists",
+        "被抵抗": "resisted_by",
+    }
+    current_type_badges = (
+        ".sprite-phone-type .sprite_type[title], "
+        ".sprite-info-type .sprite_type[title]"
+    )
+    for badge in soup.select(current_type_badges):
+        title = badge.get("title", "")
+        for line in title.splitlines():
+            if "：" not in line:
+                continue
+            label, values = line.split("：", 1)
+            key = title_label_map.get(_clean_text(label))
+            if not key:
+                continue
+            for value in _split_cn_values(values):
+                if value not in matchup[key]:
+                    matchup[key].append(value)
+
+    # The current damage panel only exposes incoming high/low damage. Keep it as a fallback.
+    if not matchup["weak_to"]:
+        for img in soup.select(".sprite-info-dmghigh .sprite-info-dmg-content img"):
+            attr = img_alt_to_attr(img.get("alt", ""))
+            if attr and attr not in matchup["weak_to"]:
+                matchup["weak_to"].append(attr)
+    if not matchup["resists"]:
+        for img in soup.select(".sprite-info-dmglow .sprite-info-dmg-content img"):
+            attr = img_alt_to_attr(img.get("alt", ""))
+            if attr and attr not in matchup["resists"]:
+                matchup["resists"].append(attr)
+
+    if any(matchup.values()):
+        return matchup
+
     label_map = {
         "克制": "strong_against",
         "被克制": "weak_to",
@@ -696,6 +861,96 @@ def parse_skills(
         list[dict]: 技能列表
     """
     skills = []
+
+    # Current BWIKI layout: one .skill-single block per learnable skill.
+    for container in soup.select(".skill-single"):
+        try:
+            skill_name = _clean_text(
+                container.select_one(".skill-name").get_text(" ", strip=True)
+                if container.select_one(".skill-name")
+                else ""
+            )
+            if not skill_name:
+                continue
+
+            skill_icon = container.select_one(".skill-single-head > img")
+            skill_icon_url = _best_img_src(skill_icon) if skill_icon else ""
+
+            category = _clean_text(container.get("data-param2"))
+            skill_attr = _clean_text(container.get("data-param3"))
+            cost = 0
+            power: int | None = None
+
+            for img in container.select(".skill-head-typelist img"):
+                alt = img.get("alt", "")
+                parent_text = _clean_text(
+                    img.parent.get_text(" ", strip=True) if img.parent else ""
+                )
+                if "星星背景" in alt:
+                    cost = _optional_int(parent_text) or 0
+                elif "类别" in alt:
+                    category = _category_from_icon_alt(alt) or category
+                elif "宠物 属性" in alt:
+                    skill_attr = img_alt_to_attr(alt) or skill_attr
+
+            for span in container.select(".skill-head-typelist > span"):
+                if span.find("img"):
+                    continue
+                text = _clean_text(span.get_text(" ", strip=True))
+                value = _optional_int(text)
+                if value is not None:
+                    power = value
+
+            desc_node = container.select_one(".skill-desc-atk")
+            story_node = container.select_one(".skill-desc-story")
+            unlock_node = container.select_one(".skill-source")
+            description = _clean_text(desc_node.get_text(" ", strip=True) if desc_node else "")
+            flavor_text = _clean_text(story_node.get_text(" ", strip=True) if story_node else "")
+            unlock_text = (
+                unlock_node.get_text(" ", strip=True)
+                if unlock_node
+                else container.get("data-param1", "")
+            )
+            unlock = _parse_unlock_text(unlock_text)
+
+            skill_icon_path = ""
+            attr_icon_path = ""
+            attr_img = container.find("img", alt=re.compile(r"图标 宠物 属性"))
+            attr_icon_url = _best_img_src(attr_img) if attr_img else ""
+            if data_dir and skill_icon_url:
+                skill_icon_path = _add_url(skill_name, "skill", skill_icon_url, data_dir, force)
+            if data_dir and attr_icon_url:
+                attr_icon_path = _add_url(skill_attr, "attribute", attr_icon_url, data_dir, force)
+
+            skills.append(
+                {
+                    "name": skill_name,
+                    "attribute": skill_attr,
+                    "category": category,
+                    "cost": cost,
+                    "power": power,
+                    "level": unlock["level"],
+                    "description": description,
+                    "flavor_text": flavor_text,
+                    "unlock_method": unlock["unlock_method"],
+                    "raw_unlock_text": unlock["raw_unlock_text"],
+                    "skill_icon": skill_icon_path,
+                    "attribute_icon": attr_icon_path,
+                    "source_format": "sprite_skill_single",
+                }
+            )
+        except Exception:
+            continue
+
+    if skills:
+        seen = set()
+        deduped = []
+        for sk in skills:
+            if sk["name"] not in seen:
+                seen.add(sk["name"])
+                deduped.append(sk)
+        return deduped
+
     skill_cost_imgs = soup.find_all("img", alt=re.compile(r"图标 技能 星星背景"))
 
     for cost_img in skill_cost_imgs:
@@ -816,6 +1071,17 @@ def parse_attributes_from_detail(soup: BeautifulSoup) -> list[str]:
         list[str]: 属性列表
     """
     attrs = []
+
+    for img in soup.select(".sprite-phone-type img, .sprite-info-type .sprite-info-attr img"):
+        alt = img.get("alt", "")
+        if "宠物 属性" not in alt:
+            continue
+        attr = img_alt_to_attr(alt)
+        if attr and attr not in attrs:
+            attrs.append(attr)
+        if len(attrs) >= 2:
+            return attrs
+
     stat_node = soup.find(string=re.compile(r"种族值"))
     if stat_node:
         before_stats = stat_node.find_parent()
@@ -828,6 +1094,127 @@ def parse_attributes_from_detail(soup: BeautifulSoup) -> list[str]:
             if len(attrs) >= 2:
                 break
     return attrs
+
+
+def parse_skill_list_page() -> list[dict]:
+    """Parse the BWIKI skill catalog index."""
+    print(f"[*] 抓取技能图鉴页: {SKILL_LIST_URL}")
+    soup = fetch(SKILL_LIST_URL)
+    content = soup.find("div", id="mw-content-text") or soup
+    entries: list[dict] = []
+    seen: set[str] = set()
+
+    for container in content.select(".divsort"):
+        link = container.find("a", href=re.compile(r"^/rocom/"))
+        if not link:
+            continue
+        href = link.get("href", "")
+        url = urljoin(BASE_URL, href)
+        name = _clean_text(link.get("title") or link.get_text(" ", strip=True))
+        if not name:
+            name = _clean_text(unquote(href.split("/rocom/")[-1]))
+        if not _is_valid_skill_index_link(name=name, href=href) or url in seen:
+            continue
+        seen.add(url)
+
+        attr_img = container.find("img", class_="rocom_skill_attribute_icon")
+        icon_img = container.find("img", class_="rocom_skill_bg_img")
+        entries.append(
+            {
+                "name": name,
+                "url": url,
+                "category": _clean_text(container.get("data-param1")),
+                "attribute": _clean_text(container.get("data-param2"))
+                or (img_alt_to_attr(attr_img.get("alt", "")) if attr_img else ""),
+                "skill_icon_url": _normalize_img_url(_best_img_src(icon_img)) if icon_img else "",
+                "attribute_icon_url": (
+                    _normalize_img_url(_best_img_src(attr_img)) if attr_img else ""
+                ),
+                "source_format": "skill_index",
+            }
+        )
+
+    print(f"[*] 共找到 {len(entries)} 条技能索引记录")
+    return entries
+
+
+def _is_valid_skill_index_link(*, name: str, href: str) -> bool:
+    """过滤技能图鉴中混入的文件上传、特殊页等非技能链接。"""
+    if not name:
+        return False
+    if name.startswith("文件:") or name.startswith("特殊:"):
+        return False
+    if "特殊:" in unquote(href) or "Special:" in href:
+        return False
+    return True
+
+
+def parse_skill_detail(entry: dict, data_dir: Path | None = None, force: bool = False) -> dict:
+    """Parse a skill detail page from the current BWIKI skill card layout."""
+    soup = fetch(entry["url"])
+    content = soup.find("div", id="mw-content-text") or soup
+    card = content.select_one(".sd-skill-card")
+    if not card:
+        return {
+            **entry,
+            "parse_status": "unresolved",
+            "power": None,
+            "cost": None,
+            "description": "",
+            "raw_page_title": _clean_text((soup.find("h1") or soup).get_text(" ", strip=True)),
+        }
+
+    name_node = card.select_one(".sd-card-name")
+    desc_node = card.select_one(".sd-skill-desc")
+    attr_img = card.select_one(".sd-skill-type img")
+    icon_img = card.select_one(".sd-skill-icon img")
+
+    name = _clean_text(name_node.get_text(" ", strip=True) if name_node else entry.get("name"))
+    attr = (
+        img_alt_to_attr(attr_img.get("alt", ""))
+        if attr_img
+        else _clean_text(entry.get("attribute"))
+    )
+    category_node = card.select_one(".sd-skill-cat")
+    category = _clean_text(
+        category_node.get_text(" ", strip=True) if category_node else entry.get("category")
+    )
+    description = _clean_text(desc_node.get_text(" ", strip=True) if desc_node else "")
+
+    power: int | None = None
+    cost: int | None = None
+    for meta in card.select(".sd-skill-meta span"):
+        label = _clean_text(meta.find("em").get_text(" ", strip=True) if meta.find("em") else "")
+        value = _optional_int(
+            meta.find("strong").get_text(" ", strip=True) if meta.find("strong") else ""
+        )
+        if label == "威力":
+            power = value
+        elif label == "耗能":
+            cost = value
+
+    skill_icon_path = ""
+    attr_icon_path = ""
+    skill_icon_url = _best_img_src(icon_img) if icon_img else entry.get("skill_icon_url", "")
+    attr_icon_url = _best_img_src(attr_img) if attr_img else entry.get("attribute_icon_url", "")
+    if data_dir and skill_icon_url:
+        skill_icon_path = _add_url(name, "skill", skill_icon_url, data_dir, force)
+    if data_dir and attr_icon_url:
+        attr_icon_path = _add_url(attr, "attribute", attr_icon_url, data_dir, force)
+
+    return {
+        **entry,
+        "name": name,
+        "attribute": attr,
+        "category": category,
+        "power": power,
+        "cost": cost,
+        "description": description,
+        "skill_icon": skill_icon_path,
+        "attribute_icon": attr_icon_path,
+        "parse_status": "parsed",
+        "source_format": "skill_detail_card",
+    }
 
 
 def parse_evolution_chain(soup: BeautifulSoup) -> list[dict] | None:
@@ -900,6 +1287,44 @@ def parse_evolution_chain(soup: BeautifulSoup) -> list[dict] | None:
     return result
 
 
+ROMAN_TITLE_FALLBACKS = {
+    "Ⅰ": "I",
+    "Ⅱ": "II",
+    "Ⅲ": "III",
+    "Ⅳ": "IV",
+    "Ⅴ": "V",
+    "Ⅵ": "VI",
+    "Ⅶ": "VII",
+    "Ⅷ": "VIII",
+    "Ⅸ": "IX",
+    "Ⅹ": "X",
+}
+
+
+def _sprite_detail_candidate_urls(entry: dict) -> list[str]:
+    """生成详情页候选 URL，用于 BWIKI 形态页或罗马数字标题解析失败时回退。"""
+    urls = [entry["url"]]
+    name = _clean_text(entry.get("name"))
+    if entry.get("form") and name:
+        urls.append(urljoin(BASE_URL, f"/rocom/{quote(name)}"))
+    roman_fallback_name = "".join(ROMAN_TITLE_FALLBACKS.get(char, char) for char in name)
+    if roman_fallback_name != name:
+        urls.append(urljoin(BASE_URL, f"/rocom/{quote(roman_fallback_name)}"))
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for url in urls:
+        if url and url not in seen:
+            result.append(url)
+            seen.add(url)
+    return result
+
+
+def _has_complete_stats(stats: dict) -> bool:
+    stat_keys = ("hp", "atk", "def", "sp_atk", "sp_def", "spd")
+    return all(isinstance(stats.get(key), int) for key in stat_keys)
+
+
 def parse_sprite_detail(entry: dict, data_dir: Path | None = None, force: bool = False) -> dict:
     """
     爬取并解析单个精灵的详情页。
@@ -914,60 +1339,38 @@ def parse_sprite_detail(entry: dict, data_dir: Path | None = None, force: bool =
     Returns:
         dict: 精灵完整信息
     """
-    soup = fetch(entry["url"])
-    content = soup.find("div", id="mw-content-text") or soup
-
-    stats = parse_stat_block(content)
+    final_content = None
+    detail_url_used = entry["url"]
+    stats: dict = {}
+    last_error: Exception | None = None
+    for candidate_url in _sprite_detail_candidate_urls(entry):
+        try:
+            soup = fetch(candidate_url)
+        except Exception as exc:
+            last_error = exc
+            continue
+        content = soup.find("div", id="mw-content-text") or soup
+        stats = parse_stat_block(content)
+        final_content = content
+        detail_url_used = candidate_url
+        if _has_complete_stats(stats):
+            break
+    if final_content is None:
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(f"无法解析精灵详情页: {entry['url']}")
+    content = final_content
     sprite_image_path = ""
 
-    # 属性图标
-    attrs = []
-    h1 = soup.find("h1")
-    if h1:
-        for img in h1.find_all_next("img", limit=10):
-            alt = img.get("alt", "")
-            if "图标 宠物 属性" in alt:
-                a = img_alt_to_attr(alt)
-                if a and a not in attrs:
-                    attrs.append(a)
-            if len(attrs) >= 2:
-                break
-
-    # 特性
-    ability = None
-    ability_section = content.find(string=re.compile(r"^特性$"))
-    if ability_section:
-        p = ability_section.find_parent()
-        if p:
-            nxt = p.find_next("img", alt=re.compile(r"^(?!图标|界面|页面)"))
-            if nxt:
-                ability_name = nxt.get("alt", "").replace(".png", "")
-                desc_node = nxt.find_next(string=re.compile(r".{5,}"))
-                ability_desc = desc_node.strip() if desc_node else ""
-                ability_icon_url = _best_img_src(nxt)
-                ability_icon_path = ""
-                if data_dir and ability_icon_url and ability_name:
-                    ability_icon_path = _add_url(
-                        ability_name, "ability", ability_icon_url, data_dir, force
-                    )
-                ability = {
-                    "name": ability_name,
-                    "description": ability_desc,
-                    "icon": ability_icon_path,
-                }
+    attrs = parse_attributes_from_detail(content)
+    ability = parse_ability(content, data_dir, force)
 
     # 精灵立绘
     if data_dir:
-        grament_div = content.find("div", class_="rocom_sprite_grament_img")
-        if grament_div:
-            sprite_img = grament_div.find("img")
-            if sprite_img:
-                sprite_url = _best_img_src(sprite_img)
-                sprite_label = f"{entry['name']}{'_' + entry['form'] if entry.get('form') else ''}"
-                if sprite_url:
-                    sprite_image_path = _add_url(
-                        sprite_label, "sprite", sprite_url, data_dir, force
-                    )
+        sprite_url = extract_sprite_image_url(content)
+        sprite_label = f"{entry['name']}{'_' + entry['form'] if entry.get('form') else ''}"
+        if sprite_url:
+            sprite_image_path = _add_url(sprite_label, "sprite", sprite_url, data_dir, force)
 
         # 克制表属性图标
         matchup_section = content.find(string=re.compile(r"^克制$"))
@@ -992,6 +1395,7 @@ def parse_sprite_detail(entry: dict, data_dir: Path | None = None, force: bool =
 
     return {
         **entry,
+        "detail_url_used": detail_url_used,
         "sprite_image": sprite_image_path,
         "attributes": attrs,
         "stats": stats,
@@ -1014,6 +1418,7 @@ def scrape_rocom_sprites(
     force: bool = False,
     debug_images: bool = False,
     repair_images: bool = False,
+    skip_skill_catalog: bool = False,
 ) -> dict:
     """
     执行爬取并返回原始 JSON 数据。
@@ -1111,6 +1516,31 @@ def scrape_rocom_sprites(
 
     _backfill_evolution_ids(results)
     _save(results, out_path)
+
+    skill_results: list[dict] = []
+    skill_failed: list[str] = []
+    skills_out_path = out_path.with_name("skills_raw.json")
+    if not skip_skill_catalog and not repair_images:
+        try:
+            skill_entries = parse_skill_list_page()
+            if limit > 0:
+                skill_entries = skill_entries[:limit]
+                print(f"[*] 限制模式: 只处理前 {limit} 个技能详情")
+
+            for i, entry in enumerate(skill_entries, 1):
+                print_progress(i, len(skill_entries), f"技能 {entry['name']}")
+                try:
+                    skill_results.append(parse_skill_detail(entry, data_dir, force))
+                    if i % 20 == 0:
+                        _save(skill_results, skills_out_path)
+                except Exception as e:
+                    print(f"\n  [!] 技能详情失败: {entry.get('name')} {e}")
+                    skill_failed.append(entry["url"])
+                time.sleep(random.uniform(delay, delay + 1.5))
+            _save(skill_results, skills_out_path)
+        except Exception as e:
+            print(f"\n  [!] 技能图鉴爬取失败: {e}")
+
     image_rows = sorted(
         _urls_cache.values(),
         key=lambda row: (row.get("type", ""), row.get("name", ""), row.get("url", "")),
@@ -1120,19 +1550,27 @@ def scrape_rocom_sprites(
     if failed:
         fail_path = out_path.with_name("failed_urls.txt")
         fail_path.write_text("\n".join(failed), encoding="utf-8")
+    if skill_failed:
+        skill_fail_path = out_path.with_name("failed_skill_urls.txt")
+        skill_fail_path.write_text("\n".join(skill_failed), encoding="utf-8")
 
     return {
         "sprites": results,
+        "skills": skill_results,
         "image_urls": image_rows,
         "output_path": str(out_path.resolve()),
+        "skills_output_path": str(skills_out_path.resolve()) if skill_results else None,
         "image_urls_path": str((out_path.parent / "image_urls.json").resolve()),
         "failed_urls": failed,
+        "failed_skill_urls": skill_failed,
         "stats": {
             "entries": len(entries),
             "sprites": len(results),
+            "skill_details": len(skill_results),
             "skipped": skipped,
             "repaired_images": repaired_images,
             "failed": len(failed),
+            "skill_failed": len(skill_failed),
             "with_images": with_images,
         },
     }
@@ -1167,6 +1605,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--repair-images", action="store_true", help="只在 --with-images 模式下补下载缺失图片"
     )
+    parser.add_argument("--skip-skill-catalog", action="store_true", help="跳过技能图鉴独立爬取")
     return parser
 
 
@@ -1181,8 +1620,11 @@ def main() -> None:
         force=args.force,
         debug_images=args.debug_images,
         repair_images=args.repair_images,
+        skip_skill_catalog=args.skip_skill_catalog,
     )
     print(f"\n[完成] JSON 已保存至: {result['output_path']}")
+    if result.get("skills_output_path"):
+        print(f"[完成] 技能图鉴 raw JSON 已保存至: {result['skills_output_path']}")
     print(f"[完成] 图片 URL 元数据已保存至: {result['image_urls_path']}")
 
     if not args.skip_clean:
@@ -1195,6 +1637,7 @@ def main() -> None:
             dataset = clean_from_raw_sprites(
                 result["sprites"],
                 image_url_rows=result["image_urls"],
+                raw_skill_rows=result.get("skills"),
                 data_version=args.data_version,
                 image_mode="local" if args.with_images else "remote",
             )

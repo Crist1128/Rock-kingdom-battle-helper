@@ -50,7 +50,7 @@ export function EventLogPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">事件日志与回放</h1>
-        <p className="mt-1 text-muted-foreground">查看时间线，并使用后端提供的事件作废与重放占位接口。</p>
+        <p className="mt-1 text-muted-foreground">查看时间线，并使用后端提供的事件作废与重放接口。</p>
       </div>
       <Card>
         <CardContent className="flex items-end gap-3 pt-5">
@@ -67,7 +67,7 @@ export function EventLogPage() {
         <Card>
           <CardHeader>
             <CardTitle>纠错能力</CardTitle>
-            <CardDescription>事件作废接口已接入；重放接口当前返回明确占位，不会执行真实重算。</CardDescription>
+            <CardDescription>事件作废接口已接入；重放接口会重建实时估计、运行时状态和事件后快照链。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div>
@@ -99,7 +99,7 @@ export function EventLogPage() {
                 {correctMutation.isPending ? "修正中..." : "创建修正事件"}
               </Button>
             </div>
-            <div className="rounded-2xl border bg-white p-3"><Badge variant="warning">占位</Badge><div className="mt-2">重放接口当前只确认事件存在，不会执行真实重算。</div></div>
+            <div className="rounded-2xl border bg-white p-3"><Badge variant="success">可用</Badge><div className="mt-2">重放会重建实时估计、运行时状态、最终状态实例和事件后快照链。</div></div>
             {lastMessage ? <div className="rounded-2xl border bg-emerald-50 p-3 text-emerald-900">{lastMessage}</div> : null}
           </CardContent>
         </Card>

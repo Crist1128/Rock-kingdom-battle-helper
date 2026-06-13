@@ -112,8 +112,7 @@ class DamageEventCreate(BaseModel):
     - visual_total_damage：必须传 final_total_damage_value；服务层会同步为 damage_value。
     - combo_repeated_damage：必须传 per_hit_damage_value 和 hit_count；服务层计算总伤害。
 
-    伤害公式尚未完全确认，本请求不会触发旧候选排除；开启 sync_observation 时只会更新
-    敌方实时面板估计。
+    伤害公式尚未完全确认；开启 sync_observation 时只会更新敌方实时面板估计。
     """
 
     turn_number: int | None = Field(default=None, description="发生回合，默认使用战斗当前回合")
@@ -123,6 +122,16 @@ class DamageEventCreate(BaseModel):
     defender_elf_id: str | None = Field(default=None, description="防御方精灵 ID")
     skill_id: str | None = Field(default=None, description="技能 ID")
     skill_confirmed: bool = Field(default=False, description="技能是否确认")
+    formula_type: str = Field(
+        default="attack",
+        description="伤害公式类型：attack 普通攻击；status 灼烧/中毒/棘刺等状态结算",
+    )
+    effect_id: str | None = Field(default=None, description="状态结算伤害关联的状态/印记 ID")
+    effect_layers: int | None = Field(default=None, ge=1, description="状态结算层数")
+    skill_element_type: str | None = Field(
+        default=None,
+        description="本次伤害用于克制/抵抗计算的属性；状态结算可由后端按 effect_id 自动补全",
+    )
     defense_skill_id: str | None = Field(
         default=None,
         description="防御方本次用于应对/防御的技能 ID",
@@ -130,6 +139,10 @@ class DamageEventCreate(BaseModel):
     response_attack_success: bool | None = Field(default=None, description="本次是否成功应对攻击")
     response_defense_success: bool | None = Field(default=None, description="本次是否成功应对防御")
     response_status_success: bool | None = Field(default=None, description="本次是否成功应对状态")
+    condition_flags: dict[str, bool] | None = Field(
+        default=None,
+        description="本次伤害可供规则分支读取的通用条件标记，例如 target_switched_this_turn",
+    )
     damage_display_type: DamageDisplayType = Field(..., description="伤害显示类型")
     damage_value: int | None = Field(default=None, ge=0, description="单次或总伤害")
     final_total_damage_value: int | None = Field(
@@ -173,10 +186,6 @@ class DamageEventCreate(BaseModel):
         default=True,
         description="是否由伤害事件服务同步写入实时面板估计观测",
     )
-    allow_hard_exclude: bool = Field(
-        default=False,
-        description="废弃字段；实时反推主流程不再写旧候选硬排除",
-    )
     damage_tolerance: int = Field(default=0, ge=0, description="整数伤害匹配容差")
     percent_tolerance: float = Field(default=1.0, ge=0, description="扣血百分比匹配容差")
     notes: str | None = Field(default=None, description="备注")
@@ -184,6 +193,8 @@ class DamageEventCreate(BaseModel):
     @model_validator(mode="after")
     def validate_damage_payload(self) -> "DamageEventCreate":
         """按 damage_display_type 校验必填字段。"""
+        if self.formula_type == "status" and not self.effect_id:
+            raise ValueError("status 公式必须提供 effect_id")
         if self.damage_display_type == DamageDisplayType.SINGLE_DAMAGE:
             if self.damage_value is None:
                 raise ValueError("single_damage 必须提供 damage_value")
@@ -329,9 +340,53 @@ class BattleEventCorrectInput(BaseModel):
 
 
 class BattleReplayResult(BaseModel):
-    """从某事件开始重放的占位响应。"""
+    """事件重放响应。
+
+    当前后端先落地 estimate/evidence 层重建；完整战斗状态重演仍是后续能力。
+    """
 
     battle_id: str
     from_event_id: str
-    status: str = "replay_not_implemented"
+    status: str = "runtime_and_estimate_rebuilt"
+    replay_scope: str = Field(
+        default="full_estimate_rebuild",
+        description="重放范围；当前为整场实时估计重建",
+    )
+    rebuilt_estimate_count: int = Field(default=0, description="重建的敌方估计档案数量")
+    replayed_event_count: int = Field(default=0, description="参与扫描的非作废事件数量")
+    replayed_observation_count: int = Field(default=0, description="重放写入的 observation 数量")
+    skipped_event_count: int = Field(default=0, description="未产生估计 observation 的事件数量")
+    runtime_replay_status: str = Field(
+        default="partial_runtime_rebuilt",
+        description="运行时重放状态；当前为基础运行时状态部分重建",
+    )
+    runtime_state_updated_count: int = Field(default=0, description="重置并重算的战斗精灵状态数量")
+    runtime_switch_event_count: int = Field(default=0, description="重放的切换事件数量")
+    runtime_resource_event_count: int = Field(default=0, description="重放的资源事件数量")
+    runtime_effect_change_event_count: int = Field(default=0, description="重放的状态变化事件数量")
+    runtime_active_effect_count: int = Field(
+        default=0,
+        description="重放后仍处于生效状态的状态数量",
+    )
+    runtime_snapshot_id: str | None = Field(
+        default=None,
+        description="重放完成后最后一张事件后状态快照 ID",
+    )
+    runtime_snapshot_rebuilt_count: int = Field(
+        default=0,
+        description="本次重放重新生成并绑定到事件的快照数量",
+    )
+    runtime_snapshot_effect_count: int = Field(
+        default=0,
+        description="重放完成后最后一张快照中的生效状态数量",
+    )
+    runtime_damage_fallback_count: int = Field(
+        default=0,
+        description="缺少资源子事件时按 DamageEvent 百分比兜底更新的次数",
+    )
+    runtime_skipped_event_count: int = Field(default=0, description="运行时重放跳过的事件数量")
+    runtime_unsupported_event_types: list[str] = Field(
+        default_factory=list,
+        description="当前骨架尚未重演副作用的事件类型",
+    )
     message: str

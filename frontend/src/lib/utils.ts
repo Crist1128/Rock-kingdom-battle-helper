@@ -174,9 +174,12 @@ export function eventTypeName(type?: string | null) {
     effect_apply: "施加状态",
     effect_remove: "移除状态",
     switch_elf: "切换精灵",
+    runtime_form_change: "有效形态变化",
     switch_clear: "切换清除",
     weather_change: "天气变化",
     mark_change: "印记变化",
+    effect_trigger: "状态触发",
+    action_interrupted: "行动被打断",
     resource_change: "资源变化",
   };
   return type ? names[type] ?? type : "事件";

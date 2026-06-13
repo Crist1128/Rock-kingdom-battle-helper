@@ -8,13 +8,18 @@ FastAPI 应用主入口模块。
 - 根路由定义
 """
 
-from fastapi import FastAPI
+import logging
+from time import perf_counter
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.seed.core_natures import ensure_core_natures_with_session
 from app.seed.core_skills import ensure_core_skills_with_session
+
+request_logger = logging.getLogger("uvicorn.error")
 
 
 def create_app() -> FastAPI:
@@ -39,6 +44,32 @@ def create_app() -> FastAPI:
         allow_methods=["*"],  # 允许所有 HTTP 方法
         allow_headers=["*"],  # 允许所有请求头
     )
+
+    @app.middleware("http")
+    async def log_api_request(request: Request, call_next):
+        """稳定输出 API 请求路径、响应码和耗时，便于联调时确认前端是否打到后端。"""
+        start_time = perf_counter()
+        path = request.url.path
+        query = request.url.query
+        path_with_query = f"{path}?{query}" if query else path
+        try:
+            response = await call_next(request)
+        except Exception:
+            elapsed_ms = (perf_counter() - start_time) * 1000
+            if path.startswith("/api/"):
+                message = f"API {request.method} {path_with_query} -> 500 {elapsed_ms:.1f}ms"
+                print(message, flush=True)
+                request_logger.exception(message)
+            raise
+        elapsed_ms = (perf_counter() - start_time) * 1000
+        if path.startswith("/api/"):
+            message = (
+                f"API {request.method} {path_with_query} -> "
+                f"{response.status_code} {elapsed_ms:.1f}ms"
+            )
+            print(message, flush=True)
+            request_logger.info(message)
+        return response
 
     # 注册 API 路由，所有路由以 /api 为前缀
     app.include_router(api_router, prefix="/api")

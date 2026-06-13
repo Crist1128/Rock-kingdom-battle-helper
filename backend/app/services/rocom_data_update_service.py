@@ -1,7 +1,7 @@
 """洛克王国 BWIKI 数据更新服务。
 
 本模块只负责“主动触发”的数据更新管理，不在后端普通启动流程中主动检查
-远程站点。这样可以保证本地战斗记录、候选生成等核心功能不受外部网络、BWIKI
+远程站点。这样可以保证本地战斗记录、实时面板估计等核心功能不受外部网络、BWIKI
 可用性和爬虫耗时影响。
 
 当前提供三类能力：
@@ -47,6 +47,7 @@ class RocomUpdateParams:
     with_images: bool = False
     data_version: str | None = None
     write_artifacts: bool = True
+    refresh_static: bool = False
 
 
 @dataclass(slots=True)
@@ -68,6 +69,7 @@ class RocomImportLocalParams:
     cleaned_dir: str | None = None
     commit: bool = False
     data_version: str | None = None
+    refresh_static: bool = False
 
 
 @dataclass(slots=True)
@@ -268,6 +270,7 @@ def run_rocom_update_job(job_id: str) -> None:
         )
         dataset = clean_from_raw_sprites(
             scrape_result["sprites"],
+            raw_skill_rows=scrape_result.get("skills"),
             image_url_rows=scrape_result["image_urls"],
             data_version=params.data_version,
             image_mode="local" if params.with_images else "remote",
@@ -278,6 +281,7 @@ def run_rocom_update_job(job_id: str) -> None:
         import_summary, transaction = _import_dataset_with_transaction(
             dataset=dataset,
             commit=params.commit,
+            refresh_static=params.refresh_static,
         )
 
         result = {
@@ -327,6 +331,7 @@ def run_rocom_import_local_job(job_id: str) -> None:
         import_summary, transaction = _import_dataset_with_transaction(
             dataset=dataset,
             commit=params.commit,
+            refresh_static=params.refresh_static,
         )
 
         result = {
@@ -356,12 +361,21 @@ def _override_dataset_version(dataset: Any, data_version: str) -> None:
         row["data_version"] = data_version
 
 
-def _import_dataset_with_transaction(*, dataset: Any, commit: bool) -> tuple[dict[str, Any], str]:
+def _import_dataset_with_transaction(
+    *,
+    dataset: Any,
+    commit: bool,
+    refresh_static: bool = False,
+) -> tuple[dict[str, Any], str]:
     """导入数据集，并按 commit 决定提交或回滚。"""
     init_db()
     db = SessionLocal()
     try:
-        import_summary = import_dataset(db, dataset)
+        import_summary = import_dataset(
+            db,
+            dataset,
+            refresh_static=refresh_static,
+        )
         if commit:
             db.commit()
             transaction = "committed"

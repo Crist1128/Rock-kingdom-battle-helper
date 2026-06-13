@@ -5,13 +5,14 @@
 skipped/unknown，不强行改写状态。
 """
 
+from math import floor
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.enums import EventSource, OwnerScope, Side
-from app.models.battle import Battle, BattleElfState
+from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.effect import BattleEffectInstance
 from app.models.event import BattleEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import EffectDefinition, SkillDefinition
@@ -29,7 +30,10 @@ class EffectOperationExecutor:
         "clear_effects",
         "change_weather",
         "resource_change",
+        "heal_from_damage_dealt",
         "multiply_layers",
+        "multiply_layers_by_polarity",
+        "clear_effect_layers",
         "conditional_branch",
     }
     ALWAYS_CONDITIONS = {None, "", "always", "normal", "on_skill_use"}
@@ -63,6 +67,14 @@ class EffectOperationExecutor:
                 }
             ]
 
+        return self.execute_operations_for_event(battle_event, operations)
+
+    def execute_operations_for_event(
+        self,
+        battle_event: BattleEvent,
+        operations: list[dict],
+    ) -> list[dict]:
+        """执行调用方显式传入的一组结构化效果操作。"""
         results: list[dict] = []
         for index, operation in enumerate(operations):
             if not isinstance(operation, dict):
@@ -112,8 +124,19 @@ class EffectOperationExecutor:
             return self._execute_conditional_branch(battle_event, operation, operation_index)
         if operation_type == "resource_change":
             return self._execute_resource_change(battle_event, operation, operation_index)
+        if operation_type == "heal_from_damage_dealt":
+            return self._execute_heal_from_damage_dealt(battle_event, operation, operation_index)
         if operation_type == "clear_effects":
             return self._execute_clear_effects(battle_event, operation, operation_index)
+        if operation_type == "clear_effect_layers":
+            return self._execute_clear_effect_layers(battle_event, operation, operation_index)
+        if operation_type == "multiply_layers_by_polarity":
+            return self._execute_multiply_layers_by_polarity(
+                battle_event,
+                operation,
+                operation_index,
+                condition,
+            )
 
         effect_id = operation.get("effect_id")
         if not isinstance(effect_id, str) or not effect_id:
@@ -168,6 +191,15 @@ class EffectOperationExecutor:
                 "effect_id": effect_id,
             }
         layers = int(layers_result["layers"])
+        layer_bonus_sources = self._positive_stat_layer_bonus_sources(
+            battle_event,
+            definition,
+            target,
+        )
+        if layer_bonus_sources:
+            layers += sum(int(item["layers_bonus"]) for item in layer_bonus_sources)
+            if definition.max_layers is not None:
+                layers = min(layers, definition.max_layers)
         existing = self._find_existing_instance(
             battle_id=battle_event.battle_id,
             definition=definition,
@@ -221,7 +253,58 @@ class EffectOperationExecutor:
             "owner_elf_id": instance.owner_elf_id,
             "layers_before": layers_before,
             "layers_after": instance.layers,
+            "layer_bonus_sources": layer_bonus_sources,
         }
+
+    def _positive_stat_layer_bonus_sources(
+        self,
+        battle_event: BattleEvent,
+        definition: EffectDefinition,
+        target: dict,
+    ) -> list[dict]:
+        """解析“获得属性增益时额外加层”的监听来源。
+
+        当前仅落地已确认的萌化印记口径：新获得的属性类增益额外 +1 层；
+        不作用于印记、天气、技能槽增益等非基础属性修正。
+        """
+        if not self._eligible_for_positive_stat_layer_bonus(definition):
+            return []
+        target_side = target.get("owner_side")
+        if target_side not in {Side.SELF.value, Side.ENEMY.value}:
+            return []
+        marks = self.db.scalars(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == battle_event.battle_id,
+                BattleEffectInstance.effect_id == "effect_cute_mark",
+                BattleEffectInstance.owner_scope == OwnerScope.SIDE.value,
+                BattleEffectInstance.owner_side == target_side,
+                BattleEffectInstance.is_active.is_(True),
+            )
+        ).all()
+        if not marks:
+            return []
+        # 用户确认：萌化印记让“新获得的那个增益多 +1 层”，不是按印记层数累加。
+        source = marks[0]
+        return [
+            {
+                "effect_id": source.effect_id,
+                "effect_instance_id": source.instance_id,
+                "layers_bonus": 1,
+                "reason": "cute_mark_positive_stat_bonus",
+            }
+        ]
+
+    @staticmethod
+    def _eligible_for_positive_stat_layer_bonus(definition: EffectDefinition) -> bool:
+        if definition.polarity != "positive":
+            return False
+        if definition.category != "stat_modifier":
+            return False
+        if definition.owner_scope == OwnerScope.SKILL_SLOT.value:
+            return False
+        if definition.attach_target_type == "skill_slot":
+            return False
+        return True
 
     def _execute_conditional_branch(
         self,
@@ -273,6 +356,7 @@ class EffectOperationExecutor:
             operation=operation,
             effect_ids=None,
             categories={"weather"},
+            polarity=None,
             conflict_group=definition.conflict_group or "weather",
             exclude_effect_id=definition.effect_id,
             reason="change_weather_replace",
@@ -395,15 +479,17 @@ class EffectOperationExecutor:
         """按 effect_ids/category/target 清除一组状态。"""
         effect_ids = self._normalize_str_set(operation.get("effect_ids"))
         categories = self._normalize_str_set(operation.get("categories"))
+        polarity = str(operation.get("polarity") or "") or None
         if not effect_ids and isinstance(operation.get("effect_id"), str):
             effect_ids = {str(operation["effect_id"])}
-        if not effect_ids and not categories:
+        if not effect_ids and not categories and polarity is None:
             return self._skipped(operation, operation_index, "clear_selector_missing")
         removed = self._clear_matching_effects(
             battle_event=battle_event,
             operation=operation,
             effect_ids=effect_ids,
             categories=categories,
+            polarity=polarity,
             conflict_group=None,
             exclude_effect_id=None,
             reason="skill_clear_effects",
@@ -465,6 +551,214 @@ class EffectOperationExecutor:
             "layers_before": layers_before,
             "layers_after": existing.layers,
         }
+
+    def _execute_clear_effect_layers(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """按玩家指定的状态实例扣除层数，不自动选择目标。"""
+        selections = operation.get("selected_effect_instance_layers")
+        if selections is None:
+            payload = loads_json(battle_event.payload_json, {})
+            if isinstance(payload, dict):
+                selections = payload.get("selected_effect_instance_layers")
+        if not isinstance(selections, list) or not selections:
+            return {
+                "status": "unknown",
+                "reason": "manual_layer_selection_missing",
+                "operation_index": operation_index,
+                "operation": "clear_effect_layers",
+            }
+
+        target_side = self._resolve_target_side(battle_event, operation.get("target"))
+        definitions_by_id = self._load_effect_definitions()
+        changed: list[dict] = []
+        skipped: list[dict] = []
+        for index, selection in enumerate(selections):
+            if not isinstance(selection, dict):
+                skipped.append({"index": index, "reason": "selection_not_object"})
+                continue
+            instance_id = selection.get("instance_id") or selection.get("effect_instance_id")
+            raw_layers = selection.get("layers")
+            if not isinstance(instance_id, str) or not instance_id:
+                skipped.append({"index": index, "reason": "effect_instance_id_missing"})
+                continue
+            if not isinstance(raw_layers, int | float) or int(raw_layers) <= 0:
+                skipped.append(
+                    {"index": index, "instance_id": instance_id, "reason": "layers_invalid"}
+                )
+                continue
+            instance = self.db.get(BattleEffectInstance, instance_id)
+            if (
+                instance is None
+                or instance.battle_id != battle_event.battle_id
+                or not instance.is_active
+            ):
+                skipped.append(
+                    {
+                        "index": index,
+                        "instance_id": instance_id,
+                        "reason": "active_instance_missing",
+                    }
+                )
+                continue
+            definition = definitions_by_id.get(instance.effect_id)
+            if definition is None:
+                skipped.append(
+                    {
+                        "index": index,
+                        "instance_id": instance_id,
+                        "reason": "effect_definition_missing",
+                    }
+                )
+                continue
+            if target_side is not None and instance.owner_scope != OwnerScope.FIELD.value:
+                if instance.owner_side != target_side:
+                    skipped.append(
+                        {
+                            "index": index,
+                            "instance_id": instance_id,
+                            "reason": "target_side_mismatch",
+                        }
+                    )
+                    continue
+
+            layers_before = instance.layers
+            clear_layers = min(int(raw_layers), max(instance.layers, 0))
+            instance.layers = max(instance.layers - clear_layers, 0)
+            instance.is_active = instance.layers > 0
+            instance.last_updated_turn = battle_event.turn_number
+            self._create_effect_change_event(
+                battle_event=battle_event,
+                definition=definition,
+                instance=instance,
+                change_type="clear_layers" if instance.is_active else "clear",
+                layers_before=layers_before,
+                condition_branch=None,
+                reason="manual_clear_effect_layers",
+            )
+            changed.append(
+                {
+                    "effect_id": instance.effect_id,
+                    "effect_instance_id": instance.instance_id,
+                    "requested_layers": int(raw_layers),
+                    "cleared_layers": clear_layers,
+                    "layers_before": layers_before,
+                    "layers_after": instance.layers,
+                }
+            )
+        return {
+            "status": "executed" if changed else "skipped",
+            "reason": None if changed else "no_layers_cleared",
+            "operation_index": operation_index,
+            "operation": "clear_effect_layers",
+            "changed_effects": changed,
+            "skipped_selections": skipped,
+        }
+
+    def _execute_multiply_layers_by_polarity(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+        condition: object,
+    ) -> dict:
+        """按极性批量修改目标状态层数，用于“增益翻倍”等机制。"""
+        polarity = str(operation.get("polarity") or "")
+        if polarity not in {"positive", "negative", "neutral"}:
+            return self._skipped(operation, operation_index, "invalid_polarity")
+        multiplier = operation.get("multiplier", 2)
+        if not isinstance(multiplier, int | float) or multiplier <= 0:
+            return self._skipped(operation, operation_index, "invalid_multiplier")
+        target_side = self._resolve_target_side(battle_event, operation.get("target"))
+        definitions_by_id = self._load_effect_definitions()
+        changed: list[dict] = []
+        for instance in self.db.scalars(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == battle_event.battle_id,
+                BattleEffectInstance.is_active.is_(True),
+            )
+        ).all():
+            definition = definitions_by_id.get(instance.effect_id)
+            if definition is None or definition.polarity != polarity:
+                continue
+            if target_side is not None and instance.owner_scope != OwnerScope.FIELD.value:
+                if instance.owner_side != target_side:
+                    continue
+            layers_before = instance.layers
+            next_layers = int(instance.layers * multiplier)
+            if definition.max_layers is not None:
+                next_layers = min(next_layers, definition.max_layers)
+            instance.layers = max(next_layers, 0)
+            instance.is_active = instance.layers > 0
+            instance.last_updated_turn = battle_event.turn_number
+            self._create_effect_change_event(
+                battle_event=battle_event,
+                definition=definition,
+                instance=instance,
+                change_type="multiply_layers",
+                layers_before=layers_before,
+                condition_branch=(
+                    str(condition) if condition not in self.ALWAYS_CONDITIONS else None
+                ),
+                reason="skill_multiply_layers_by_polarity",
+            )
+            changed.append(
+                {
+                    "effect_id": instance.effect_id,
+                    "effect_instance_id": instance.instance_id,
+                    "polarity": polarity,
+                    "multiplier": multiplier,
+                    "layers_before": layers_before,
+                    "layers_after": instance.layers,
+                }
+            )
+        return {
+            "status": "executed" if changed else "skipped",
+            "reason": None if changed else "no_matching_effects",
+            "operation_index": operation_index,
+            "operation": "multiply_layers_by_polarity",
+            "changed_effects": changed,
+        }
+
+    def _execute_heal_from_damage_dealt(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """按本次已知伤害量回复生命，回复值向下取整。"""
+        damage_value = self._damage_value_from_event_payload(battle_event, operation)
+        if damage_value is None:
+            return {
+                "status": "unknown",
+                "reason": "damage_value_missing",
+                "operation_index": operation_index,
+                "operation": "heal_from_damage_dealt",
+            }
+        ratio = operation.get("ratio", 1)
+        if not isinstance(ratio, int | float) or ratio < 0:
+            return self._skipped(operation, operation_index, "invalid_ratio")
+        heal_value = floor(float(damage_value) * float(ratio))
+        heal_operation = dict(operation)
+        heal_operation.update(
+            {
+                "op_type": "resource_change",
+                "resource_type": "hp",
+                "change_type": "heal",
+                "value_type": "value",
+                "value": heal_value,
+            }
+        )
+        result = self._execute_resource_change(battle_event, heal_operation, operation_index)
+        result["operation"] = "heal_from_damage_dealt"
+        result["damage_value"] = damage_value
+        result["ratio"] = ratio
+        result["heal_value"] = heal_value
+        result["rounding"] = "floor"
+        return result
 
     def _execute_resource_change(
         self,
@@ -536,6 +830,37 @@ class EffectOperationExecutor:
             "after_value": after_value,
         }
 
+    @staticmethod
+    def _damage_value_from_event_payload(
+        battle_event: BattleEvent,
+        operation: dict,
+    ) -> float | int | None:
+        payload = loads_json(battle_event.payload_json, {})
+        if not isinstance(payload, dict):
+            return None
+        source = operation.get("damage_source")
+        candidates = [source] if isinstance(source, str) and source else []
+        candidates.extend(
+            [
+                "damage_value",
+                "damage_dealt",
+                "observed_damage",
+                "computed_total_damage_value",
+                "final_total_damage_value",
+            ]
+        )
+        for key in candidates:
+            value: object = payload
+            for part in str(key).split("."):
+                if isinstance(value, dict):
+                    value = value.get(part)
+                else:
+                    value = None
+                    break
+            if isinstance(value, int | float):
+                return value
+        return None
+
     def _condition_result(self, battle_event: BattleEvent, condition: object) -> str:
         """判断条件分支是否满足；未知条件只返回 unknown。"""
         if condition in self.ALWAYS_CONDITIONS:
@@ -603,9 +928,9 @@ class EffectOperationExecutor:
                 "field_id": None,
             }
         if definition.owner_scope == OwnerScope.SKILL_SLOT.value:
-            owner_skill_slot_id = (
-                battle_event.skill_id if target in {"source_skill", "self_skill"} else None
-            )
+            owner_skill_slot_id = None
+            if target in {"source_skill", "self_skill"} and battle_event.skill_id:
+                owner_skill_slot_id = self._source_skill_slot_id(battle_event)
             if owner_skill_slot_id is None:
                 return {"status": "failed", "reason": "owner_skill_slot_id_missing"}
             return {
@@ -621,6 +946,8 @@ class EffectOperationExecutor:
     @staticmethod
     def _resolve_target_side(battle_event: BattleEvent, target: object) -> str | None:
         """解析目标阵营。"""
+        if target in {"field", "battlefield", "all_field"}:
+            return None
         if target in {"enemy_side", "opponent_side", "defender_side"}:
             return EffectOperationExecutor._opposite_side(battle_event.actor_side)
         if target in {"self_side", "actor_side", "source_side"}:
@@ -649,6 +976,24 @@ class EffectOperationExecutor:
         if target_side == Side.ENEMY.value:
             return battle.enemy_active_elf_id
         return None
+
+    def _source_skill_slot_id(self, battle_event: BattleEvent) -> str | None:
+        """读取本次使用技能对应的运行时技能槽 ID。"""
+        if (
+            battle_event.actor_side is None
+            or battle_event.actor_elf_id is None
+            or battle_event.skill_id is None
+        ):
+            return None
+        slot = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == battle_event.battle_id,
+                BattleSkillSlot.side == battle_event.actor_side,
+                BattleSkillSlot.elf_id == battle_event.actor_elf_id,
+                BattleSkillSlot.skill_id == battle_event.skill_id,
+            )
+        ).first()
+        return slot.slot_id if slot is not None else None
 
     @staticmethod
     def _opposite_side(side: str | None) -> str | None:
@@ -735,6 +1080,7 @@ class EffectOperationExecutor:
         operation: dict,
         effect_ids: set[str] | None,
         categories: set[str] | None,
+        polarity: str | None,
         conflict_group: str | None,
         exclude_effect_id: str | None,
         reason: str,
@@ -758,6 +1104,8 @@ class EffectOperationExecutor:
             if effect_ids and instance.effect_id not in effect_ids:
                 continue
             if categories and instance.category not in categories:
+                continue
+            if polarity is not None and definition.polarity != polarity:
                 continue
             if conflict_group and definition.conflict_group != conflict_group:
                 continue
