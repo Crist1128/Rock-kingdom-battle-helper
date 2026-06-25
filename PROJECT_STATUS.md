@@ -76,7 +76,7 @@
 - 本地数据库已有真实 rocom 静态数据，当前活跃 rocom 精灵/技能已刷新到 `rocom_bwiki_20260609` 版本；数据库中活跃精灵 469 个、技能 497 个（含核心默认技能 1 个）、精灵可学习技能 22387 条、属性克制规则 113 条。线上详情页缺六维的 4 个精灵保留旧版本有效数据和旧 BWIKI 技能关系，避免空页面覆盖面板反推基础数据。
 - 30 种性格已拆为正式核心规则，后端启动时会幂等自检查并写入/修正。
 - P0 状态定义已可通过 `backend/app/seed/effect_definitions_p0.json` 和 effect importer 写入；当前工作库已导入 11 条 P0 状态定义，其中新增 `effect_physical_attack_up_100` 支撑力量增效。技能人工审阅、机制补齐和确认印记/蓄力时序机制额外补入 57 条属性/速度/技能层数/印记/行动修正状态，当前 active `effect_definition` 共 68 条。
-- 技能人工审阅已完成 cleaned 全量 496 条：第一批 `backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260611.json` 覆盖 cleaned 技能前 40 条；第二批 `backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260611_02.json` 覆盖第 41-90 条；第三批 `backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260611_03.json` 覆盖第 91-190 条；第四批 `backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260612.json` 覆盖第 191-290 条；第五批 `backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260612_02.json` 覆盖第 291-390 条；第六批 `backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260612_03.json` 覆盖第 391-490 条；收尾批 `backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260612_04.json` 覆盖第 491-496 条。结构缺口和后续方案记录在 `docs/03_系统设计/技能规则人工审阅记录_v0.1.md`。
+- 技能人工审阅已完成 cleaned 全量 496 条；当前工作树只保留正式导入总文件 `backend/app/seed/manual_skill_effect_definitions_all_20260612.json` 和 `backend/app/seed/manual_skill_rule_reviews_all_20260612.json`。早期分批 JSON 归档已在整合后移除以缩减仓库体积，历史批次过程和结构缺口记录在 `docs/03_系统设计/技能规则人工审阅记录_v0.1.md`。
 
 ## 当前未完成内容
 
@@ -121,7 +121,7 @@
 - 2026-06-12 完成技能逐条审阅第五批和机制状态补齐后，本地库已 commit 机制/层数状态定义和第 291-390 条技能审阅结果。导入 dry-run 与 commit 摘要一致：状态定义累计 active 55 条；技能更新 100 条，状态分布为 48 structured、44 partial、8 needs_review。聚焦验证：`python -m pytest app/tests/test_skill_rule_review_importer.py app/tests/test_skill_rules_api.py app/tests/test_effect_operation_executor.py app/tests/test_modifier_resolver.py -q`：`29 passed`；`python -m ruff check app` 通过；本轮中文文件 mojibake 扫描和 `git diff --check` 通过。
 - 2026-06-12 完成技能逐条审阅第六批后，本地库已 commit 第 391-490 条技能审阅结果。导入 dry-run 与 commit 摘要一致：技能更新 100 条，状态分布为 49 structured、36 partial、15 needs_review；未新增状态定义，active effect_definition 仍为 55 条。聚焦验证：`python -m pytest app/tests/test_skill_rule_review_importer.py app/tests/test_skill_rules_api.py app/tests/test_effect_operation_executor.py app/tests/test_modifier_resolver.py app/tests/test_core_default_skill.py -q`：`34 passed`；`python -m ruff check app` 通过；本轮改动文件 mojibake 扫描和 `git diff --check` 通过。
 - 2026-06-12 完成技能逐条审阅收尾批后，本地库已 commit 第 491-496 条技能审阅结果。导入 dry-run 与 commit 摘要一致：技能更新 6 条，状态分布为 3 structured、2 partial、1 needs_review；全量 cleaned 技能 496 条累计状态为 231 structured、194 partial、70 needs_review、1 ambiguous。新增缺口主要是龙噬印记和蓄力/下次无需蓄力。
-- 2026-06-12 阅读 `docs/03_系统设计/技能机制缺口回应.txt` 后，完成确认印记/萌化机制首批落地：新增 `manual_skill_effect_definitions_confirmed_marks_20260612.json` 11 条状态定义，并用 `manual_skill_rule_reviews_confirmed_marks_20260612.json` 更新 17 条技能规则；后端新增按层数百分比技能修正、回合末/入场资源变化、龙噬印记 3 能耗技能触发双攻增益。追加确认后又新增 `manual_skill_effect_definitions_confirmed_timing_20260612.json` 2 条行动状态，落地萌化印记属性增益 +1 层、初始首发/返场迸发窗口与具体效果记录、蓄力第一次扣能和同技能释放、返场后端语义。仍保留迸发历史继承、蓄力受击/可用防御技能高级分支、风起先手自动判定、萌化面板回退、迅捷、传动、脱离/打断和特殊动态公式。
+- 2026-06-12 阅读 `docs/03_系统设计/技能机制缺口回应.txt` 后，完成确认印记/萌化机制首批落地；对应状态定义和技能规则已整合进 `manual_skill_effect_definitions_all_20260612.json` / `manual_skill_rule_reviews_all_20260612.json`。后端新增按层数百分比技能修正、回合末/入场资源变化、龙噬印记 3 能耗技能触发双攻增益，落地萌化印记属性增益 +1 层、初始首发/返场迸发窗口与具体效果记录、蓄力第一次扣能和同技能释放、返场后端语义。仍保留迸发历史继承、蓄力受击/可用防御技能高级分支、风起先手自动判定、萌化面板回退、迅捷、传动、脱离/打断和特殊动态公式。
 
 新环境仍需先安装依赖：
 
@@ -161,7 +161,6 @@ docs/03_系统设计/后端MVP完成路线_v0.1.md
 8. 计算稳定后继续收敛实时面板估计主流程：Observation 默认更新属性约束和估计 evidence，不再回到旧候选空间落库筛选。
 
 - 2026-06-12 完成状态层数/吸血/锁定机制补齐后，新增手动指定消层、按极性驱散/翻倍、吸血向下取整、状态型技能威力/连击/能耗层数修正和换宠锁定冲突提示。验证：机制状态定义 seed dry-run 通过；`python -m pytest app/tests/test_effect_operation_executor.py app/tests/test_modifier_resolver.py app/tests/test_core_default_skill.py -q`：`29 passed`；后端全量 `python -m pytest -q`：`118 passed`，仍有 16 个 FastAPI `on_event` deprecation warnings；`python -m ruff check app`、前端 `npm.cmd run build`、本轮改动文件 mojibake 扫描和 `git diff --check` 均通过。
-- 2026-06-12 完成技能逐条审阅第六批后，`backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260612_03.json` 已覆盖 cleaned 技能第 391-490 条并 commit 到本地库：100 条技能中 `structured` 49 条、`partial` 36 条、`needs_review` 15 条。新增记录的缺口包括迸发历史、传动/槽位、迅捷/先手、蓄力、返场/脱离、动态威力公式、萌化/减速/降灵/风起印记等；体重公式、奉献、变形/复制仍按要求只保留 future hook。
-- 2026-06-12 完成技能逐条审阅收尾批后，`backend/app/seed/archive/manual_reviews_20260612/manual_skill_rule_reviews_batch_20260612_04.json` 已覆盖 cleaned 技能第 491-496 条并 commit 到本地库；全量 cleaned 技能 496 条审阅完成，累计 `structured` 231 条、`partial` 194 条、`needs_review` 70 条、`ambiguous` 1 条。后续进入机制缺口统筹与逐类落地阶段。
+- 2026-06-12 完成技能逐条审阅第六批和收尾批后，全量 cleaned 技能 496 条审阅完成，历史分批结果已整合进正式总文件并从工作树移除。累计 `structured` 231 条、`partial` 194 条、`needs_review` 70 条、`ambiguous` 1 条；后续进入机制缺口统筹与逐类落地阶段。
 
 - 2026-06-12 新增运行时有效形态/退化手动处理：前后端提供 `runtime-form` 调整入口，原始精灵身份保持不变，保留性格与六维培养并按所选有效形态种族值重算面板；伤害预览、本系与属性读取已改为使用有效形态。该操作不会触发普通切换、返场、入场结算或首回合机制。

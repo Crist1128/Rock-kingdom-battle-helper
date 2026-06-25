@@ -13,6 +13,9 @@
 4. 与当前 SQLite 数据库比对，确认 active rocom 技能和带拓展分支的技能都有覆盖。
 
 默认只生成总文件和报告；只有传入 ``--rewrite-sources`` 才会重写历史分批文件。
+历史分批 JSON 已从当前工作树移除以缩减仓库体积；如需重新整合，请先从
+Git 历史恢复源文件，或在 ``app/seed`` / ``app/seed/archive/manual_reviews_20260612``
+放入新的分批源文件。
 """
 
 from __future__ import annotations
@@ -61,11 +64,11 @@ def write_json(path: Path, rows: list[dict[str, Any]] | dict[str, Any]) -> None:
 
 
 def source_files(seed_dir: Path, prefix: str) -> list[Path]:
-    """??????????????
+    """查找可整合的历史分批源文件。
 
-    ??????? seed ????? ``*_all_20260612.json``???????
-    ????? ``archive/manual_reviews_20260612``????????????
-    ???????????????????????
+    会跳过已经整合好的 ``*_all_20260612.json`` 和整合报告，避免把总文件再次当
+    源文件读入。当前仓库默认只保留总文件；该函数主要用于后续新增分批源文件时
+    重新生成总文件。
     """
     search_dirs = [seed_dir, seed_dir / ARCHIVE_SOURCE_SUBDIR]
     files: list[Path] = []
@@ -349,6 +352,11 @@ def main() -> None:
 
     effect_files = source_files(seed_dir, "manual_skill_effect_definitions")
     review_files = source_files(seed_dir, "manual_skill_rule_reviews")
+    if not effect_files and not review_files:
+        raise SystemExit(
+            "未找到可整合的历史分批源文件；当前仓库默认只保留 *_all_20260612.json "
+            "总文件。请先恢复或新增分批源文件后再运行本脚本。"
+        )
 
     effect_rows, effect_summary = consolidate_rows(
         effect_files, "effect_id", "effect", args.rewrite_sources
