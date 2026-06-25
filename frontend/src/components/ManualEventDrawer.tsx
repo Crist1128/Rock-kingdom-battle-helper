@@ -403,7 +403,7 @@ function buildStatusEffectPrefill(
 ): StatusEffectPrefill | null {
   const operations = parseEffectOperations(skill?.effect_operations_json);
   for (const operation of operations) {
-    const opType = asString(operation.op_type);
+    const opType = asString(operation.op_type ?? operation.operation ?? operation.type);
     if (!["apply_effect", "add_layers", "dynamic_apply_effect"].includes(opType ?? "")) continue;
     const effectId = asString(operation.effect_id);
     if (!effectId) continue;

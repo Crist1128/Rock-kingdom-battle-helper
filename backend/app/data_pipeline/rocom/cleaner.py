@@ -680,6 +680,15 @@ def build_elf_record(
         },
         "evolution_chain": parse_evolution_chain(row.get("evolution_chain")),
     }
+    dex_metadata = {
+        "stage": normalize_text(row.get("dex_stage")) or None,
+        "element": normalize_text(row.get("dex_element")) or None,
+        "form_type": normalize_text(row.get("dex_form_type")) or None,
+        "is_main_form": parse_bool(row.get("dex_is_main_form")),
+        "evolution_role": normalize_text(row.get("dex_evolution_role")) or None,
+    }
+    if any(value not in (None, False, "") for value in dex_metadata.values()):
+        forms_payload["dex_metadata"] = dex_metadata
 
     return {
         "elf_id": make_elf_id(row),
@@ -823,6 +832,11 @@ def raw_sprite_to_row(sprite: dict[str, Any]) -> dict[str, Any]:
             for e in (sprite.get("evolution_chain") or [])
         ),
         "skills": ";".join(skill_str(skill) for skill in (sprite.get("skills") or [])),
+        "dex_stage": sprite.get("dex_stage", ""),
+        "dex_element": sprite.get("dex_element", ""),
+        "dex_form_type": sprite.get("dex_form_type", ""),
+        "dex_is_main_form": sprite.get("dex_is_main_form", False),
+        "dex_evolution_role": sprite.get("dex_evolution_role", ""),
     }
 
 

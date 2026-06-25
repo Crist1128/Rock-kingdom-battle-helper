@@ -123,6 +123,66 @@ def test_skill_use_applies_starfall_mark_to_enemy_side(
         assert snapshot_items[0]["effect_id"] == "effect_starfall_mark"
 
 
+def test_strength_amplification_applies_ten_physical_attack_layers(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """力量增效的 cleaned operation/actor_side 写法应给行动方上场精灵施加 10 层物攻。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_projection", layers=4)
+        session.add(_physical_attack_up_definition())
+        session.add(
+            _skill(
+                "rocom_skill_5656feeb59",
+                "力量增效",
+                operations=[
+                    {
+                        "operation": "apply_effect",
+                        "effect_id": "effect_physical_attack_up_layered",
+                        "target": "actor_side",
+                        "layers": 10,
+                        "timing": "on_skill_use",
+                    }
+                ],
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "rocom_skill_5656feeb59",
+            "skill_confirmed": True,
+        },
+    )
+
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    result = payload["effect_operation_results"][0]
+    assert result["status"] == "executed"
+    assert result["owner_scope"] == "elf"
+    assert result["owner_side"] == "self"
+    assert result["owner_elf_id"] == "elf_self"
+    assert result["layers_after"] == 10
+
+    with session_factory() as session:
+        instance = session.scalar(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == "battle_ops",
+                BattleEffectInstance.effect_id == "effect_physical_attack_up_layered",
+            )
+        )
+        assert instance is not None
+        assert instance.owner_side == "self"
+        assert instance.owner_elf_id == "elf_self"
+        assert instance.layers == 10
+
+
 def test_dedicated_skill_event_endpoint_executes_operations(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
@@ -1046,6 +1106,42 @@ def _starfall_definition() -> EffectDefinition:
             }
         ),
         special_rule_id="starfall_damage",
+    )
+
+
+def _physical_attack_up_definition() -> EffectDefinition:
+    """构造力量增效使用的物攻层数状态。"""
+    return EffectDefinition(
+        effect_id="effect_physical_attack_up_layered",
+        effect_name="物攻增加",
+        category="stat_modifier",
+        polarity="positive",
+        display_group="stat_modifier_layered",
+        display_priority=300,
+        owner_scope="elf",
+        target_scope="single",
+        attach_target_type="elf",
+        is_visible_icon=True,
+        is_recognizable_by_icon=True,
+        default_layers=1,
+        max_layers=None,
+        stack_rule="add_layers",
+        duration_type="until_switch_or_cleanse",
+        clear_on_switch=True,
+        clear_by_stat_clear=True,
+        stat_modifier_json=dumps_json(
+            {
+                "modifier_type": "stat_stage",
+                "modifiers": [
+                    {
+                        "modifier_type": "stat_stage",
+                        "stat": "physical_attack",
+                        "value_type": "percent_add",
+                        "value_per_layer": 0.1,
+                    }
+                ],
+            }
+        ),
     )
 
 

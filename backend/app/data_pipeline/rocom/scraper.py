@@ -39,6 +39,7 @@ import random
 import re
 import shutil
 import time
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import quote, unquote, urljoin
 
@@ -92,6 +93,35 @@ DOWNLOAD_IMAGES = False
 
 # urls.csv 的列定义
 URL_COLUMNS = ["name", "type", "url", "local_path", "status", "bytes", "content_type", "error"]
+
+ProgressCallback = Callable[[dict], None]
+
+
+def emit_progress(
+    callback: ProgressCallback | None,
+    stage: str,
+    message: str,
+    *,
+    current: int = 0,
+    total: int = 0,
+    **details: object,
+) -> None:
+    """Emit a structured crawler progress event for API/UI callers."""
+    if callback is None:
+        return
+    percent = 0.0
+    if total > 0:
+        percent = max(0.0, min(100.0, current / total * 100))
+    payload = {
+        "stage": stage,
+        "message": message,
+        "current": current,
+        "total": total,
+        "percent": percent,
+    }
+    if details:
+        payload["details"] = details
+    callback(payload)
 
 
 # ==================== 图片下载工具函数 ====================
@@ -596,56 +626,128 @@ def _parse_unlock_text(text: str) -> dict:
 # ==================== 列表页解析 ====================
 
 
-def parse_list_page() -> list[dict]:
-    """
-    解析精灵图鉴列表页。
+def _name_and_form_from_sprite_href(href: str) -> tuple[str, str | None]:
+    """Extract sprite base name and optional form name from a BWIKI href."""
+    raw = unquote(href.split("/rocom/", 1)[-1].split("?", 1)[0].split("#", 1)[0])
+    raw = raw.replace("_", " ").strip()
+    form_match = re.match(r"^(.+?)[\uFF08(]([^\uFF08\uFF09()]+)[\uFF09)]$", raw)
+    if form_match:
+        return _clean_text(form_match.group(1)), _clean_text(form_match.group(2))
+    return _clean_text(raw), None
 
-    返回精灵基本信息列表，包含编号、名称、形态、URL等。
 
-    Returns:
-        list[dict]: 精灵信息列表
-    """
-    print(f"[*] 抓取列表页: {LIST_URL}")
-    soup = fetch(LIST_URL)
+def _text_from_first(root, selectors: tuple[str, ...]) -> str:
+    """Return text from the first matching selector."""
+    for selector in selectors:
+        node = root.select_one(selector)
+        if node:
+            text_value = _clean_text(node.get_text(" ", strip=True))
+            if text_value:
+                return text_value
+    return ""
 
+
+def _entry_from_current_dex_card(card) -> dict | None:
+    """Parse one current BWIKI `.dex-pet-card` sprite item."""
+    link = card.find("a", href=re.compile(r"^/rocom/(?!index\.php)"))
+    if not link:
+        return None
+    href = link.get("href", "")
+    if not href or "\u7279\u6b8a:" in href or "Special:" in href:
+        return None
+
+    text_value = _clean_text(card.get_text(" ", strip=True))
+    no_match = re.search(r"(?:NO\.?|No\.?|no\.?)\s*(\d+)", text_value, re.I)
+    if not no_match:
+        return None
+    no = int(no_match.group(1))
+
+    href_name, href_form = _name_and_form_from_sprite_href(href)
+    name = (
+        _text_from_first(card, (".dex-pet-name", ".pet-name", ".name"))
+        or _clean_text(link.get("title"))
+        or href_name
+    )
+    form = _text_from_first(card, (".dex-pet-form", ".pet-form", ".form")) or href_form
+
+    dex_stage = _text_from_first(card, (".dex-pet-stage", ".pet-stage", ".stage"))
+    dex_element = _text_from_first(
+        card,
+        (".dex-pet-element", ".pet-element", ".element", ".sprite_type"),
+    )
+    dex_form_type = _text_from_first(card, (".dex-pet-form-type", ".form-type"))
+    dex_evolution_role = _text_from_first(card, (".dex-pet-evolution-role", ".evolution-role"))
+    data_main = str(card.get("data-main-form") or card.get("data-is-main-form") or "").lower()
+    dex_is_main_form = data_main in {"1", "true", "yes"} if data_main else form in {"", None}
+
+    return {
+        "no": no,
+        "name": name,
+        "form": form or None,
+        "url": urljoin(BASE_URL, href),
+        "has_shiny": "\u5f02\u8272" in text_value or "shiny" in text_value.lower(),
+        "dex_stage": dex_stage,
+        "dex_element": dex_element,
+        "dex_form_type": dex_form_type,
+        "dex_is_main_form": dex_is_main_form,
+        "dex_evolution_role": dex_evolution_role,
+    }
+
+
+def _parse_current_dex_card_list(content) -> list[dict]:
+    """Parse the current BWIKI dex card grid layout."""
+    entries: list[dict] = []
+    seen: set[tuple[int, str, str | None, str]] = set()
+    for card in content.select(".dex-pet-card"):
+        entry = _entry_from_current_dex_card(card)
+        if not entry:
+            continue
+        key = (entry["no"], entry["name"], entry.get("form"), entry["url"])
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append(entry)
+    return entries
+
+
+def _parse_legacy_sprite_anchor_list(content) -> list[dict]:
+    """Parse the legacy sprite anchor list layout."""
     entries = []
-    content = soup.find("div", id="mw-content-text") or soup
-    # 每个精灵是 <a href="/rocom/NAME"><span>NO.xxx</span>...</a>
-    for a in content.find_all("a", href=re.compile(r"^/rocom/")):
-        span = a.find("span", string=re.compile(r"^NO\.\d+"))
+    for anchor in content.find_all("a", href=re.compile(r"^/rocom/")):
+        span = anchor.find("span", string=re.compile(r"^NO\.\d+"))
         if not span:
             continue
-        no_m = re.search(r"NO\.(\d+)", span.get_text())
-        if not no_m:
+        no_match = re.search(r"NO\.(\d+)", span.get_text())
+        if not no_match:
             continue
-        no = int(no_m.group(1))
-
-        href = a["href"]
-        url = urljoin(BASE_URL, href)
-        name_raw = unquote(href.split("/rocom/")[-1])
-
-        # 解析形态（如 "精灵名（形态名）"）
-        form_m = re.match(r"^(.+?)（(.+)）$", name_raw)
-        if form_m:
-            name = form_m.group(1)
-            form = form_m.group(2)
-        else:
-            name = name_raw
-            form = None
-
-        has_shiny = "异色" in a.get_text()
-
+        href = anchor["href"]
+        name, form = _name_and_form_from_sprite_href(href)
         entries.append(
             {
-                "no": no,
+                "no": int(no_match.group(1)),
                 "name": name,
                 "form": form,
-                "url": url,
-                "has_shiny": has_shiny,
+                "url": urljoin(BASE_URL, href),
+                "has_shiny": (
+                    "\u5f02\u8272" in anchor.get_text()
+                    or "shiny" in anchor.get_text().lower()
+                ),
             }
         )
+    return entries
 
-    print(f"[*] 共找到 {len(entries)} 条精灵记录")
+
+def parse_list_page() -> list[dict]:
+    """Parse the sprite dex list page."""
+    print(f"[*] Fetch sprite list page: {LIST_URL}")
+    soup = fetch(LIST_URL)
+
+    content = soup.find("div", id="mw-content-text") or soup
+    entries = _parse_current_dex_card_list(content)
+    if not entries:
+        entries = _parse_legacy_sprite_anchor_list(content)
+
+    print(f"[*] Found {len(entries)} sprite entries")
     return entries
 
 
@@ -1419,6 +1521,8 @@ def scrape_rocom_sprites(
     debug_images: bool = False,
     repair_images: bool = False,
     skip_skill_catalog: bool = False,
+    progress_callback: ProgressCallback | None = None,
+    entries: list[dict] | None = None,
 ) -> dict:
     """
     执行爬取并返回原始 JSON 数据。
@@ -1454,12 +1558,31 @@ def scrape_rocom_sprites(
             for d in json.load(f):
                 existing[(d["no"], d["name"], d.get("form"))] = d
 
-    try:
-        entries = parse_list_page()
-    except RuntimeError as e:
-        print(f"\n[!] 无法连接 wiki: {e}")
-        print("[!] 可能是网络问题或服务器限速，请稍后重试")
-        raise
+    if entries is None:
+        try:
+            emit_progress(progress_callback, "fetch_sprite_list", "Fetching BWIKI sprite list")
+            entries = parse_list_page()
+            emit_progress(
+                progress_callback,
+                "fetch_sprite_list",
+                "Fetched BWIKI sprite list",
+                current=len(entries),
+                total=len(entries),
+            )
+        except RuntimeError as e:
+            print(f"\n[!] Unable to connect wiki: {e}")
+            print("[!] It may be a network issue or BWIKI rate limit; please retry later.")
+            raise
+    else:
+        entries = list(entries)
+        emit_progress(
+            progress_callback,
+            "fetch_sprite_list",
+            "Using pre-filtered BWIKI sprite list",
+            current=len(entries),
+            total=len(entries),
+        )
+
 
     if limit > 0:
         entries = entries[:limit]
@@ -1469,6 +1592,13 @@ def scrape_rocom_sprites(
     failed = []
     skipped = 0
     repaired_images = 0
+    emit_progress(
+        progress_callback,
+        "scrape_sprites",
+        "Scraping sprite details",
+        current=0,
+        total=len(entries),
+    )
 
     for i, entry in enumerate(entries, 1):
         key = (entry["no"], entry["name"], entry.get("form"))
@@ -1513,6 +1643,15 @@ def scrape_rocom_sprites(
             failed.append(entry["url"])
 
         time.sleep(random.uniform(delay, delay + 1.5))
+        emit_progress(
+            progress_callback,
+            "scrape_sprites",
+            "Scraping sprite details",
+            current=i,
+            total=len(entries),
+            failed=len(failed),
+            skipped=skipped,
+        )
 
     _backfill_evolution_ids(results)
     _save(results, out_path)
@@ -1522,7 +1661,15 @@ def scrape_rocom_sprites(
     skills_out_path = out_path.with_name("skills_raw.json")
     if not skip_skill_catalog and not repair_images:
         try:
+            emit_progress(progress_callback, "fetch_skill_list", "Fetching BWIKI skill list")
             skill_entries = parse_skill_list_page()
+            emit_progress(
+                progress_callback,
+                "fetch_skill_list",
+                "Fetched BWIKI skill list",
+                current=len(skill_entries),
+                total=len(skill_entries),
+            )
             if limit > 0:
                 skill_entries = skill_entries[:limit]
                 print(f"[*] 限制模式: 只处理前 {limit} 个技能详情")
@@ -1537,6 +1684,14 @@ def scrape_rocom_sprites(
                     print(f"\n  [!] 技能详情失败: {entry.get('name')} {e}")
                     skill_failed.append(entry["url"])
                 time.sleep(random.uniform(delay, delay + 1.5))
+                emit_progress(
+                    progress_callback,
+                    "scrape_skills",
+                    "Scraping skill details",
+                    current=i,
+                    total=len(skill_entries),
+                    failed=len(skill_failed),
+                )
             _save(skill_results, skills_out_path)
         except Exception as e:
             print(f"\n  [!] 技能图鉴爬取失败: {e}")
@@ -1553,6 +1708,16 @@ def scrape_rocom_sprites(
     if skill_failed:
         skill_fail_path = out_path.with_name("failed_skill_urls.txt")
         skill_fail_path.write_text("\n".join(skill_failed), encoding="utf-8")
+
+    emit_progress(
+        progress_callback,
+        "scrape_complete",
+        "Scrape complete",
+        current=len(results) + len(skill_results),
+        total=len(entries) + len(skill_results),
+        failed=len(failed),
+        skill_failed=len(skill_failed),
+    )
 
     return {
         "sprites": results,

@@ -109,6 +109,14 @@ GET  /api/v1/admin/data-updates/rocom/jobs
 
 - `refresh_static=true`：按全量刷新处理 rocom 静态数据。导入前会重建 BWIKI
   `elf_learnable_skill` 关系；导入后会把本次数据集中已经不存在的 rocom 精灵、技能和属性克制规则软删除。
+- 远程同步任务会向任务状态写入 `progress`：包括 `fetch_sprite_list`、`scrape_sprites`、`fetch_skill_list`、
+  `scrape_skills`、`scrape_complete`、`clean`、`import`、`complete`、`failed` 等阶段；前端设置页用该字段展示进度条。
+- 安全限制：`commit=true`、`refresh_static=true` 且 `limit>0` 的远程同步会被拒绝，避免局部爬取结果触发全量刷新软删除。
+- 当前 BWIKI 精灵图鉴列表优先解析 `.dex-pet-card` 布局，旧版 `<a><span>NO.xxx</span></a>` 布局作为 fallback。
+  `.dex-pet-card` 中的阶段、属性、形态类型、主形态标记和进化角色会保存在 cleaned `forms_json.dex_metadata`，不新增数据库列。
+- 前端一键导入提供两种模式：
+  - `full`：全量刷新，等价于 `refresh_static=true`，适合完整 cleaned 数据集。
+  - `new_only`：远程同步时先检查本地缺失的新增精灵，只抓取这些新增精灵并增量导入，不软删除旧数据。
 
 如果配置了 `ADMIN_UPDATE_TOKEN`，请求需要带：
 

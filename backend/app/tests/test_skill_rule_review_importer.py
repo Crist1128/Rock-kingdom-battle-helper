@@ -114,15 +114,58 @@ def test_import_skill_rule_reviews_can_replace_rules(db_session: Session) -> Non
     assert operations[0]["effect_id"] == "effect_freeze"
 
 
+def test_import_skill_rule_reviews_falls_back_to_unique_skill_name(
+    db_session: Session,
+) -> None:
+    """人工规则的 skill_id 失效时，应按唯一技能名兜底匹配。"""
+    db_session.add(_skill("new_stable_skill_id", skill_name="力量增效"))
+    db_session.commit()
+
+    summary = import_skill_rule_reviews(
+        db_session,
+        [
+            {
+                "skill_id": "old_stale_skill_id",
+                "skill_name": "力量增效",
+                "review_status": "structured",
+                "clear_damage_rule": True,
+                "effect_operations": [
+                    {
+                        "op_type": "apply_effect",
+                        "effect_id": "effect_physical_attack_up_layered",
+                        "target": "actor_side",
+                        "layers": 10,
+                    }
+                ],
+            }
+        ],
+    )
+
+    assert summary["skills_updated"] == 1
+    assert summary["skills_missing"] == 0
+    assert summary["skill_name_fallbacks"] == [
+        {
+            "review_skill_id": "old_stale_skill_id",
+            "skill_name": "力量增效",
+            "matched_skill_id": "new_stable_skill_id",
+        }
+    ]
+    skill = db_session.get(SkillDefinition, "new_stable_skill_id")
+    assert skill is not None
+    operations = loads_json(skill.effect_operations_json, [])
+    assert operations[0]["layers"] == 10
+
+
 def _skill(
     skill_id: str,
     *,
+    skill_name: str = "测试技能",
     damage_rule_json: str | None = None,
     effect_operations_json: str | None = None,
 ) -> SkillDefinition:
     return SkillDefinition(
         skill_id=skill_id,
-        skill_name="测试技能",
+        skill_name=skill_name,
         element_type="普通",
         skill_category="status",
         base_power=None,

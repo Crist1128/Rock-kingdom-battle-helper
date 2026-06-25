@@ -1,5 +1,6 @@
 """rocom 当前 BWIKI 页面结构解析测试。"""
 
+import pytest
 from bs4 import BeautifulSoup
 
 from app.data_pipeline.rocom import scraper
@@ -222,3 +223,148 @@ def test_parse_sprite_detail_falls_back_to_base_page(monkeypatch) -> None:
 
     assert detail["stats"]["hp"] == 67
     assert detail["detail_url_used"].endswith("%E6%9D%BF%E6%9D%BF%E5%A3%B3")
+
+
+def test_parse_current_dex_card_list_layout(monkeypatch) -> None:
+    """Current `.dex-pet-card` dex list should produce sprite entries with metadata."""
+    soup = BeautifulSoup(
+        """
+        <div id="mw-content-text">
+          <div class="dex-pet-card" data-main-form="true">
+            <a href="/rocom/%E7%81%AB%E8%8A%B1" title="火花">
+              <span class="dex-pet-no">NO.007</span>
+              <span class="dex-pet-name">火花</span>
+            </a>
+            <span class="dex-pet-stage">初始</span>
+            <span class="dex-pet-element">火</span>
+            <span class="dex-pet-form-type">主形态</span>
+            <span class="dex-pet-evolution-role">一阶</span>
+          </div>
+          <div class="dex-pet-card">
+            <a href="/rocom/%E7%81%AB%E8%8A%B1%EF%BC%88%E5%BC%82%E8%89%B2%EF%BC%89">
+              <span>NO.007</span>
+              <span class="dex-pet-name">火花</span>
+              <span class="dex-pet-form">异色</span>
+            </a>
+          </div>
+        </div>
+        """,
+        "html.parser",
+    )
+    monkeypatch.setattr(scraper, "fetch", lambda _url: soup)
+
+    entries = scraper.parse_list_page()
+
+    assert len(entries) == 2
+    assert entries[0]["no"] == 7
+    assert entries[0]["name"] == "火花"
+    assert entries[0]["dex_stage"] == "初始"
+    assert entries[0]["dex_element"] == "火"
+    assert entries[0]["dex_is_main_form"] is True
+    assert entries[1]["form"] == "异色"
+
+
+def test_scrape_rocom_sprites_reports_progress(monkeypatch, tmp_path) -> None:
+    """The crawler should report progress for sprite, skill and complete stages."""
+    monkeypatch.setattr(
+        scraper,
+        "parse_list_page",
+        lambda: [
+            {
+                "no": 1,
+                "name": "TestMon",
+                "form": None,
+                "url": "https://example.test/elf",
+                "has_shiny": False,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        scraper,
+        "parse_sprite_detail",
+        lambda entry, data_dir=None, force=False: {
+            **entry,
+            "attributes": ["normal"],
+            "stats": {},
+            "ability": {},
+            "type_matchup": {},
+            "evolution_chain": [],
+            "skills": [],
+        },
+    )
+    monkeypatch.setattr(
+        scraper,
+        "parse_skill_list_page",
+        lambda: [{"name": "TestSkill", "url": "https://example.test/skill"}],
+    )
+    monkeypatch.setattr(
+        scraper,
+        "parse_skill_detail",
+        lambda entry, data_dir=None, force=False: {
+            **entry,
+            "attribute": "normal",
+            "category": "physical",
+            "power": 40,
+            "cost": 1,
+            "description": "",
+            "parse_status": "parsed",
+        },
+    )
+    monkeypatch.setattr(scraper.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(scraper.random, "uniform", lambda _a, _b: 0)
+    events: list[dict] = []
+
+    scraper.scrape_rocom_sprites(
+        output=tmp_path / "sprites_raw.json",
+        delay=0,
+        progress_callback=events.append,
+    )
+
+    stages = [event["stage"] for event in events]
+    assert "fetch_sprite_list" in stages
+    assert "scrape_sprites" in stages
+    assert "fetch_skill_list" in stages
+    assert "scrape_skills" in stages
+    assert stages[-1] == "scrape_complete"
+
+
+def test_scrape_rocom_sprites_can_use_prefiltered_entries(monkeypatch, tmp_path) -> None:
+    """New-only sync can pass pre-filtered sprite entries without parsing the full list again."""
+    monkeypatch.setattr(
+        scraper,
+        "parse_list_page",
+        lambda: pytest.fail("parse_list_page should not be called when entries are provided"),
+    )
+    monkeypatch.setattr(
+        scraper,
+        "parse_sprite_detail",
+        lambda entry, data_dir=None, force=False: {
+            **entry,
+            "attributes": ["normal"],
+            "stats": {},
+            "ability": {},
+            "type_matchup": {},
+            "evolution_chain": [],
+            "skills": [],
+        },
+    )
+    monkeypatch.setattr(scraper.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(scraper.random, "uniform", lambda _a, _b: 0)
+
+    result = scraper.scrape_rocom_sprites(
+        output=tmp_path / "sprites_raw.json",
+        delay=0,
+        skip_skill_catalog=True,
+        entries=[
+            {
+                "no": 99,
+                "name": "OnlyNew",
+                "form": None,
+                "url": "https://example.test/only-new",
+                "has_shiny": False,
+            }
+        ],
+    )
+
+    assert result["stats"]["entries"] == 1
+    assert result["sprites"][0]["name"] == "OnlyNew"

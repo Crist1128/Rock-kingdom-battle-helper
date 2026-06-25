@@ -882,6 +882,8 @@ export interface RocomDataUpdateRequest {
   write_artifacts?: boolean;
   /** 是否按全量刷新 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项。 */
   refresh_static?: boolean;
+  /** Update mode: incremental, full, or new_only. */
+  update_mode?: "incremental" | "full" | "new_only";
 }
 
 export interface RocomLocalImportRequest {
@@ -893,12 +895,25 @@ export interface RocomLocalImportRequest {
   data_version?: string | null;
   /** 是否按全量刷新 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项。 */
   refresh_static?: boolean;
+  /** Local import mode: incremental or full. */
+  update_mode?: "incremental" | "full";
 }
 
 export interface RocomDataUpdateAccepted {
   job_id: string;
   status: "queued" | "running" | "succeeded" | "failed";
   message: string;
+}
+
+export interface RocomJobProgress {
+  stage?: string;
+  message?: string;
+  current?: number;
+  total?: number;
+  percent?: number;
+  updated_at?: string;
+  details?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface RocomDataUpdateJobStatus {
@@ -911,4 +926,5 @@ export interface RocomDataUpdateJobStatus {
   params: Record<string, unknown>;
   result?: Record<string, unknown> | null;
   error?: string | null;
+  progress?: RocomJobProgress;
 }

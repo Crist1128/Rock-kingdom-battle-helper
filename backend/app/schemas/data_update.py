@@ -24,6 +24,10 @@ class RocomDataUpdateRequest(BaseModel):
         default=False,
         description="是否按全量刷新处理 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项",
     )
+    update_mode: str = Field(
+        default="incremental",
+        description="更新模式：incremental=增量更新；full=全量刷新；new_only=只抓取远程新增精灵",
+    )
 
 
 class RocomCheckRequest(BaseModel):
@@ -54,6 +58,10 @@ class RocomLocalImportRequest(BaseModel):
         default=False,
         description="是否按全量刷新处理 rocom 静态数据，重建 BWIKI 技能关系并软删除缺失静态项",
     )
+    update_mode: str = Field(
+        default="incremental",
+        description="本地导入模式：incremental=增量导入；full=全量刷新",
+    )
 
 
 class RocomDataUpdateAccepted(BaseModel):
@@ -76,6 +84,7 @@ class RocomDataUpdateJobStatus(BaseModel):
     params: dict[str, Any]
     result: dict[str, Any] | None = None
     error: str | None = None
+    progress: dict[str, Any] = Field(default_factory=dict, description="后台任务进度")
 
 
 class RocomCheckResponse(BaseModel):

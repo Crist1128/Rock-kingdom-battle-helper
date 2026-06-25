@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.db.init_db import ensure_database_schema_current
 from app.seed.core_natures import ensure_core_natures_with_session
 from app.seed.core_skills import ensure_core_skills_with_session
 
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def ensure_core_rules_on_startup() -> None:
         """服务启动时幂等补齐小型核心规则数据。"""
+        ensure_database_schema_current()
         ensure_core_natures_with_session()
         ensure_core_skills_with_session()
 

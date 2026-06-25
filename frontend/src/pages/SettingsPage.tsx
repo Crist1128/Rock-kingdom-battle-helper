@@ -7,6 +7,7 @@ import type {
   RocomCheckResponse,
   RocomDataUpdateAccepted,
   RocomDataUpdateJobStatus,
+  RocomJobProgress,
 } from "@/types/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +44,10 @@ export function SettingsPage() {
   const [syncForce, setSyncForce] = useState(false);
   const [syncWithImages, setSyncWithImages] = useState(false);
   const [syncWriteArtifacts, setSyncWriteArtifacts] = useState(true);
+  const [syncUpdateMode, setSyncUpdateMode] = useState<"full" | "new_only">("full");
   const [localCleanedDir, setLocalCleanedDir] = useState("");
   const [localDataVersion, setLocalDataVersion] = useState("");
+  const [localUpdateMode, setLocalUpdateMode] = useState<"full" | "incremental">("full");
   const [lastCheckResult, setLastCheckResult] = useState<RocomCheckResponse | null>(null);
   const [lastAcceptedJob, setLastAcceptedJob] = useState<RocomDataUpdateAccepted | null>(null);
 
@@ -64,7 +67,7 @@ export function SettingsPage() {
     queryFn: () => api.adminDataUpdates.listRocomJobs(adminToken || undefined),
     refetchInterval: (query) => {
       const jobs = query.state.data as RocomDataUpdateJobStatus[] | undefined;
-      return jobs?.some((job) => job.status === "queued" || job.status === "running") ? 3000 : false;
+      return jobs?.some((job) => job.status === "queued" || job.status === "running") ? 1000 : false;
     },
   });
 
@@ -105,8 +108,19 @@ export function SettingsPage() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: (commit: boolean) =>
-      api.adminDataUpdates.syncRocom(
+    mutationFn: async (commit: boolean) => {
+      const check = await api.adminDataUpdates.checkRocom(
+        {
+          limit: 0,
+          include_new_elves_limit: 50,
+        },
+        adminToken || undefined,
+      );
+      setLastCheckResult(check);
+      if (syncUpdateMode === "new_only" && check.new_elf_count === 0) {
+        throw new Error("远程检查没有发现新增精灵，已取消“只更新新增”任务。");
+      }
+      return api.adminDataUpdates.syncRocom(
         {
           commit,
           force: syncForce,
@@ -115,9 +129,12 @@ export function SettingsPage() {
           with_images: syncWithImages,
           data_version: emptyToNull(syncDataVersion),
           write_artifacts: syncWriteArtifacts,
+          refresh_static: syncUpdateMode === "full",
+          update_mode: syncUpdateMode,
         },
         adminToken || undefined,
-      ),
+      );
+    },
     onSuccess: async (result) => {
       setLastAcceptedJob(result);
       await refreshRuleQueries();
@@ -131,6 +148,8 @@ export function SettingsPage() {
           cleaned_dir: emptyToNull(localCleanedDir),
           commit,
           data_version: emptyToNull(localDataVersion),
+          refresh_static: localUpdateMode === "full",
+          update_mode: localUpdateMode,
         },
         adminToken || undefined,
       ),
@@ -187,6 +206,7 @@ export function SettingsPage() {
   const dataJobsError = getApiErrorText(dataUpdateJobs.error);
   const bulkError = getApiErrorText(bulkPurgeMutation.error);
   const singleError = getApiErrorText(singlePurgeMutation.error);
+  const syncLimitedRefreshCommitBlocked = syncUpdateMode === "full" && toNumber(syncLimit, 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -285,7 +305,8 @@ export function SettingsPage() {
             <div>
               <h3 className="font-semibold">2. 从本地 cleaned JSON 导入数据库</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                如果你已经通过爬虫或其他方式生成了 cleaned JSON，优先用这个入口。它不访问远程，速度更稳定。
+                如果你已经通过爬虫或其他方式生成了 cleaned JSON，优先用这个入口。它不访问远程，速度更稳定；
+                提交时会在同一事务内补齐项目内置状态定义和人工技能规则。
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -306,13 +327,39 @@ export function SettingsPage() {
                 />
               </label>
             </div>
+            <div className="space-y-2 rounded-xl border bg-slate-50 p-3 text-sm">
+              <div className="font-medium">导入模式</div>
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="local-update-mode"
+                  checked={localUpdateMode === "full"}
+                  onChange={() => setLocalUpdateMode("full")}
+                />
+                <span>全量更新：重建 BWIKI 技能关系，并软删除本地缺失的 rocom 静态项。</span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="local-update-mode"
+                  checked={localUpdateMode === "incremental"}
+                  onChange={() => setLocalUpdateMode("incremental")}
+                />
+                <span>增量导入：不软删除旧数据，适合只补充新爬到的数据。</span>
+              </label>
+            </div>
+            {localUpdateMode === "full" ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                全量提交前请先确认 cleaned JSON 是完整数据集；你当前已生成的默认 cleaned 目录会被直接导入，不会重新访问 BWIKI。
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 onClick={() => importLocalMutation.mutate(false)}
                 disabled={Boolean(runningJob) || importLocalMutation.isPending}
               >
-                本地导入 dry-run
+                预检查本地数据（dry-run）
               </Button>
               <Button
                 onClick={() => {
@@ -322,7 +369,7 @@ export function SettingsPage() {
                 }}
                 disabled={Boolean(runningJob) || importLocalMutation.isPending}
               >
-                提交本地导入
+                一键导入本地数据（提交）
               </Button>
             </div>
             {importLocalError ? <ErrorBox text={importLocalError} /> : null}
@@ -332,7 +379,7 @@ export function SettingsPage() {
             <div>
               <h3 className="font-semibold">3. 远程爬取、清洗并导入</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                该操作会访问 BWIKI。默认按钮是 dry-run，不提交数据库；确认无误后再提交写库。
+                该操作会访问 BWIKI。默认按钮是 dry-run，不提交数据库；确认无误后再提交写库。提交时同样会补齐项目内置状态定义和人工技能规则。
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
@@ -379,13 +426,39 @@ export function SettingsPage() {
                 写 raw / cleaned 文件
               </label>
             </div>
+            <div className="space-y-2 rounded-xl border bg-slate-50 p-3 text-sm">
+              <div className="font-medium">远程更新模式</div>
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="sync-update-mode"
+                  checked={syncUpdateMode === "full"}
+                  onChange={() => setSyncUpdateMode("full")}
+                />
+                <span>全量更新：先检查远程，再完整爬取并全量刷新本地 rocom 静态数据。</span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="sync-update-mode"
+                  checked={syncUpdateMode === "new_only"}
+                  onChange={() => setSyncUpdateMode("new_only")}
+                />
+                <span>只更新新增：先检查远程，只抓取本地还没有的新增精灵，不软删除旧数据。</span>
+              </label>
+            </div>
+            {syncLimitedRefreshCommitBlocked ? (
+              <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                全量提交不能和“同步前 N 条”同时使用；请先 dry-run，或把同步前 N 条改为 0 后再提交。
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 onClick={() => syncMutation.mutate(false)}
                 disabled={Boolean(runningJob) || syncMutation.isPending}
               >
-                远程同步 dry-run
+                预检查远程并 dry-run
               </Button>
               <Button
                 onClick={() => {
@@ -393,9 +466,9 @@ export function SettingsPage() {
                     syncMutation.mutate(true);
                   }
                 }}
-                disabled={Boolean(runningJob) || syncMutation.isPending}
+                disabled={Boolean(runningJob) || syncMutation.isPending || syncLimitedRefreshCommitBlocked}
               >
-                提交远程同步
+                一键导入远程数据（提交）
               </Button>
             </div>
             {syncError ? <ErrorBox text={syncError} /> : null}
@@ -558,24 +631,53 @@ function RocomJobCard({ job }: { job: RocomDataUpdateJobStatus }) {
     <div className="rounded-xl border bg-slate-50 p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="font-medium">{job.job_type} · {job.job_id}</div>
+          <div className="font-medium">{job.job_type} - {job.job_id}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            创建：{new Date(job.created_at).toLocaleString()}
-            {job.finished_at ? ` · 完成：${new Date(job.finished_at).toLocaleString()}` : ""}
+            Created: {new Date(job.created_at).toLocaleString()}
+            {job.finished_at ? ` - Finished: ${new Date(job.finished_at).toLocaleString()}` : ""}
           </div>
         </div>
         <Badge variant={getJobBadgeVariant(job.status)}>{translateJobStatus(job.status)}</Badge>
       </div>
       {job.error ? <ErrorBox text={job.error} /> : null}
+      <RocomJobProgressBar progress={job.progress} status={job.status} />
       <details className="mt-3">
-        <summary className="cursor-pointer text-sm text-muted-foreground">查看参数 / 结果</summary>
+        <summary className="cursor-pointer text-sm text-muted-foreground">View params / progress / result</summary>
         <pre className="mt-2 max-h-72 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-white">
-          {JSON.stringify({ params: job.params, result: job.result }, null, 2)}
+          {JSON.stringify({ params: job.params, progress: job.progress, result: job.result }, null, 2)}
         </pre>
       </details>
     </div>
   );
 }
+
+function RocomJobProgressBar({
+  progress,
+  status,
+}: {
+  progress?: RocomJobProgress;
+  status: RocomDataUpdateJobStatus["status"];
+}) {
+  const percent = clampProgressPercent(progress?.percent, status);
+  const current = typeof progress?.current === "number" ? progress.current : null;
+  const total = typeof progress?.total === "number" ? progress.total : null;
+  const countText = current !== null && total !== null && total > 0 ? `${current}/${total}` : "";
+
+  return (
+    <div className="mt-3 space-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          {translateProgressStage(progress?.stage)}{progress?.message ? ` - ${progress.message}` : ""}
+        </span>
+        <span className="font-mono">{countText ? `${countText} - ` : ""}{percent.toFixed(0)}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 
 function ArchivedBattleRow({
   battle,
@@ -671,6 +773,33 @@ function translateJobStatus(status: RocomDataUpdateJobStatus["status"]): string 
     failed: "失败",
   };
   return dict[status];
+}
+
+function translateProgressStage(stage?: string): string {
+  const dict: Record<string, string> = {
+    queued: "Queued",
+    running: "Running",
+    fetch_sprite_list: "Fetch sprite list",
+    scrape_sprites: "Scrape sprites",
+    fetch_skill_list: "Fetch skill list",
+    scrape_skills: "Scrape skills",
+    scrape_complete: "Scrape complete",
+    clean: "Clean",
+    load_cleaned: "Load cleaned JSON",
+    import: "Import",
+    complete: "Complete",
+    failed: "Failed",
+  };
+  return stage ? (dict[stage] ?? stage) : "Waiting";
+}
+
+function clampProgressPercent(
+  percent: RocomJobProgress["percent"] | undefined,
+  status: RocomDataUpdateJobStatus["status"],
+): number {
+  if (status === "succeeded") return 100;
+  if (typeof percent !== "number" || !Number.isFinite(percent)) return 0;
+  return Math.min(100, Math.max(0, percent));
 }
 
 function getApiErrorText(error: unknown): string | null {

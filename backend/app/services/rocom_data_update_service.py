@@ -22,14 +22,28 @@ from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import BACKEND_DIR, settings
+from app.data_pipeline.effects.importer import import_effect_definitions, read_effect_rows
 from app.data_pipeline.rocom.cleaner import clean_from_raw_sprites, write_cleaned_dataset
 from app.data_pipeline.rocom.importer import import_dataset, load_cleaned_dataset
 from app.data_pipeline.rocom.scraper import parse_list_page, scrape_rocom_sprites
+from app.data_pipeline.skill_rule_reviews.importer import (
+    import_skill_rule_reviews,
+    read_review_rows,
+)
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
 from app.models.static import ElfDefinition
+
+PROJECT_EFFECT_SEED_FILES = (
+    BACKEND_DIR / "app" / "seed" / "manual_skill_effect_definitions_all_20260612.json",
+    BACKEND_DIR / "app" / "seed" / "effect_definitions_p0.json",
+)
+PROJECT_SKILL_REVIEW_SEED_FILES = (
+    BACKEND_DIR / "app" / "seed" / "manual_skill_rule_reviews_all_20260612.json",
+)
 
 
 @dataclass(slots=True)
@@ -48,6 +62,7 @@ class RocomUpdateParams:
     data_version: str | None = None
     write_artifacts: bool = True
     refresh_static: bool = False
+    update_mode: str = "incremental"
 
 
 @dataclass(slots=True)
@@ -70,6 +85,7 @@ class RocomImportLocalParams:
     commit: bool = False
     data_version: str | None = None
     refresh_static: bool = False
+    update_mode: str = "incremental"
 
 
 @dataclass(slots=True)
@@ -89,6 +105,7 @@ class RocomUpdateJob:
     finished_at: str | None = None
     result: dict[str, Any] | None = None
     error: str | None = None
+    progress: dict[str, Any] = field(default_factory=dict)
     traceback: str | None = field(default=None, repr=False)
 
 
@@ -132,13 +149,21 @@ def _create_job(params: dict[str, Any], *, job_type: str) -> dict[str, Any]:
             status="queued",
             created_at=utc_now_iso(),
             params=params,
+            progress={
+                "stage": "queued",
+                "message": "任务已排队",
+                "current": 0,
+                "total": 0,
+                "percent": 0,
+            },
         )
         _jobs[job_id] = job
         return asdict(job)
 
 
 def create_rocom_update_job(params: RocomUpdateParams) -> dict[str, Any]:
-    """创建远程同步任务记录。"""
+    """Create a remote sync job."""
+    _validate_update_params(params)
     return _create_job(asdict(params), job_type="sync")
 
 
@@ -148,31 +173,119 @@ def create_rocom_import_local_job(params: RocomImportLocalParams) -> dict[str, A
 
 
 def _finish_job_success(job_id: str, result: dict[str, Any]) -> None:
-    """把任务标记为成功。"""
+    """Mark a job as successful."""
     with _jobs_lock:
         job = _jobs[job_id]
         job.status = "succeeded"
         job.finished_at = utc_now_iso()
         job.result = result
+        job.progress = {
+            "stage": "complete",
+            "message": "Job complete",
+            "current": 100,
+            "total": 100,
+            "percent": 100,
+            "updated_at": utc_now_iso(),
+        }
 
 
 def _finish_job_error(job_id: str, exc: Exception) -> None:
-    """把任务标记为失败，并保存 traceback 供开发排查。"""
+    """Mark a job as failed and keep traceback for debugging."""
     with _jobs_lock:
         job = _jobs[job_id]
         job.status = "failed"
         job.finished_at = utc_now_iso()
         job.error = str(exc)
+        job.progress = {
+            "stage": "failed",
+            "message": str(exc),
+            "current": 0,
+            "total": 0,
+            "percent": 0,
+            "updated_at": utc_now_iso(),
+        }
         job.traceback = traceback.format_exc()
 
 
 def _mark_job_running(job_id: str) -> tuple[str, dict[str, Any]]:
-    """把任务标记为 running，并返回 job_type 与参数副本。"""
+    """Mark a job as running and return job_type plus params copy."""
     with _jobs_lock:
         job = _jobs[job_id]
         job.status = "running"
         job.started_at = utc_now_iso()
+        job.progress = {
+            "stage": "running",
+            "message": "Job started",
+            "current": 0,
+            "total": 0,
+            "percent": 0,
+            "updated_at": utc_now_iso(),
+        }
         return job.job_type, dict(job.params)
+
+
+def _update_job_progress(job_id: str, progress: dict[str, Any]) -> None:
+    """Update background job progress for frontend polling."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job is None:
+            return
+        job.progress = {**progress, "updated_at": utc_now_iso()}
+
+
+def _validate_update_params(params: RocomUpdateParams) -> None:
+    """Reject partial committed full-refresh jobs to protect static data."""
+    if params.update_mode not in {"incremental", "full", "new_only"}:
+        raise ValueError("update_mode must be incremental, full, or new_only")
+    effective_refresh_static = params.refresh_static or params.update_mode == "full"
+    if params.update_mode == "new_only" and params.refresh_static:
+        raise ValueError("new_only mode cannot be used with refresh_static=true")
+    if params.commit and effective_refresh_static and params.limit > 0:
+        raise ValueError(
+            "commit=true with refresh_static=true requires limit=0; "
+            "run dry-run first or set limit to 0 before committing a full refresh."
+        )
+
+
+def _local_rocom_elf_ids() -> set[str]:
+    """Return active local rocom elf IDs."""
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            select(ElfDefinition.elf_id).where(
+                ElfDefinition.elf_id.like("rocom_elf_%"),
+                ElfDefinition.deleted_at.is_(None),
+            )
+        ).all()
+        return {row.elf_id for row in rows}
+    finally:
+        db.close()
+
+
+def _new_remote_sprite_entries(limit: int = 0) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Fetch the remote sprite list and keep entries that do not exist locally."""
+    from app.data_pipeline.rocom.cleaner import make_elf_id
+
+    entries = parse_list_page()
+    local_ids = _local_rocom_elf_ids()
+    new_entries = [entry for entry in entries if make_elf_id(entry) not in local_ids]
+    if limit > 0:
+        new_entries = new_entries[:limit]
+    return new_entries, {
+        "remote_count": len(entries),
+        "local_rocom_count": len(local_ids),
+        "new_elf_count": len(new_entries),
+        "new_elf_preview": [
+            {
+                "no": entry.get("no"),
+                "name": entry.get("name"),
+                "form": entry.get("form"),
+                "url": entry.get("url"),
+            }
+            for entry in new_entries[:50]
+        ],
+        "new_elf_preview_truncated": len(new_entries) > 50,
+    }
 
 
 def check_rocom_remote_updates(params: RocomCheckParams) -> dict[str, Any]:
@@ -255,10 +368,68 @@ def run_rocom_update_job(job_id: str) -> None:
 
     data_root = Path(settings.rocom_data_dir)
     raw_dir = data_root / "raw"
-    cleaned_dir = data_root / "cleaned"
-    raw_output = raw_dir / "sprites_raw.json"
+    cleaned_name = "cleaned_new_only" if params.update_mode == "new_only" else "cleaned"
+    cleaned_dir = data_root / cleaned_name
+    raw_output = raw_dir / (
+        "sprites_raw_new_only.json" if params.update_mode == "new_only" else "sprites_raw.json"
+    )
 
     try:
+        _validate_update_params(params)
+        entries_override: list[dict[str, Any]] | None = None
+        remote_check: dict[str, Any] | None = None
+        skip_skill_catalog = False
+        if params.update_mode == "new_only":
+            _update_job_progress(
+                job_id,
+                {
+                    "stage": "check_remote",
+                    "message": "Checking remote new sprites",
+                    "current": 0,
+                    "total": 1,
+                    "percent": 0,
+                },
+            )
+            entries_override, remote_check = _new_remote_sprite_entries(params.limit)
+            _update_job_progress(
+                job_id,
+                {
+                    "stage": "check_remote",
+                    "message": "Remote check complete",
+                    "current": 1,
+                    "total": 1,
+                    "percent": 100,
+                    "details": remote_check,
+                },
+            )
+            skip_skill_catalog = True
+            if not entries_override:
+                _update_job_progress(
+                    job_id,
+                    {
+                        "stage": "import_project_rules",
+                        "message": "No new sprites; importing project seed rules only",
+                        "current": 0,
+                        "total": 1,
+                        "percent": 0,
+                    },
+                )
+                project_rule_summary, transaction = _import_project_seed_rules_with_transaction(
+                    commit=params.commit
+                )
+                _finish_job_success(
+                    job_id,
+                    {
+                        "transaction": transaction,
+                        "commit": params.commit,
+                        "remote_check": remote_check,
+                        "import_summary": {},
+                        "project_rule_summary": project_rule_summary,
+                        "warnings": [],
+                    },
+                )
+                return
+
         scrape_result = scrape_rocom_sprites(
             output=raw_output,
             limit=params.limit,
@@ -267,6 +438,19 @@ def run_rocom_update_job(job_id: str) -> None:
             force=params.force,
             debug_images=False,
             repair_images=False,
+            skip_skill_catalog=skip_skill_catalog,
+            progress_callback=lambda progress: _update_job_progress(job_id, progress),
+            entries=entries_override,
+        )
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "clean",
+                "message": "Cleaning scraped data",
+                "current": 0,
+                "total": 1,
+                "percent": 0,
+            },
         )
         dataset = clean_from_raw_sprites(
             scrape_result["sprites"],
@@ -277,21 +461,54 @@ def run_rocom_update_job(job_id: str) -> None:
         )
         if params.write_artifacts:
             write_cleaned_dataset(dataset, cleaned_dir)
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "clean",
+                "message": "Clean complete",
+                "current": 1,
+                "total": 1,
+                "percent": 100,
+            },
+        )
 
-        import_summary, transaction = _import_dataset_with_transaction(
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "import",
+                "message": "Importing dataset; commit=false will roll back as dry-run",
+                "current": 0,
+                "total": 1,
+                "percent": 0,
+            },
+        )
+        import_summary, project_rule_summary, transaction = _import_dataset_with_transaction(
             dataset=dataset,
             commit=params.commit,
-            refresh_static=params.refresh_static,
+            refresh_static=params.refresh_static or params.update_mode == "full",
+        )
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "import",
+                "message": "Import complete",
+                "current": 1,
+                "total": 1,
+                "percent": 100,
+            },
         )
 
         result = {
             "transaction": transaction,
             "commit": params.commit,
+            "update_mode": params.update_mode,
             "raw_output": str(raw_output.resolve()),
             "cleaned_dir": str(cleaned_dir.resolve()) if params.write_artifacts else None,
+            "remote_check": remote_check,
             "scrape_stats": scrape_result["stats"],
             "clean_stats": dataset.stats,
             "import_summary": import_summary,
+            "project_rule_summary": project_rule_summary,
             "warnings": dataset.warnings[:50],
         }
         _finish_job_success(job_id, result)
@@ -324,22 +541,64 @@ def run_rocom_import_local_job(job_id: str) -> None:
     cleaned_dir = _resolve_cleaned_dir(params.cleaned_dir)
 
     try:
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "load_cleaned",
+                "message": "Loading local cleaned JSON",
+                "current": 0,
+                "total": 1,
+                "percent": 0,
+            },
+        )
         dataset = load_cleaned_dataset(cleaned_dir)
         if params.data_version:
             _override_dataset_version(dataset, params.data_version)
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "load_cleaned",
+                "message": "Loaded local cleaned JSON",
+                "current": 1,
+                "total": 1,
+                "percent": 100,
+            },
+        )
 
-        import_summary, transaction = _import_dataset_with_transaction(
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "import",
+                "message": "Importing dataset; commit=false will roll back as dry-run",
+                "current": 0,
+                "total": 1,
+                "percent": 0,
+            },
+        )
+        import_summary, project_rule_summary, transaction = _import_dataset_with_transaction(
             dataset=dataset,
             commit=params.commit,
-            refresh_static=params.refresh_static,
+            refresh_static=params.refresh_static or params.update_mode == "full",
+        )
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "import",
+                "message": "Import complete",
+                "current": 1,
+                "total": 1,
+                "percent": 100,
+            },
         )
 
         result = {
             "transaction": transaction,
             "commit": params.commit,
+            "update_mode": params.update_mode,
             "cleaned_dir": str(cleaned_dir.resolve()),
             "clean_stats": dataset.stats,
             "import_summary": import_summary,
+            "project_rule_summary": project_rule_summary,
             "warnings": dataset.warnings[:50],
         }
         _finish_job_success(job_id, result)
@@ -366,8 +625,8 @@ def _import_dataset_with_transaction(
     dataset: Any,
     commit: bool,
     refresh_static: bool = False,
-) -> tuple[dict[str, Any], str]:
-    """导入数据集，并按 commit 决定提交或回滚。"""
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    """导入数据集和项目规则种子，并按 commit 决定提交或回滚。"""
     init_db()
     db = SessionLocal()
     try:
@@ -376,18 +635,64 @@ def _import_dataset_with_transaction(
             dataset,
             refresh_static=refresh_static,
         )
+        project_rule_summary = import_project_seed_rules(db)
         if commit:
             db.commit()
             transaction = "committed"
         else:
             db.rollback()
             transaction = "rolled_back_dry_run"
-        return import_summary, transaction
+        return import_summary, project_rule_summary, transaction
     except Exception:
         db.rollback()
         raise
     finally:
         db.close()
+
+
+def _import_project_seed_rules_with_transaction(*, commit: bool) -> tuple[dict[str, Any], str]:
+    """只导入项目规则种子，用于远程 new_only 无新增时补齐空库规则。"""
+    init_db()
+    db = SessionLocal()
+    try:
+        project_rule_summary = import_project_seed_rules(db)
+        if commit:
+            db.commit()
+            transaction = "committed"
+        else:
+            db.rollback()
+            transaction = "rolled_back_dry_run"
+        return project_rule_summary, transaction
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def import_project_seed_rules(db: Session) -> dict[str, Any]:
+    """导入本项目运行必需的状态定义与人工技能规则。
+
+    rocom cleaned 只负责精灵/技能/可学习关系等 BWIKI 基础数据；状态系统还依赖
+    仓库内稳定 effect_id 的人工规则种子。把这一步并入本地/远程数据导入事务后，
+    新电脑或空库不会出现“技能有结构化操作但 effect_definition 为空”的半成品状态。
+    """
+    effect_summaries: list[dict[str, Any]] = []
+    for path in PROJECT_EFFECT_SEED_FILES:
+        rows = read_effect_rows(path)
+        summary = import_effect_definitions(db, rows)
+        effect_summaries.append({"path": str(path), **summary})
+
+    review_summaries: list[dict[str, Any]] = []
+    for path in PROJECT_SKILL_REVIEW_SEED_FILES:
+        rows = read_review_rows(path)
+        summary = import_skill_rule_reviews(db, rows)
+        review_summaries.append({"path": str(path), **summary})
+
+    return {
+        "effect_seed_files": effect_summaries,
+        "skill_review_seed_files": review_summaries,
+    }
 
 
 def start_rocom_update_thread(params: RocomUpdateParams) -> dict[str, Any]:

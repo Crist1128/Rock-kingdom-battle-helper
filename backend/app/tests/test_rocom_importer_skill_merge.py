@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.data_pipeline.rocom.avatar_repair import repair_missing_elf_avatars
 from app.data_pipeline.rocom.cleaner import CleanedDataset
-from app.data_pipeline.rocom.importer import import_dataset
+from app.data_pipeline.rocom.importer import ELF_FIELDS, SKILL_FIELDS, import_dataset
 from app.db.base import Base
 from app.models import battle as _battle_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
@@ -522,3 +522,12 @@ def test_repair_missing_elf_avatars_updates_only_empty_avatar(
     assert empty.avatar == "https://example.test/empty.png"
     assert keep is not None
     assert keep.avatar == "https://example.test/old.png"
+
+
+def test_rocom_importer_fields_match_static_models() -> None:
+    """Importer field allowlists should match existing static ORM columns."""
+    elf_columns = set(ElfDefinition.__table__.columns.keys())
+    skill_columns = set(SkillDefinition.__table__.columns.keys())
+
+    assert set(ELF_FIELDS).issubset(elf_columns)
+    assert set(SKILL_FIELDS).issubset(skill_columns)

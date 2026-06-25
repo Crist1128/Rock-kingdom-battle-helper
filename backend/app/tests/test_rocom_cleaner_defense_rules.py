@@ -212,3 +212,49 @@ def test_cleaner_parses_basic_weather_and_strength_operations() -> None:
     assert strength_ops[0]["operation"] == "apply_effect"
     assert strength_ops[0]["effect_id"] == "effect_physical_attack_up_layered"
     assert strength_ops[0]["layers"] == 10
+
+
+def test_clean_from_raw_sprites_keeps_dex_card_metadata_in_forms_json() -> None:
+    """Dex-card metadata should stay in forms_json without requiring new DB columns."""
+    from app.data_pipeline.rocom.cleaner import clean_from_raw_sprites
+
+    dataset = clean_from_raw_sprites(
+        [
+            {
+                "no": 7,
+                "name": "火花",
+                "form": None,
+                "url": "https://wiki.biligame.com/rocom/%E7%81%AB%E8%8A%B1",
+                "has_shiny": False,
+                "attributes": ["火"],
+                "stats": {
+                    "hp": 100,
+                    "atk": 90,
+                    "sp_atk": 80,
+                    "def": 70,
+                    "sp_def": 60,
+                    "spd": 50,
+                    "total": 450,
+                },
+                "ability": {"name": "test", "description": "test"},
+                "type_matchup": {},
+                "evolution_chain": [],
+                "skills": [],
+                "dex_stage": "初始",
+                "dex_element": "火",
+                "dex_form_type": "主形态",
+                "dex_is_main_form": True,
+                "dex_evolution_role": "一阶",
+            }
+        ],
+        image_url_rows=[],
+    )
+
+    forms = json.loads(dataset.elves[0]["forms_json"])
+    assert forms["dex_metadata"] == {
+        "stage": "初始",
+        "element": "火",
+        "form_type": "主形态",
+        "is_main_form": True,
+        "evolution_role": "一阶",
+    }

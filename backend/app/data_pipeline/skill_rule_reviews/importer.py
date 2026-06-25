@@ -12,6 +12,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.init_db import init_db
@@ -33,18 +34,20 @@ def read_review_rows(path: str | Path) -> list[dict[str, Any]]:
 def validate_review_rows(rows: list[dict[str, Any]]) -> list[str]:
     """校验技能审阅行，返回错误列表。"""
     errors: list[str] = []
-    seen_skill_ids: set[str] = set()
+    seen_skill_keys: set[str] = set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             errors.append(f"row[{index}] 不是对象")
             continue
         skill_id = row.get("skill_id")
-        if not skill_id:
-            errors.append(f"row[{index}] 缺少 skill_id")
-        elif str(skill_id) in seen_skill_ids:
-            errors.append(f"row[{index}] skill_id 重复：{skill_id}")
+        skill_name = row.get("skill_name")
+        skill_key = str(skill_id or skill_name or "")
+        if not skill_key:
+            errors.append(f"row[{index}] 缺少 skill_id 或 skill_name")
+        elif skill_key in seen_skill_keys:
+            errors.append(f"row[{index}] skill_id/skill_name 重复：{skill_key}")
         else:
-            seen_skill_ids.add(str(skill_id))
+            seen_skill_keys.add(skill_key)
 
         status = row.get("review_status")
         if status not in REVIEW_STATUS_VALUES:
@@ -78,6 +81,8 @@ def import_skill_rule_reviews(db: Session, rows: list[dict[str, Any]]) -> dict[s
         "skills_skipped": 0,
         "errors": errors,
         "missing_skill_ids": [],
+        "skill_name_fallbacks": [],
+        "skill_name_conflicts": [],
         "status_counts": {},
         "structure_gap_counts": {},
         "total_rows": len(rows),
@@ -89,18 +94,33 @@ def import_skill_rule_reviews(db: Session, rows: list[dict[str, Any]]) -> dict[s
     status_counts: Counter[str] = Counter()
     gap_counts: Counter[str] = Counter()
     for row in rows:
-        skill_id = str(row["skill_id"])
-        skill = db.get(SkillDefinition, skill_id)
+        skill_id = str(row.get("skill_id") or "")
+        expected_name = str(row.get("skill_name") or "")
+        skill = db.get(SkillDefinition, skill_id) if skill_id else None
+        if skill is None or skill.deleted_at is not None:
+            fallback = _find_active_skill_by_name(db, expected_name) if expected_name else None
+            if fallback is not None:
+                skill = fallback
+                summary["skill_name_fallbacks"].append(
+                    {
+                        "review_skill_id": skill_id or None,
+                        "skill_name": expected_name,
+                        "matched_skill_id": skill.skill_id,
+                    }
+                )
+            elif expected_name and _has_active_skill_name_conflict(db, expected_name):
+                summary["skill_name_conflicts"].append(
+                    {"review_skill_id": skill_id or None, "skill_name": expected_name}
+                )
         if skill is None or skill.deleted_at is not None:
             summary["skills_missing"] += 1
-            summary["missing_skill_ids"].append(skill_id)
+            summary["missing_skill_ids"].append(skill_id or expected_name)
             continue
 
-        expected_name = row.get("skill_name")
         if expected_name and expected_name != skill.skill_name:
             summary.setdefault("name_mismatches", []).append(
                 {
-                    "skill_id": skill_id,
+                    "skill_id": skill.skill_id,
                     "expected": expected_name,
                     "actual": skill.skill_name,
                 }
@@ -122,6 +142,35 @@ def import_skill_rule_reviews(db: Session, rows: list[dict[str, Any]]) -> dict[s
     summary["status_counts"] = dict(sorted(status_counts.items()))
     summary["structure_gap_counts"] = dict(sorted(gap_counts.items()))
     return summary
+
+
+def _find_active_skill_by_name(db: Session, skill_name: str) -> SkillDefinition | None:
+    """按技能名兜底匹配，避免清洗器稳定 ID 规则调整后人工规则无法导入。"""
+    if not skill_name:
+        return None
+    matches = list(
+        db.scalars(
+            select(SkillDefinition).where(
+                SkillDefinition.skill_name == skill_name,
+                SkillDefinition.deleted_at.is_(None),
+            )
+        ).all()
+    )
+    return matches[0] if len(matches) == 1 else None
+
+
+def _has_active_skill_name_conflict(db: Session, skill_name: str) -> bool:
+    if not skill_name:
+        return False
+    matches = list(
+        db.scalars(
+            select(SkillDefinition.skill_id).where(
+                SkillDefinition.skill_name == skill_name,
+                SkillDefinition.deleted_at.is_(None),
+            )
+        ).all()
+    )
+    return len(matches) > 1
 
 
 def _damage_rule_with_review(skill: SkillDefinition, row: dict[str, Any]) -> str:
