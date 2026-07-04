@@ -25,6 +25,51 @@ export interface ElfDefinitionOut {
   data_version?: string | null;
 }
 
+export interface RecognitionBoxOut {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface EnemyAvatarMatchedElfOut {
+  elf_id: string;
+  elf_name: string;
+  avatar: string;
+  element_types_json: string;
+  data_version?: string | null;
+}
+
+export interface EnemyAvatarCandidateOut {
+  dex_no: string;
+  elf_name: string;
+  file_name: string;
+  icon_url: string;
+  score: number;
+  spatial_score: number;
+  histogram_score: number;
+  pixel_score: number;
+  hash_score: number;
+  edge_score: number;
+  confidence_level: "high" | "medium" | "low" | string;
+  matched_elves: EnemyAvatarMatchedElfOut[];
+}
+
+export interface EnemyAvatarSlotRecognitionOut {
+  slot_index: number;
+  box: RecognitionBoxOut;
+  location_method: "black_slot" | "green_hp_bar" | "fixed_reference" | "custom_boxes" | string;
+  location_confidence: number;
+  candidates: EnemyAvatarCandidateOut[];
+}
+
+export interface EnemyLineupRecognitionOut {
+  source_image_size: [number, number];
+  icon_template_count: number;
+  slots: EnemyAvatarSlotRecognitionOut[];
+  warnings: string[];
+}
+
 export interface SkillDefinitionOut {
   skill_id: string;
   skill_name: string;
@@ -494,6 +539,12 @@ export interface RuntimeFormChangeInput {
   effective_elf_id?: string | null;
   hp_policy?: "keep_percent" | string;
   reason?: string | null;
+  notes?: string | null;
+}
+
+export interface SkillSlotRuntimeUpdateInput {
+  current_power?: number | null;
+  current_energy_cost?: number | null;
   notes?: string | null;
 }
 

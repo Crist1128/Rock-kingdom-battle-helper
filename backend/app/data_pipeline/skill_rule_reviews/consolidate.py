@@ -9,7 +9,7 @@
 
 1. 把历史分批文件合并为稳定的总文件，后续导入优先使用总文件；
 2. 使用 ``ensure_ascii=False`` 重写 JSON，避免中文被保存成 ``\\uXXXX``；
-3. 对已知的历史 ``????`` 损坏文本做显式修复；
+3. 对已知的历史问号占位损坏文本做显式修复；
 4. 与当前 SQLite 数据库比对，确认 active rocom 技能和带拓展分支的技能都有覆盖。
 
 默认只生成总文件和报告；只有传入 ``--rewrite-sources`` 才会重写历史分批文件。
@@ -34,8 +34,8 @@ DEFAULT_REPORT_OUT = "manual_skill_rules_consolidation_report_20260612.json"
 ARCHIVE_SOURCE_SUBDIR = Path("archive/manual_reviews_20260612")
 
 MOJIBAKE_MARKERS = (
-    "????",
-    "??",
+    "?" * 4,
+    "?" * 2,
     "\u951b",
     "\u93b4",
     "\u9473",
@@ -91,13 +91,13 @@ def repair_known_corruption(rows: list[dict[str, Any]], kind: str) -> list[str]:
             effect_id = row.get("effect_id")
             if effect_id == "effect_charge_ready":
                 if row.get("effect_name") != "蓄力就绪":
-                    changes.append("effect_charge_ready.effect_name: ???? -> 蓄力就绪")
+                    changes.append("effect_charge_ready.effect_name: 历史损坏文本 -> 蓄力就绪")
                 row["effect_name"] = "蓄力就绪"
                 row["recognition_alias_json"] = ["蓄力就绪", "蓄力"]
             elif effect_id == "effect_next_charge_free":
                 if row.get("effect_name") != "下次技能无需蓄力":
                     changes.append(
-                        "effect_next_charge_free.effect_name: ???????? -> 下次技能无需蓄力"
+                        "effect_next_charge_free.effect_name: 历史损坏文本 -> 下次技能无需蓄力"
                     )
                 row["effect_name"] = "下次技能无需蓄力"
                 row["recognition_alias_json"] = ["下次技能无需蓄力", "免蓄力"]

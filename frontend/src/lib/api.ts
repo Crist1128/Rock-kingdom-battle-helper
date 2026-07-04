@@ -15,6 +15,7 @@ import type {
   DamageEventCreateResult,
   EffectApplyInput,
   EffectDefinitionOut,
+  EnemyLineupRecognitionOut,
   EnemyDefaultConfigInput,
   EnemyPanelEstimateEvidenceOut,
   EnemyPanelEstimateOut,
@@ -37,6 +38,7 @@ import type {
   RocomLocalImportRequest,
   RuntimeFormChangeInput,
   SkillDefinitionOut,
+  SkillSlotRuntimeUpdateInput,
   SkillRuleCapabilityAuditOut,
   SkillRuleManualUpdate,
   SkillRuleReviewOut,
@@ -83,6 +85,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let detail: unknown = response.statusText;
+    try {
+      detail = await response.json();
+    } catch {
+      // keep response.statusText
+    }
+    throw new ApiError(response.status, detail);
+  }
+
+  return (await response.json()) as T;
+}
+
 const qs = (params: Record<string, string | number | boolean | null | undefined>) => {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -94,6 +115,17 @@ const qs = (params: Record<string, string | number | boolean | null | undefined>
 
 export const api = {
   health: () => request<{ status: string }>("/health"),
+
+  recognition: {
+    enemyLineup: (file: File, topK = 5) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return uploadRequest<EnemyLineupRecognitionOut>(
+        `/recognition/enemy-lineup${qs({ top_k: topK })}`,
+        formData,
+      );
+    },
+  },
 
   elves: {
     list: (params: { q?: string; limit?: number; offset?: number } = {}) =>
@@ -184,6 +216,15 @@ export const api = {
     changeRuntimeForm: (battleId: string, stateId: string, payload: RuntimeFormChangeInput) =>
       request<BattleStateOut>(`/battles/${battleId}/elves/${stateId}/runtime-form`, {
         method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    updateSkillSlotRuntime: (
+      battleId: string,
+      slotId: string,
+      payload: SkillSlotRuntimeUpdateInput,
+    ) =>
+      request<BattleStateOut>(`/battles/${battleId}/skill-slots/${slotId}/runtime`, {
+        method: "PATCH",
         body: JSON.stringify(payload),
       }),
     endTurn: (battleId: string, payload: EndTurnInput = {}) =>

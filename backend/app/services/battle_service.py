@@ -49,6 +49,7 @@ from app.schemas.battle import (
     LineupInput,
     LineupOut,
     RuntimeFormChangeInput,
+    SkillSlotRuntimeUpdateInput,
     SwitchElfInput,
 )
 from app.schemas.event import (
@@ -452,6 +453,83 @@ class BattleService:
             source=EventSource.MANUAL_INPUT.value,
             manual_override=True,
             payload_json=dumps_json(event_payload),
+            notes=payload.notes,
+        )
+        self.db.add(event)
+        self.db.flush()
+        snapshot = SnapshotService(self.db).create_effect_snapshot(
+            battle_id,
+            battle.turn_number,
+            source_event_id=event.event_id,
+            commit=False,
+        )
+        event.snapshot_id = snapshot.snapshot_id
+        self.db.commit()
+        self.db.refresh(battle)
+        return self.get_state(battle)
+
+    def update_skill_slot_runtime(
+        self,
+        battle_id: str,
+        slot_id: str,
+        payload: SkillSlotRuntimeUpdateInput,
+    ) -> BattleStateOut:
+        """手动调整技能槽运行时值。
+
+        `BattleSkillSlot.current_power` 已被 RuleResolver 和工作台预览优先读取，
+        因此这里写入后，后续理论伤害、伤害事件计算都会优先使用该手动威力。
+        该修改同时落一条事件，便于时间线审计和重放恢复。
+        """
+        battle = self.require_battle(battle_id)
+        slot = self.db.get(BattleSkillSlot, slot_id)
+        if slot is None or slot.battle_id != battle_id:
+            raise LookupError(f"战斗技能槽不存在：{slot_id}")
+
+        updated_fields = payload.model_fields_set & {"current_power", "current_energy_cost"}
+        if not updated_fields:
+            raise ValueError("至少需要提交 current_power 或 current_energy_cost")
+
+        before = {
+            "current_power": slot.current_power,
+            "current_energy_cost": slot.current_energy_cost,
+            "manual_override": slot.manual_override,
+        }
+        if "current_power" in updated_fields:
+            slot.current_power = payload.current_power
+        if "current_energy_cost" in updated_fields:
+            slot.current_energy_cost = payload.current_energy_cost
+        slot.manual_override = True
+        after = {
+            "current_power": slot.current_power,
+            "current_energy_cost": slot.current_energy_cost,
+            "manual_override": slot.manual_override,
+        }
+
+        event = BattleEvent(
+            event_id=f"event_{uuid4().hex}",
+            battle_id=battle_id,
+            turn_number=battle.turn_number,
+            event_type=BattleEventType.SKILL_SLOT_RUNTIME_CHANGE.value,
+            actor_side=slot.side,
+            actor_elf_id=slot.elf_id,
+            target_side=slot.side,
+            target_elf_id=slot.elf_id,
+            skill_id=slot.skill_id,
+            skill_confirmed=True,
+            source=EventSource.MANUAL_INPUT.value,
+            manual_override=True,
+            payload_json=dumps_json(
+                {
+                    "slot_id": slot.slot_id,
+                    "side": slot.side,
+                    "elf_id": slot.elf_id,
+                    "skill_id": slot.skill_id,
+                    "slot_index": slot.slot_index,
+                    "before": before,
+                    "after": after,
+                    "updated_fields": sorted(updated_fields),
+                }
+            ),
             notes=payload.notes,
         )
         self.db.add(event)

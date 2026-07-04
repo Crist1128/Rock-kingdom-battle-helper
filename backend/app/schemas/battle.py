@@ -161,6 +161,29 @@ class RuntimeFormChangeInput(BaseModel):
     notes: str | None = Field(default=None, description="备注")
 
 
+class SkillSlotRuntimeUpdateInput(BaseModel):
+    """
+    技能槽运行时手动修正请求。
+
+    当前主要用于把“本场战斗中某个携带技能的威力变化”直接写入技能槽。
+    `current_power=null` 表示清除手动/运行时威力覆盖，重新回到静态基础威力。
+    """
+
+    current_power: int | None = Field(
+        default=None,
+        ge=0,
+        le=999,
+        description="当前技能威力；null 表示清除威力覆盖",
+    )
+    current_energy_cost: int | None = Field(
+        default=None,
+        ge=0,
+        le=99,
+        description="当前技能能耗；null 表示清除能耗覆盖",
+    )
+    notes: str | None = Field(default=None, description="备注")
+
+
 class EndTurnInput(BaseModel):
     """结束当前回合请求。
 

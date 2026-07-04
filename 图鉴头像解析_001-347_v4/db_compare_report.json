@@ -1,0 +1,7002 @@
+{
+  "source_folder": "图鉴头像解析_001-347_v4",
+  "database": "data/app.db",
+  "summary": {
+    "total_icons": 347,
+    "exact": 310,
+    "base_name_without_form_suffix": 36,
+    "no_active_db_row": 1,
+    "mismatch": 0
+  },
+  "notes": [
+    "match_status=base_name_without_form_suffix 表示头像名称去掉形态后缀后与数据库名称匹配。",
+    "编号 301 当前 active elf_definition 未命中；data/rocom/cleaned/elves.json 中存在 rocom_elf_0301_156599，可后续确认是否需要入库或激活。",
+    "本报告仅用于头像与数据库精灵名称比对，mismatch=0 表示未发现名称冲突。"
+  ],
+  "items": [
+    {
+      "dex_no": "001",
+      "icon_name": "迪莫",
+      "icon_128_path": "icons_128/group_001-016/001_迪莫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0001_8cceb6",
+          "elf_name": "迪莫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0001_8cceb6",
+          "elf_name": "迪莫"
+        }
+      ]
+    },
+    {
+      "dex_no": "002",
+      "icon_name": "喵喵",
+      "icon_128_path": "icons_128/group_001-016/002_喵喵.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0002_f7dfb4",
+          "elf_name": "喵喵"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0002_f7dfb4",
+          "elf_name": "喵喵"
+        }
+      ]
+    },
+    {
+      "dex_no": "003",
+      "icon_name": "喵呜",
+      "icon_128_path": "icons_128/group_001-016/003_喵呜.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0003_4bea0f",
+          "elf_name": "喵呜"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0003_4bea0f",
+          "elf_name": "喵呜"
+        }
+      ]
+    },
+    {
+      "dex_no": "004",
+      "icon_name": "魔力猫",
+      "icon_128_path": "icons_128/group_001-016/004_魔力猫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0004_43540d",
+          "elf_name": "魔力猫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0004_43540d",
+          "elf_name": "魔力猫"
+        },
+        {
+          "elf_id": "rocom_elf_0004_4580cf",
+          "elf_name": "叶冕魔力猫"
+        }
+      ]
+    },
+    {
+      "dex_no": "005",
+      "icon_name": "火花",
+      "icon_128_path": "icons_128/group_001-016/005_火花.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0005_d97e16",
+          "elf_name": "火花"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0005_d97e16",
+          "elf_name": "火花"
+        }
+      ]
+    },
+    {
+      "dex_no": "006",
+      "icon_name": "焰火",
+      "icon_128_path": "icons_128/group_001-016/006_焰火.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0006_4d4454",
+          "elf_name": "焰火"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0006_4d4454",
+          "elf_name": "焰火"
+        }
+      ]
+    },
+    {
+      "dex_no": "007",
+      "icon_name": "火神",
+      "icon_128_path": "icons_128/group_001-016/007_火神.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0007_b0a0cb",
+          "elf_name": "火神"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0007_b0a0cb",
+          "elf_name": "火神"
+        },
+        {
+          "elf_id": "rocom_elf_0007_102c35",
+          "elf_name": "烈火战神"
+        }
+      ]
+    },
+    {
+      "dex_no": "008",
+      "icon_name": "水蓝蓝",
+      "icon_128_path": "icons_128/group_001-016/008_水蓝蓝.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0008_700c90",
+          "elf_name": "水蓝蓝"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0008_700c90",
+          "elf_name": "水蓝蓝"
+        }
+      ]
+    },
+    {
+      "dex_no": "009",
+      "icon_name": "波波拉",
+      "icon_128_path": "icons_128/group_001-016/009_波波拉.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0009_c8352b",
+          "elf_name": "波波拉"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0009_c8352b",
+          "elf_name": "波波拉"
+        }
+      ]
+    },
+    {
+      "dex_no": "010",
+      "icon_name": "水灵",
+      "icon_128_path": "icons_128/group_001-016/010_水灵.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0010_7a2a41",
+          "elf_name": "水灵"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0010_7a2a41",
+          "elf_name": "水灵"
+        },
+        {
+          "elf_id": "rocom_elf_0010_c340a0",
+          "elf_name": "圣水守护"
+        }
+      ]
+    },
+    {
+      "dex_no": "011",
+      "icon_name": "鸭吉吉",
+      "icon_128_path": "icons_128/group_001-016/011_鸭吉吉.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0011_ee8dec",
+          "elf_name": "鸭吉吉（蓬松的样子）（蓬松的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_fcf0c3",
+          "elf_name": "鸭吉吉（紧实的样子）（紧实的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_dfae16",
+          "elf_name": "鸭吉吉（急急急鸭）（急急急鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_506f03",
+          "elf_name": "鸭吉吉（等一等鸭）（等一等鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_18bd0d",
+          "elf_name": "鸭吉吉（燃了鸭）（燃了鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_e7a7f5",
+          "elf_name": "鸭吉吉（起来鸭）（起来鸭）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0011_ee8dec",
+          "elf_name": "鸭吉吉（蓬松的样子）（蓬松的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_fcf0c3",
+          "elf_name": "鸭吉吉（紧实的样子）（紧实的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_dfae16",
+          "elf_name": "鸭吉吉（急急急鸭）（急急急鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_506f03",
+          "elf_name": "鸭吉吉（等一等鸭）（等一等鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_18bd0d",
+          "elf_name": "鸭吉吉（燃了鸭）（燃了鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_e7a7f5",
+          "elf_name": "鸭吉吉（起来鸭）（起来鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_dc4feb",
+          "elf_name": "鸭吉吉国王（首领形态）（首领形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_73483e",
+          "elf_name": "鸭吉吉国王（蓬松的样子）（蓬松的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_1ff765",
+          "elf_name": "鸭吉吉国王（紧实的样子）（紧实的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_08494a",
+          "elf_name": "鸭吉吉国王（急急急鸭）（急急急鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_235e2c",
+          "elf_name": "鸭吉吉国王（等一等鸭）（等一等鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_7b602f",
+          "elf_name": "鸭吉吉国王（燃了鸭）（燃了鸭）"
+        },
+        {
+          "elf_id": "rocom_elf_0011_bdf463",
+          "elf_name": "鸭吉吉国王（起来鸭）（起来鸭）"
+        }
+      ]
+    },
+    {
+      "dex_no": "012",
+      "icon_name": "板板壳",
+      "icon_128_path": "icons_128/group_001-016/012_板板壳.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0012_7d6b6c",
+          "elf_name": "板板壳"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0012_7d6b6c",
+          "elf_name": "板板壳"
+        },
+        {
+          "elf_id": "rocom_elf_0012_efbf3d",
+          "elf_name": "板板壳（蜕皮时的样子）（蜕皮时的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "013",
+      "icon_name": "咔咔壳",
+      "icon_128_path": "icons_128/group_001-016/013_咔咔壳.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0013_4f852c",
+          "elf_name": "咔咔壳"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0013_4f852c",
+          "elf_name": "咔咔壳"
+        },
+        {
+          "elf_id": "rocom_elf_0013_101d9c",
+          "elf_name": "咔咔壳（蜕皮时的样子）（蜕皮时的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "014",
+      "icon_name": "水泡壳",
+      "icon_128_path": "icons_128/group_001-016/014_水泡壳.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0014_a8a426",
+          "elf_name": "水泡壳"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0014_a8a426",
+          "elf_name": "水泡壳"
+        },
+        {
+          "elf_id": "rocom_elf_0014_c712dd",
+          "elf_name": "水泡壳（蜕皮时的样子）（蜕皮时的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "015",
+      "icon_name": "锥尾羊",
+      "icon_128_path": "icons_128/group_001-016/015_锥尾羊.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0015_545ed4",
+          "elf_name": "锥尾羊"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0015_545ed4",
+          "elf_name": "锥尾羊"
+        }
+      ]
+    },
+    {
+      "dex_no": "016",
+      "icon_name": "铃兰羊",
+      "icon_128_path": "icons_128/group_001-016/016_铃兰羊.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0016_e3bb72",
+          "elf_name": "铃兰羊"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0016_e3bb72",
+          "elf_name": "铃兰羊"
+        }
+      ]
+    },
+    {
+      "dex_no": "017",
+      "icon_name": "花影羚羊",
+      "icon_128_path": "icons_128/group_017-032/017_花影羚羊.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0017_52c782",
+          "elf_name": "花影羚羊"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0017_52c782",
+          "elf_name": "花影羚羊"
+        }
+      ]
+    },
+    {
+      "dex_no": "018",
+      "icon_name": "雪绒鸟",
+      "icon_128_path": "icons_128/group_017-032/018_雪绒鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0018_ba86df",
+          "elf_name": "雪绒鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0018_0459dc",
+          "elf_name": "雪绒鸟（春天的样子）（春天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0018_50e3d2",
+          "elf_name": "雪绒鸟（夏天的样子）（夏天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0018_58cef9",
+          "elf_name": "雪绒鸟（秋天的样子）（秋天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0018_ba86df",
+          "elf_name": "雪绒鸟"
+        }
+      ]
+    },
+    {
+      "dex_no": "019",
+      "icon_name": "冬羽雀",
+      "icon_128_path": "icons_128/group_017-032/019_冬羽雀.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0019_32844e",
+          "elf_name": "冬羽雀"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0019_32844e",
+          "elf_name": "冬羽雀"
+        },
+        {
+          "elf_id": "rocom_elf_0019_977932",
+          "elf_name": "冬羽雀（春天的样子）（春天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0019_295b38",
+          "elf_name": "冬羽雀（夏天的样子）（夏天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0019_59a53d",
+          "elf_name": "冬羽雀（秋天的样子）（秋天的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "020",
+      "icon_name": "岚鸟",
+      "icon_128_path": "icons_128/group_017-032/020_岚鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0020_52b34b",
+          "elf_name": "岚鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0020_52b34b",
+          "elf_name": "岚鸟"
+        },
+        {
+          "elf_id": "rocom_elf_0020_9097c8",
+          "elf_name": "岚鸟（春天的样子）（春天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0020_d72667",
+          "elf_name": "岚鸟（夏天的样子）（夏天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0020_84c4e9",
+          "elf_name": "岚鸟（秋天的样子）（秋天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0020_48607a",
+          "elf_name": "霜翼领主"
+        },
+        {
+          "elf_id": "rocom_elf_0020_2db7d9",
+          "elf_name": "霜翼领主（春天的样子）（春天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0020_674b3f",
+          "elf_name": "霜翼领主（夏天的样子）（夏天的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0020_8eba1e",
+          "elf_name": "霜翼领主（秋天的样子）（秋天的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "021",
+      "icon_name": "小灵菇",
+      "icon_128_path": "icons_128/group_017-032/021_小灵菇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0021_11eec6",
+          "elf_name": "小灵菇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0021_11eec6",
+          "elf_name": "小灵菇"
+        }
+      ]
+    },
+    {
+      "dex_no": "022",
+      "icon_name": "幻灵菇",
+      "icon_128_path": "icons_128/group_017-032/022_幻灵菇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0022_b978b7",
+          "elf_name": "幻灵菇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0022_b978b7",
+          "elf_name": "幻灵菇"
+        }
+      ]
+    },
+    {
+      "dex_no": "023",
+      "icon_name": "幻影灵菇",
+      "icon_128_path": "icons_128/group_017-032/023_幻影灵菇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0023_bd5e17",
+          "elf_name": "幻影灵菇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0023_bd5e17",
+          "elf_name": "幻影灵菇"
+        }
+      ]
+    },
+    {
+      "dex_no": "024",
+      "icon_name": "石肤蜥",
+      "icon_128_path": "icons_128/group_017-032/024_石肤蜥.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0024_958ca7",
+          "elf_name": "石肤蜥"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0024_958ca7",
+          "elf_name": "石肤蜥"
+        },
+        {
+          "elf_id": "rocom_elf_0024_4f2936",
+          "elf_name": "石肤蜥（球球尾巴的样子）（球球尾巴的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "025",
+      "icon_name": "石刺蜥",
+      "icon_128_path": "icons_128/group_017-032/025_石刺蜥.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0025_a39422",
+          "elf_name": "石刺蜥"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0025_a39422",
+          "elf_name": "石刺蜥"
+        },
+        {
+          "elf_id": "rocom_elf_0025_350b03",
+          "elf_name": "石刺蜥（球球尾巴的样子）（球球尾巴的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "026",
+      "icon_name": "石冠王蜥",
+      "icon_128_path": "icons_128/group_017-032/026_石冠王蜥.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0026_a8c82b",
+          "elf_name": "石冠王蜥"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0026_a8c82b",
+          "elf_name": "石冠王蜥"
+        },
+        {
+          "elf_id": "rocom_elf_0026_2dd109",
+          "elf_name": "石冠王蜥（球球尾巴的样子）（球球尾巴的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "027",
+      "icon_name": "布是石",
+      "icon_128_path": "icons_128/group_017-032/027_布是石.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0027_1f61b0",
+          "elf_name": "布是石"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0027_1f61b0",
+          "elf_name": "布是石"
+        }
+      ]
+    },
+    {
+      "dex_no": "028",
+      "icon_name": "布是岩",
+      "icon_128_path": "icons_128/group_017-032/028_布是岩.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0028_0e5d63",
+          "elf_name": "布是岩"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0028_0e5d63",
+          "elf_name": "布是岩"
+        }
+      ]
+    },
+    {
+      "dex_no": "029",
+      "icon_name": "布克棱岩",
+      "icon_128_path": "icons_128/group_017-032/029_布克棱岩.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0029_f08a0f",
+          "elf_name": "布克棱岩"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0029_f08a0f",
+          "elf_name": "布克棱岩"
+        },
+        {
+          "elf_id": "rocom_elf_0029_ef32a0",
+          "elf_name": "迷嶂布莱克"
+        }
+      ]
+    },
+    {
+      "dex_no": "030",
+      "icon_name": "恶魔叮",
+      "icon_128_path": "icons_128/group_017-032/030_恶魔叮.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0030_7c01ac",
+          "elf_name": "恶魔叮"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0030_7c01ac",
+          "elf_name": "恶魔叮"
+        }
+      ]
+    },
+    {
+      "dex_no": "031",
+      "icon_name": "叮叮恶魔",
+      "icon_128_path": "icons_128/group_017-032/031_叮叮恶魔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0031_4b0d28",
+          "elf_name": "叮叮恶魔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0031_4b0d28",
+          "elf_name": "叮叮恶魔"
+        }
+      ]
+    },
+    {
+      "dex_no": "032",
+      "icon_name": "毛毛",
+      "icon_128_path": "icons_128/group_017-032/032_毛毛.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0032_d41c1c",
+          "elf_name": "毛毛"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0032_d41c1c",
+          "elf_name": "毛毛"
+        }
+      ]
+    },
+    {
+      "dex_no": "033",
+      "icon_name": "爬爬",
+      "icon_128_path": "icons_128/group_033-048/033_爬爬.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0033_b1f6ee",
+          "elf_name": "爬爬"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0033_b1f6ee",
+          "elf_name": "爬爬"
+        }
+      ]
+    },
+    {
+      "dex_no": "034",
+      "icon_name": "化蝶",
+      "icon_128_path": "icons_128/group_033-048/034_化蝶.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0034_6fa133",
+          "elf_name": "化蝶（平常的样子）（平常的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0034_a65657",
+          "elf_name": "化蝶（幽冥眼的样子）（幽冥眼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0034_ae89f8",
+          "elf_name": "化蝶（喵喵的样子）（喵喵的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0034_917c58",
+          "elf_name": "化蝶（奇丽花的样子）（奇丽花的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0034_6fa133",
+          "elf_name": "化蝶（平常的样子）（平常的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0034_a65657",
+          "elf_name": "化蝶（幽冥眼的样子）（幽冥眼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0034_ae89f8",
+          "elf_name": "化蝶（喵喵的样子）（喵喵的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0034_917c58",
+          "elf_name": "化蝶（奇丽花的样子）（奇丽花的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "035",
+      "icon_name": "幽影树",
+      "icon_128_path": "icons_128/group_033-048/035_幽影树.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0035_e9cde0",
+          "elf_name": "幽影树"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0035_e9cde0",
+          "elf_name": "幽影树"
+        },
+        {
+          "elf_id": "rocom_elf_0035_8e921a",
+          "elf_name": "幻影荆棘"
+        }
+      ]
+    },
+    {
+      "dex_no": "036",
+      "icon_name": "小鼠獭",
+      "icon_128_path": "icons_128/group_033-048/036_小鼠獭.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0036_32bb1c",
+          "elf_name": "小鼠獭"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0036_32bb1c",
+          "elf_name": "小鼠獭"
+        }
+      ]
+    },
+    {
+      "dex_no": "037",
+      "icon_name": "燕尾獭",
+      "icon_128_path": "icons_128/group_033-048/037_燕尾獭.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0037_78e057",
+          "elf_name": "燕尾獭"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0037_78e057",
+          "elf_name": "燕尾獭"
+        }
+      ]
+    },
+    {
+      "dex_no": "038",
+      "icon_name": "卷胡巨獭",
+      "icon_128_path": "icons_128/group_033-048/038_卷胡巨獭.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0038_21d17a",
+          "elf_name": "卷胡巨獭"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0038_21d17a",
+          "elf_name": "卷胡巨獭"
+        }
+      ]
+    },
+    {
+      "dex_no": "039",
+      "icon_name": "矿晶虫",
+      "icon_128_path": "icons_128/group_033-048/039_矿晶虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0039_62828d",
+          "elf_name": "矿晶虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0039_62828d",
+          "elf_name": "矿晶虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "040",
+      "icon_name": "晶石蜗",
+      "icon_128_path": "icons_128/group_033-048/040_晶石蜗.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0040_563b35",
+          "elf_name": "晶石蜗（西瓜碧玺的样子）（西瓜碧玺的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_538038",
+          "elf_name": "晶石蜗（莲花刚玉的样子）（莲花刚玉的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_c9756c",
+          "elf_name": "晶石蜗（星彩榴石的样子）（星彩榴石的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_cc1a0a",
+          "elf_name": "晶石蜗（火山琉璃的样子）（火山琉璃的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_02c6f9",
+          "elf_name": "晶石蜗（蓝锥矿的样子）（蓝锥矿的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_14e162",
+          "elf_name": "晶石蜗（烧蓝黄金的样子）（烧蓝黄金的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0040_563b35",
+          "elf_name": "晶石蜗（西瓜碧玺的样子）（西瓜碧玺的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_538038",
+          "elf_name": "晶石蜗（莲花刚玉的样子）（莲花刚玉的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_c9756c",
+          "elf_name": "晶石蜗（星彩榴石的样子）（星彩榴石的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_cc1a0a",
+          "elf_name": "晶石蜗（火山琉璃的样子）（火山琉璃的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_02c6f9",
+          "elf_name": "晶石蜗（蓝锥矿的样子）（蓝锥矿的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_14e162",
+          "elf_name": "晶石蜗（烧蓝黄金的样子）（烧蓝黄金的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_f85647",
+          "elf_name": "钻石蜗（西瓜碧玺的样子）（西瓜碧玺的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_4d4521",
+          "elf_name": "钻石蜗（莲花刚玉的样子）（莲花刚玉的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_623198",
+          "elf_name": "钻石蜗（星彩榴石的样子）（星彩榴石的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_48574d",
+          "elf_name": "钻石蜗（火山琉璃的样子）（火山琉璃的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_4cbe5c",
+          "elf_name": "钻石蜗（蓝锥矿的样子）（蓝锥矿的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0040_257ddc",
+          "elf_name": "钻石蜗（烧蓝黄金的样子）（烧蓝黄金的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "041",
+      "icon_name": "奇丽草",
+      "icon_128_path": "icons_128/group_033-048/041_奇丽草.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0041_4e6b3b",
+          "elf_name": "奇丽草"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0041_4e6b3b",
+          "elf_name": "奇丽草"
+        }
+      ]
+    },
+    {
+      "dex_no": "042",
+      "icon_name": "奇丽叶",
+      "icon_128_path": "icons_128/group_033-048/042_奇丽叶.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0042_0ee0df",
+          "elf_name": "奇丽叶"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0042_0ee0df",
+          "elf_name": "奇丽叶"
+        }
+      ]
+    },
+    {
+      "dex_no": "043",
+      "icon_name": "奇丽花",
+      "icon_128_path": "icons_128/group_033-048/043_奇丽花.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0043_c1d94b",
+          "elf_name": "奇丽花"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0043_c1d94b",
+          "elf_name": "奇丽花"
+        },
+        {
+          "elf_id": "rocom_elf_0043_2dfc43",
+          "elf_name": "奇丽果"
+        }
+      ]
+    },
+    {
+      "dex_no": "044",
+      "icon_name": "丢丢",
+      "icon_128_path": "icons_128/group_033-048/044_丢丢.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0044_ee9000",
+          "elf_name": "丢丢（草地附近的样子）（草地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0044_34f9f1",
+          "elf_name": "丢丢（沙地附近的样子）（沙地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0044_8916ef",
+          "elf_name": "丢丢（雪山附近的样子）（雪山附近的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0044_ee9000",
+          "elf_name": "丢丢（草地附近的样子）（草地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0044_34f9f1",
+          "elf_name": "丢丢（沙地附近的样子）（沙地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0044_8916ef",
+          "elf_name": "丢丢（雪山附近的样子）（雪山附近的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "045",
+      "icon_name": "卡卡虫",
+      "icon_128_path": "icons_128/group_033-048/045_卡卡虫.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0045_1913a0",
+          "elf_name": "卡卡虫（草地附近的样子）（草地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0045_31627f",
+          "elf_name": "卡卡虫（沙地附近的样子）（沙地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0045_5b0f87",
+          "elf_name": "卡卡虫（雪山附近的样子）（雪山附近的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0045_1913a0",
+          "elf_name": "卡卡虫（草地附近的样子）（草地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0045_31627f",
+          "elf_name": "卡卡虫（沙地附近的样子）（沙地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0045_5b0f87",
+          "elf_name": "卡卡虫（雪山附近的样子）（雪山附近的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "046",
+      "icon_name": "卡瓦重",
+      "icon_128_path": "icons_128/group_033-048/046_卡瓦重.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0046_651fbe",
+          "elf_name": "卡瓦重（草地附近的样子）（草地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0046_b5ac0c",
+          "elf_name": "卡瓦重（沙地附近的样子）（沙地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0046_53043e",
+          "elf_name": "卡瓦重（雪山附近的样子）（雪山附近的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0046_651fbe",
+          "elf_name": "卡瓦重（草地附近的样子）（草地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0046_b5ac0c",
+          "elf_name": "卡瓦重（沙地附近的样子）（沙地附近的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0046_53043e",
+          "elf_name": "卡瓦重（雪山附近的样子）（雪山附近的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "047",
+      "icon_name": "护主犬",
+      "icon_128_path": "icons_128/group_033-048/047_护主犬.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0047_90aa77",
+          "elf_name": "护主犬"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0047_90aa77",
+          "elf_name": "护主犬"
+        }
+      ]
+    },
+    {
+      "dex_no": "048",
+      "icon_name": "音速犬",
+      "icon_128_path": "icons_128/group_033-048/048_音速犬.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0048_1ac2fc",
+          "elf_name": "音速犬"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0048_1ac2fc",
+          "elf_name": "音速犬"
+        },
+        {
+          "elf_id": "rocom_elf_0048_c3f4d1",
+          "elf_name": "风暴战犬"
+        }
+      ]
+    },
+    {
+      "dex_no": "049",
+      "icon_name": "绿耳松鼠",
+      "icon_128_path": "icons_128/group_049-064/049_绿耳松鼠.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0049_1e5df3",
+          "elf_name": "绿耳松鼠"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0049_1e5df3",
+          "elf_name": "绿耳松鼠"
+        }
+      ]
+    },
+    {
+      "dex_no": "050",
+      "icon_name": "抱枕松鼠",
+      "icon_128_path": "icons_128/group_049-064/050_抱枕松鼠.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0050_a4096c",
+          "elf_name": "抱枕松鼠"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0050_a4096c",
+          "elf_name": "抱枕松鼠"
+        }
+      ]
+    },
+    {
+      "dex_no": "051",
+      "icon_name": "蹦床松鼠",
+      "icon_128_path": "icons_128/group_049-064/051_蹦床松鼠.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0051_a63c9d",
+          "elf_name": "蹦床松鼠"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0051_a63c9d",
+          "elf_name": "蹦床松鼠"
+        }
+      ]
+    },
+    {
+      "dex_no": "052",
+      "icon_name": "嘟嘟煲",
+      "icon_128_path": "icons_128/group_049-064/052_嘟嘟煲.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0052_b3759f",
+          "elf_name": "嘟嘟煲"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0052_b3759f",
+          "elf_name": "嘟嘟煲"
+        }
+      ]
+    },
+    {
+      "dex_no": "053",
+      "icon_name": "嘟嘟锅",
+      "icon_128_path": "icons_128/group_049-064/053_嘟嘟锅.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0053_002f10",
+          "elf_name": "嘟嘟锅"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0053_002f10",
+          "elf_name": "嘟嘟锅"
+        }
+      ]
+    },
+    {
+      "dex_no": "054",
+      "icon_name": "小灵面",
+      "icon_128_path": "icons_128/group_049-064/054_小灵面.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0054_c8e00d",
+          "elf_name": "小灵面"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0054_c8e00d",
+          "elf_name": "小灵面"
+        }
+      ]
+    },
+    {
+      "dex_no": "055",
+      "icon_name": "暗影灵面",
+      "icon_128_path": "icons_128/group_049-064/055_暗影灵面.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0055_67582f",
+          "elf_name": "暗影灵面（睁眼的样子）（睁眼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0055_fed669",
+          "elf_name": "暗影灵面（闭眼的样子）（闭眼的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0055_67582f",
+          "elf_name": "暗影灵面（睁眼的样子）（睁眼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0055_fed669",
+          "elf_name": "暗影灵面（闭眼的样子）（闭眼的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "056",
+      "icon_name": "幽冥眼",
+      "icon_128_path": "icons_128/group_049-064/056_幽冥眼.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0056_583494",
+          "elf_name": "幽冥眼（睁眼的样子）（睁眼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0056_240f07",
+          "elf_name": "幽冥眼（闭眼的样子）（闭眼的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0056_583494",
+          "elf_name": "幽冥眼（睁眼的样子）（睁眼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0056_240f07",
+          "elf_name": "幽冥眼（闭眼的样子）（闭眼的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "057",
+      "icon_name": "梦游",
+      "icon_128_path": "icons_128/group_049-064/057_梦游.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0057_d869ad",
+          "elf_name": "梦游（穿旧睡衣的样子）（穿旧睡衣的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0057_d869ad",
+          "elf_name": "梦游（穿旧睡衣的样子）（穿旧睡衣的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "058",
+      "icon_name": "梦悠悠",
+      "icon_128_path": "icons_128/group_049-064/058_梦悠悠.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0058_05d7dd",
+          "elf_name": "梦悠悠（穿旧睡衣的样子）（穿旧睡衣的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0058_05d7dd",
+          "elf_name": "梦悠悠（穿旧睡衣的样子）（穿旧睡衣的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "059",
+      "icon_name": "兽花蕾",
+      "icon_128_path": "icons_128/group_049-064/059_兽花蕾.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0059_1f7d1c",
+          "elf_name": "兽花蕾"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0059_1f7d1c",
+          "elf_name": "兽花蕾"
+        }
+      ]
+    },
+    {
+      "dex_no": "060",
+      "icon_name": "伏地兽",
+      "icon_128_path": "icons_128/group_049-064/060_伏地兽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0060_021ea4",
+          "elf_name": "伏地兽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0060_021ea4",
+          "elf_name": "伏地兽"
+        }
+      ]
+    },
+    {
+      "dex_no": "061",
+      "icon_name": "贪食鼹",
+      "icon_128_path": "icons_128/group_049-064/061_贪食鼹.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0061_615f71",
+          "elf_name": "贪食鼹"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0061_615f71",
+          "elf_name": "贪食鼹"
+        }
+      ]
+    },
+    {
+      "dex_no": "062",
+      "icon_name": "巨噬针鼹",
+      "icon_128_path": "icons_128/group_049-064/062_巨噬针鼹.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0062_809e07",
+          "elf_name": "巨噬针鼹"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0062_809e07",
+          "elf_name": "巨噬针鼹"
+        }
+      ]
+    },
+    {
+      "dex_no": "063",
+      "icon_name": "蹦蹦种子",
+      "icon_128_path": "icons_128/group_049-064/063_蹦蹦种子.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0063_f2d664",
+          "elf_name": "蹦蹦种子（海神球形态）（海神球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0063_159f44",
+          "elf_name": "蹦蹦种子（彩玉球形态）（彩玉球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0063_b8fc4f",
+          "elf_name": "蹦蹦种子（短毛球形态）（短毛球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0063_bd96a8",
+          "elf_name": "蹦蹦种子（象牙球形态）（象牙球形态）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0063_f2d664",
+          "elf_name": "蹦蹦种子（海神球形态）（海神球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0063_159f44",
+          "elf_name": "蹦蹦种子（彩玉球形态）（彩玉球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0063_b8fc4f",
+          "elf_name": "蹦蹦种子（短毛球形态）（短毛球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0063_bd96a8",
+          "elf_name": "蹦蹦种子（象牙球形态）（象牙球形态）"
+        }
+      ]
+    },
+    {
+      "dex_no": "064",
+      "icon_name": "蹦蹦草",
+      "icon_128_path": "icons_128/group_049-064/064_蹦蹦草.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0064_a48a5c",
+          "elf_name": "蹦蹦草（海神球形态）（海神球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0064_72d5c6",
+          "elf_name": "蹦蹦草（彩玉球形态）（彩玉球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0064_0a6bbe",
+          "elf_name": "蹦蹦草（短毛球形态）（短毛球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0064_2d50fb",
+          "elf_name": "蹦蹦草（象牙球形态）（象牙球形态）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0064_a48a5c",
+          "elf_name": "蹦蹦草（海神球形态）（海神球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0064_72d5c6",
+          "elf_name": "蹦蹦草（彩玉球形态）（彩玉球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0064_0a6bbe",
+          "elf_name": "蹦蹦草（短毛球形态）（短毛球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0064_2d50fb",
+          "elf_name": "蹦蹦草（象牙球形态）（象牙球形态）"
+        }
+      ]
+    },
+    {
+      "dex_no": "065",
+      "icon_name": "蹦蹦花",
+      "icon_128_path": "icons_128/group_065-080/065_蹦蹦花.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0065_a0e318",
+          "elf_name": "蹦蹦花（海神球形态）（海神球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_e162d3",
+          "elf_name": "蹦蹦花（彩玉球形态）（彩玉球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_a61a6c",
+          "elf_name": "蹦蹦花（短毛球形态）（短毛球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_505e4a",
+          "elf_name": "蹦蹦花（象牙球形态）（象牙球形态）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0065_a0e318",
+          "elf_name": "蹦蹦花（海神球形态）（海神球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_e162d3",
+          "elf_name": "蹦蹦花（彩玉球形态）（彩玉球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_a61a6c",
+          "elf_name": "蹦蹦花（短毛球形态）（短毛球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_505e4a",
+          "elf_name": "蹦蹦花（象牙球形态）（象牙球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_850194",
+          "elf_name": "蹦蹦果（海神球形态）（海神球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_9a485e",
+          "elf_name": "蹦蹦果（彩玉球形态）（彩玉球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_13d07f",
+          "elf_name": "蹦蹦果（短毛球形态）（短毛球形态）"
+        },
+        {
+          "elf_id": "rocom_elf_0065_0783e4",
+          "elf_name": "蹦蹦果（象牙球形态）（象牙球形态）"
+        }
+      ]
+    },
+    {
+      "dex_no": "066",
+      "icon_name": "电咩咩",
+      "icon_128_path": "icons_128/group_065-080/066_电咩咩.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0066_6ca0dc",
+          "elf_name": "电咩咩"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0066_6ca0dc",
+          "elf_name": "电咩咩"
+        }
+      ]
+    },
+    {
+      "dex_no": "067",
+      "icon_name": "粉咩咩",
+      "icon_128_path": "icons_128/group_065-080/067_粉咩咩.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0067_a274c8",
+          "elf_name": "粉咩咩"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0067_a274c8",
+          "elf_name": "粉咩咩"
+        }
+      ]
+    },
+    {
+      "dex_no": "068",
+      "icon_name": "电球咩咩",
+      "icon_128_path": "icons_128/group_065-080/068_电球咩咩.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0068_298270",
+          "elf_name": "电球咩咩"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0068_298270",
+          "elf_name": "电球咩咩"
+        }
+      ]
+    },
+    {
+      "dex_no": "069",
+      "icon_name": "蒲公英",
+      "icon_128_path": "icons_128/group_065-080/069_蒲公英.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0069_18c0df",
+          "elf_name": "蒲公英"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0069_18c0df",
+          "elf_name": "蒲公英"
+        }
+      ]
+    },
+    {
+      "dex_no": "070",
+      "icon_name": "蒲公英娃娃",
+      "icon_128_path": "icons_128/group_065-080/070_蒲公英娃娃.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0070_36be6b",
+          "elf_name": "蒲公英娃娃"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0070_36be6b",
+          "elf_name": "蒲公英娃娃"
+        }
+      ]
+    },
+    {
+      "dex_no": "071",
+      "icon_name": "伊贝儿",
+      "icon_128_path": "icons_128/group_065-080/071_伊贝儿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0071_bea837",
+          "elf_name": "伊贝儿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0071_bea837",
+          "elf_name": "伊贝儿"
+        }
+      ]
+    },
+    {
+      "dex_no": "072",
+      "icon_name": "伊贝粉粉",
+      "icon_128_path": "icons_128/group_065-080/072_伊贝粉粉.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0072_1601a4",
+          "elf_name": "伊贝粉粉"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0072_1601a4",
+          "elf_name": "伊贝粉粉"
+        }
+      ]
+    },
+    {
+      "dex_no": "073",
+      "icon_name": "白发懒人",
+      "icon_128_path": "icons_128/group_065-080/073_白发懒人.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0073_f600d9",
+          "elf_name": "白发懒人"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0073_f600d9",
+          "elf_name": "白发懒人"
+        }
+      ]
+    },
+    {
+      "dex_no": "074",
+      "icon_name": "动力猿",
+      "icon_128_path": "icons_128/group_065-080/074_动力猿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0074_40bc95",
+          "elf_name": "动力猿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0074_40bc95",
+          "elf_name": "动力猿"
+        }
+      ]
+    },
+    {
+      "dex_no": "075",
+      "icon_name": "瞌睡王",
+      "icon_128_path": "icons_128/group_065-080/075_瞌睡王.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0075_65ceab",
+          "elf_name": "瞌睡王"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0075_65ceab",
+          "elf_name": "瞌睡王"
+        }
+      ]
+    },
+    {
+      "dex_no": "076",
+      "icon_name": "海盔虫",
+      "icon_128_path": "icons_128/group_065-080/076_海盔虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0076_c6e2a0",
+          "elf_name": "海盔虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0076_c6e2a0",
+          "elf_name": "海盔虫"
+        },
+        {
+          "elf_id": "rocom_elf_0076_f8daef",
+          "elf_name": "海盔虫（磨损的样子）（磨损的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "077",
+      "icon_name": "刺盔虫",
+      "icon_128_path": "icons_128/group_065-080/077_刺盔虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0077_a9fbc1",
+          "elf_name": "刺盔虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0077_a9fbc1",
+          "elf_name": "刺盔虫"
+        },
+        {
+          "elf_id": "rocom_elf_0077_a17f7e",
+          "elf_name": "刺盔虫（磨损的样子）（磨损的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "078",
+      "icon_name": "千棘盔",
+      "icon_128_path": "icons_128/group_065-080/078_千棘盔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0078_0e31b0",
+          "elf_name": "千棘盔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0078_0e31b0",
+          "elf_name": "千棘盔"
+        },
+        {
+          "elf_id": "rocom_elf_0078_92e26a",
+          "elf_name": "千棘盔（磨损的样子）（磨损的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0078_0ada77",
+          "elf_name": "千棘海针"
+        },
+        {
+          "elf_id": "rocom_elf_0078_cf91c6",
+          "elf_name": "千棘海针（磨损的样子）（磨损的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "079",
+      "icon_name": "菊花梨",
+      "icon_128_path": "icons_128/group_065-080/079_菊花梨.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0079_7b2dae",
+          "elf_name": "菊花梨"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0079_7b2dae",
+          "elf_name": "菊花梨"
+        }
+      ]
+    },
+    {
+      "dex_no": "080",
+      "icon_name": "小星光",
+      "icon_128_path": "icons_128/group_065-080/080_小星光.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0080_2cead9",
+          "elf_name": "小星光（星光能量的样子）（星光能量的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0080_00c3e4",
+          "elf_name": "小星光（月光能量的样子）（月光能量的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0080_2cead9",
+          "elf_name": "小星光（星光能量的样子）（星光能量的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0080_00c3e4",
+          "elf_name": "小星光（月光能量的样子）（月光能量的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "081",
+      "icon_name": "星光狮",
+      "icon_128_path": "icons_128/group_081-096/081_星光狮.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0081_f30be1",
+          "elf_name": "星光狮（星光能量的样子）（星光能量的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0081_293897",
+          "elf_name": "星光狮（月光能量的样子）（月光能量的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0081_f30be1",
+          "elf_name": "星光狮（星光能量的样子）（星光能量的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0081_293897",
+          "elf_name": "星光狮（月光能量的样子）（月光能量的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "082",
+      "icon_name": "一窝蜂",
+      "icon_128_path": "icons_128/group_081-096/082_一窝蜂.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0082_87b56c",
+          "elf_name": "一窝蜂"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0082_87b56c",
+          "elf_name": "一窝蜂"
+        }
+      ]
+    },
+    {
+      "dex_no": "083",
+      "icon_name": "黄蜂后",
+      "icon_128_path": "icons_128/group_081-096/083_黄蜂后.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0083_feafd8",
+          "elf_name": "黄蜂后"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0083_feafd8",
+          "elf_name": "黄蜂后"
+        }
+      ]
+    },
+    {
+      "dex_no": "084",
+      "icon_name": "花魁蜂后",
+      "icon_128_path": "icons_128/group_081-096/084_花魁蜂后.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0084_45908f",
+          "elf_name": "花魁蜂后"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0084_45908f",
+          "elf_name": "花魁蜂后"
+        },
+        {
+          "elf_id": "rocom_elf_0084_f11cbb",
+          "elf_name": "女王蜂"
+        }
+      ]
+    },
+    {
+      "dex_no": "085",
+      "icon_name": "小夜",
+      "icon_128_path": "icons_128/group_081-096/085_小夜.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0085_53487b",
+          "elf_name": "小夜"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0085_53487b",
+          "elf_name": "小夜"
+        }
+      ]
+    },
+    {
+      "dex_no": "086",
+      "icon_name": "紫夜",
+      "icon_128_path": "icons_128/group_081-096/086_紫夜.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0086_c748e4",
+          "elf_name": "紫夜"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0086_c748e4",
+          "elf_name": "紫夜"
+        }
+      ]
+    },
+    {
+      "dex_no": "087",
+      "icon_name": "朔夜伊芙",
+      "icon_128_path": "icons_128/group_081-096/087_朔夜伊芙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0087_7c50d0",
+          "elf_name": "朔夜伊芙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0087_7c50d0",
+          "elf_name": "朔夜伊芙"
+        }
+      ]
+    },
+    {
+      "dex_no": "088",
+      "icon_name": "乖乖鹄",
+      "icon_128_path": "icons_128/group_081-096/088_乖乖鹄.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0088_4562ed",
+          "elf_name": "乖乖鹄"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0088_4562ed",
+          "elf_name": "乖乖鹄"
+        }
+      ]
+    },
+    {
+      "dex_no": "089",
+      "icon_name": "蓝珠天鹅",
+      "icon_128_path": "icons_128/group_081-096/089_蓝珠天鹅.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0089_57f3d5",
+          "elf_name": "蓝珠天鹅"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0089_57f3d5",
+          "elf_name": "蓝珠天鹅"
+        }
+      ]
+    },
+    {
+      "dex_no": "090",
+      "icon_name": "翠顶夫人",
+      "icon_128_path": "icons_128/group_081-096/090_翠顶夫人.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0090_7a6bf1",
+          "elf_name": "翠顶夫人"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0090_7a6bf1",
+          "elf_name": "翠顶夫人"
+        }
+      ]
+    },
+    {
+      "dex_no": "091",
+      "icon_name": "黑羽夫人",
+      "icon_128_path": "icons_128/group_081-096/091_黑羽夫人.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0091_d9733e",
+          "elf_name": "黑羽夫人"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0091_d9733e",
+          "elf_name": "黑羽夫人"
+        }
+      ]
+    },
+    {
+      "dex_no": "092",
+      "icon_name": "锤头鹳",
+      "icon_128_path": "icons_128/group_081-096/092_锤头鹳.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0092_3d5996",
+          "elf_name": "锤头鹳"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0092_3d5996",
+          "elf_name": "锤头鹳"
+        }
+      ]
+    },
+    {
+      "dex_no": "093",
+      "icon_name": "绿草精灵",
+      "icon_128_path": "icons_128/group_081-096/093_绿草精灵.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0093_808480",
+          "elf_name": "绿草精灵"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0093_808480",
+          "elf_name": "绿草精灵"
+        }
+      ]
+    },
+    {
+      "dex_no": "094",
+      "icon_name": "魔草巫灵",
+      "icon_128_path": "icons_128/group_081-096/094_魔草巫灵.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0094_3a07bf",
+          "elf_name": "魔草巫灵"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0094_3a07bf",
+          "elf_name": "魔草巫灵"
+        }
+      ]
+    },
+    {
+      "dex_no": "095",
+      "icon_name": "记忆石",
+      "icon_128_path": "icons_128/group_081-096/095_记忆石.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0095_84a3e7",
+          "elf_name": "记忆石"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0095_84a3e7",
+          "elf_name": "记忆石"
+        }
+      ]
+    },
+    {
+      "dex_no": "096",
+      "icon_name": "咔咔羽毛",
+      "icon_128_path": "icons_128/group_081-096/096_咔咔羽毛.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0096_ae4f76",
+          "elf_name": "咔咔羽毛"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0096_ae4f76",
+          "elf_name": "咔咔羽毛"
+        }
+      ]
+    },
+    {
+      "dex_no": "097",
+      "icon_name": "咔咔雀",
+      "icon_128_path": "icons_128/group_097-112/097_咔咔雀.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0097_836ca0",
+          "elf_name": "咔咔雀"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0097_836ca0",
+          "elf_name": "咔咔雀"
+        }
+      ]
+    },
+    {
+      "dex_no": "098",
+      "icon_name": "咔咔鸟",
+      "icon_128_path": "icons_128/group_097-112/098_咔咔鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0098_fd8e4c",
+          "elf_name": "咔咔鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0098_fd8e4c",
+          "elf_name": "咔咔鸟"
+        }
+      ]
+    },
+    {
+      "dex_no": "099",
+      "icon_name": "小草虫",
+      "icon_128_path": "icons_128/group_097-112/099_小草虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0099_75e449",
+          "elf_name": "小草虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0099_75e449",
+          "elf_name": "小草虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "100",
+      "icon_name": "草衣虫",
+      "icon_128_path": "icons_128/group_097-112/100_草衣虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0100_e49261",
+          "elf_name": "草衣虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0100_e49261",
+          "elf_name": "草衣虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "101",
+      "icon_name": "花衣蝶",
+      "icon_128_path": "icons_128/group_097-112/101_花衣蝶.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0101_9651c5",
+          "elf_name": "花衣蝶"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0101_9651c5",
+          "elf_name": "花衣蝶"
+        }
+      ]
+    },
+    {
+      "dex_no": "102",
+      "icon_name": "绿翼鸟",
+      "icon_128_path": "icons_128/group_097-112/102_绿翼鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0102_28750c",
+          "elf_name": "绿翼鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0102_28750c",
+          "elf_name": "绿翼鸟"
+        }
+      ]
+    },
+    {
+      "dex_no": "103",
+      "icon_name": "魔翼鸟",
+      "icon_128_path": "icons_128/group_097-112/103_魔翼鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0103_9bc501",
+          "elf_name": "魔翼鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0103_9bc501",
+          "elf_name": "魔翼鸟"
+        }
+      ]
+    },
+    {
+      "dex_no": "104",
+      "icon_name": "魔眷鸟",
+      "icon_128_path": "icons_128/group_097-112/104_魔眷鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0104_5d24ba",
+          "elf_name": "魔眷鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0104_5d24ba",
+          "elf_name": "魔眷鸟"
+        }
+      ]
+    },
+    {
+      "dex_no": "105",
+      "icon_name": "阿米亚特",
+      "icon_128_path": "icons_128/group_097-112/105_阿米亚特.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0105_4b65b5",
+          "elf_name": "阿米亚特"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0105_4b65b5",
+          "elf_name": "阿米亚特"
+        }
+      ]
+    },
+    {
+      "dex_no": "106",
+      "icon_name": "阿米樱",
+      "icon_128_path": "icons_128/group_097-112/106_阿米樱.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0106_015791",
+          "elf_name": "阿米樱"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0106_015791",
+          "elf_name": "阿米樱"
+        }
+      ]
+    },
+    {
+      "dex_no": "107",
+      "icon_name": "罗隐",
+      "icon_128_path": "icons_128/group_097-112/107_罗隐.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0107_4b3385",
+          "elf_name": "罗隐"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0107_4b3385",
+          "elf_name": "罗隐"
+        },
+        {
+          "elf_id": "rocom_elf_0107_20ab00",
+          "elf_name": "深渊罗隐"
+        }
+      ]
+    },
+    {
+      "dex_no": "108",
+      "icon_name": "风铃鲨",
+      "icon_128_path": "icons_128/group_097-112/108_风铃鲨.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0108_062bca",
+          "elf_name": "风铃鲨"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0108_062bca",
+          "elf_name": "风铃鲨"
+        }
+      ]
+    },
+    {
+      "dex_no": "109",
+      "icon_name": "蓝蝶鲨",
+      "icon_128_path": "icons_128/group_097-112/109_蓝蝶鲨.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0109_829f1e",
+          "elf_name": "蓝蝶鲨"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0109_829f1e",
+          "elf_name": "蓝蝶鲨"
+        }
+      ]
+    },
+    {
+      "dex_no": "110",
+      "icon_name": "彩蝶鲨",
+      "icon_128_path": "icons_128/group_097-112/110_彩蝶鲨.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0110_e6c421",
+          "elf_name": "彩蝶鲨"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0110_e6c421",
+          "elf_name": "彩蝶鲨"
+        },
+        {
+          "elf_id": "rocom_elf_0110_0e6d6e",
+          "elf_name": "神谕鲨（首领形态·第3阶段）（首领形态·第3阶段）"
+        }
+      ]
+    },
+    {
+      "dex_no": "111",
+      "icon_name": "石石",
+      "icon_128_path": "icons_128/group_097-112/111_石石.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0111_53a5fc",
+          "elf_name": "石石"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0111_53a5fc",
+          "elf_name": "石石"
+        }
+      ]
+    },
+    {
+      "dex_no": "112",
+      "icon_name": "巨灵石",
+      "icon_128_path": "icons_128/group_097-112/112_巨灵石.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0112_ff673d",
+          "elf_name": "巨灵石"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0112_ff673d",
+          "elf_name": "巨灵石"
+        }
+      ]
+    },
+    {
+      "dex_no": "113",
+      "icon_name": "仪使者",
+      "icon_128_path": "icons_128/group_113-128/113_仪使者.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0113_40266e",
+          "elf_name": "仪使者"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0113_40266e",
+          "elf_name": "仪使者"
+        }
+      ]
+    },
+    {
+      "dex_no": "114",
+      "icon_name": "仪式之星",
+      "icon_128_path": "icons_128/group_113-128/114_仪式之星.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0114_94ea70",
+          "elf_name": "仪式之星"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0114_94ea70",
+          "elf_name": "仪式之星"
+        }
+      ]
+    },
+    {
+      "dex_no": "115",
+      "icon_name": "仪式巨像",
+      "icon_128_path": "icons_128/group_113-128/115_仪式巨像.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0115_d270c4",
+          "elf_name": "仪式巨像"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0115_d270c4",
+          "elf_name": "仪式巨像"
+        },
+        {
+          "elf_id": "rocom_elf_0115_0133a7",
+          "elf_name": "祭礼巨像"
+        }
+      ]
+    },
+    {
+      "dex_no": "116",
+      "icon_name": "小独角兽",
+      "icon_128_path": "icons_128/group_113-128/116_小独角兽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0116_175ae0",
+          "elf_name": "小独角兽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0116_175ae0",
+          "elf_name": "小独角兽"
+        }
+      ]
+    },
+    {
+      "dex_no": "117",
+      "icon_name": "白金独角兽",
+      "icon_128_path": "icons_128/group_113-128/117_白金独角兽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0117_6d6d40",
+          "elf_name": "白金独角兽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0117_6d6d40",
+          "elf_name": "白金独角兽"
+        },
+        {
+          "elf_id": "rocom_elf_0117_cab6c3",
+          "elf_name": "彩虹独角兽"
+        }
+      ]
+    },
+    {
+      "dex_no": "118",
+      "icon_name": "旋叶虫",
+      "icon_128_path": "icons_128/group_113-128/118_旋叶虫.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0118_1f181c",
+          "elf_name": "旋叶虫（金黄的样子）（金黄的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0118_da8024",
+          "elf_name": "旋叶虫（枯叶的样子）（枯叶的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0118_1f181c",
+          "elf_name": "旋叶虫（金黄的样子）（金黄的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0118_da8024",
+          "elf_name": "旋叶虫（枯叶的样子）（枯叶的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "119",
+      "icon_name": "蓬叶虫",
+      "icon_128_path": "icons_128/group_113-128/119_蓬叶虫.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0119_4b82b6",
+          "elf_name": "蓬叶虫（金黄的样子）（金黄的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0119_29ef9d",
+          "elf_name": "蓬叶虫（枯叶的样子）（枯叶的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0119_4b82b6",
+          "elf_name": "蓬叶虫（金黄的样子）（金黄的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0119_29ef9d",
+          "elf_name": "蓬叶虫（枯叶的样子）（枯叶的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "120",
+      "icon_name": "风滚暮虫",
+      "icon_128_path": "icons_128/group_113-128/120_风滚暮虫.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0120_f9920e",
+          "elf_name": "风滚暮虫（金黄的样子）（金黄的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0120_759a71",
+          "elf_name": "风滚暮虫（枯叶的样子）（枯叶的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0120_f9920e",
+          "elf_name": "风滚暮虫（金黄的样子）（金黄的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0120_759a71",
+          "elf_name": "风滚暮虫（枯叶的样子）（枯叶的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "121",
+      "icon_name": "小黑猫",
+      "icon_128_path": "icons_128/group_113-128/121_小黑猫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0121_5ad350",
+          "elf_name": "小黑猫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0121_5ad350",
+          "elf_name": "小黑猫"
+        }
+      ]
+    },
+    {
+      "dex_no": "122",
+      "icon_name": "黑猫巫师",
+      "icon_128_path": "icons_128/group_113-128/122_黑猫巫师.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0122_a6371c",
+          "elf_name": "黑猫巫师"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0122_a6371c",
+          "elf_name": "黑猫巫师"
+        },
+        {
+          "elf_id": "rocom_elf_0122_709cc9",
+          "elf_name": "黑猫密探"
+        }
+      ]
+    },
+    {
+      "dex_no": "123",
+      "icon_name": "忽幽狸",
+      "icon_128_path": "icons_128/group_113-128/123_忽幽狸.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0123_032ee9",
+          "elf_name": "忽幽狸"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0123_032ee9",
+          "elf_name": "忽幽狸"
+        }
+      ]
+    },
+    {
+      "dex_no": "124",
+      "icon_name": "影狸",
+      "icon_128_path": "icons_128/group_113-128/124_影狸.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0124_060999",
+          "elf_name": "影狸"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0124_060999",
+          "elf_name": "影狸"
+        }
+      ]
+    },
+    {
+      "dex_no": "125",
+      "icon_name": "多多",
+      "icon_128_path": "icons_128/group_113-128/125_多多.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0125_2ab572",
+          "elf_name": "多多"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0125_2ab572",
+          "elf_name": "多多"
+        }
+      ]
+    },
+    {
+      "dex_no": "126",
+      "icon_name": "多啦多",
+      "icon_128_path": "icons_128/group_113-128/126_多啦多.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0126_86a52b",
+          "elf_name": "多啦多"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0126_86a52b",
+          "elf_name": "多啦多"
+        }
+      ]
+    },
+    {
+      "dex_no": "127",
+      "icon_name": "古啦多",
+      "icon_128_path": "icons_128/group_113-128/127_古啦多.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0127_b86758",
+          "elf_name": "古啦多"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0127_b86758",
+          "elf_name": "古啦多"
+        }
+      ]
+    },
+    {
+      "dex_no": "128",
+      "icon_name": "哭哭菇",
+      "icon_128_path": "icons_128/group_113-128/128_哭哭菇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0128_f71d7a",
+          "elf_name": "哭哭菇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0128_f71d7a",
+          "elf_name": "哭哭菇"
+        }
+      ]
+    },
+    {
+      "dex_no": "129",
+      "icon_name": "怖须菇",
+      "icon_128_path": "icons_128/group_129-144/129_怖须菇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0129_1e4fa2",
+          "elf_name": "怖须菇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0129_1e4fa2",
+          "elf_name": "怖须菇"
+        }
+      ]
+    },
+    {
+      "dex_no": "130",
+      "icon_name": "怖哭菇",
+      "icon_128_path": "icons_128/group_129-144/130_怖哭菇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0130_70c4c6",
+          "elf_name": "怖哭菇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0130_70c4c6",
+          "elf_name": "怖哭菇"
+        }
+      ]
+    },
+    {
+      "dex_no": "131",
+      "icon_name": "恶魔狼",
+      "icon_128_path": "icons_128/group_129-144/131_恶魔狼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0131_0f02bd",
+          "elf_name": "恶魔狼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0131_0f02bd",
+          "elf_name": "恶魔狼"
+        },
+        {
+          "elf_id": "rocom_elf_0131_616991",
+          "elf_name": "恶魔狼王"
+        }
+      ]
+    },
+    {
+      "dex_no": "132",
+      "icon_name": "小电企鹅",
+      "icon_128_path": "icons_128/group_129-144/132_小电企鹅.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0132_573aad",
+          "elf_name": "小电企鹅"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0132_573aad",
+          "elf_name": "小电企鹅"
+        }
+      ]
+    },
+    {
+      "dex_no": "133",
+      "icon_name": "电企鹅",
+      "icon_128_path": "icons_128/group_129-144/133_电企鹅.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0133_e849ab",
+          "elf_name": "电企鹅"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0133_e849ab",
+          "elf_name": "电企鹅"
+        }
+      ]
+    },
+    {
+      "dex_no": "134",
+      "icon_name": "雪豆丁",
+      "icon_128_path": "icons_128/group_129-144/134_雪豆丁.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0134_0f7b1b",
+          "elf_name": "雪豆丁"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0134_0f7b1b",
+          "elf_name": "雪豆丁"
+        }
+      ]
+    },
+    {
+      "dex_no": "135",
+      "icon_name": "雪蛮人",
+      "icon_128_path": "icons_128/group_129-144/135_雪蛮人.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0135_55ea82",
+          "elf_name": "雪蛮人"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0135_55ea82",
+          "elf_name": "雪蛮人"
+        }
+      ]
+    },
+    {
+      "dex_no": "136",
+      "icon_name": "雪巨人",
+      "icon_128_path": "icons_128/group_129-144/136_雪巨人.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0136_59bfb7",
+          "elf_name": "雪巨人"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0136_59bfb7",
+          "elf_name": "雪巨人"
+        }
+      ]
+    },
+    {
+      "dex_no": "137",
+      "icon_name": "呼呼猪",
+      "icon_128_path": "icons_128/group_129-144/137_呼呼猪.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0137_3abe86",
+          "elf_name": "呼呼猪"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0137_3abe86",
+          "elf_name": "呼呼猪"
+        }
+      ]
+    },
+    {
+      "dex_no": "138",
+      "icon_name": "獠牙猪",
+      "icon_128_path": "icons_128/group_129-144/138_獠牙猪.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0138_8819c0",
+          "elf_name": "獠牙猪"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0138_8819c0",
+          "elf_name": "獠牙猪"
+        }
+      ]
+    },
+    {
+      "dex_no": "139",
+      "icon_name": "雪娃娃",
+      "icon_128_path": "icons_128/group_129-144/139_雪娃娃.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0139_ecae0d",
+          "elf_name": "雪娃娃"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0139_ecae0d",
+          "elf_name": "雪娃娃"
+        }
+      ]
+    },
+    {
+      "dex_no": "140",
+      "icon_name": "冰封怨灵",
+      "icon_128_path": "icons_128/group_129-144/140_冰封怨灵.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0140_787873",
+          "elf_name": "冰封怨灵"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0140_787873",
+          "elf_name": "冰封怨灵"
+        }
+      ]
+    },
+    {
+      "dex_no": "141",
+      "icon_name": "雪灵",
+      "icon_128_path": "icons_128/group_129-144/141_雪灵.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0141_0c3ef0",
+          "elf_name": "雪灵"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0141_0c3ef0",
+          "elf_name": "雪灵"
+        }
+      ]
+    },
+    {
+      "dex_no": "142",
+      "icon_name": "大耳帽兜",
+      "icon_128_path": "icons_128/group_129-144/142_大耳帽兜.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0142_53e10b",
+          "elf_name": "大耳帽兜"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0142_53e10b",
+          "elf_name": "大耳帽兜"
+        }
+      ]
+    },
+    {
+      "dex_no": "143",
+      "icon_name": "帽兜娃娃",
+      "icon_128_path": "icons_128/group_129-144/143_帽兜娃娃.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0143_aae9a3",
+          "elf_name": "帽兜娃娃"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0143_aae9a3",
+          "elf_name": "帽兜娃娃"
+        }
+      ]
+    },
+    {
+      "dex_no": "144",
+      "icon_name": "雪影娃娃",
+      "icon_128_path": "icons_128/group_129-144/144_雪影娃娃.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0144_729a3d",
+          "elf_name": "雪影娃娃"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0144_729a3d",
+          "elf_name": "雪影娃娃"
+        },
+        {
+          "elf_id": "rocom_elf_0144_13b58e",
+          "elf_name": "雪影冰灵"
+        }
+      ]
+    },
+    {
+      "dex_no": "145",
+      "icon_name": "权杖-Ⅱ",
+      "icon_128_path": "icons_128/group_145-160/145_权杖-Ⅱ.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0145_a1f9db",
+          "elf_name": "权杖-Ⅱ"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0145_a1f9db",
+          "elf_name": "权杖-Ⅱ"
+        }
+      ]
+    },
+    {
+      "dex_no": "146",
+      "icon_name": "权杖-V",
+      "icon_128_path": "icons_128/group_145-160/146_权杖-V.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0146_918352",
+          "elf_name": "权杖-V"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0146_918352",
+          "elf_name": "权杖-V"
+        }
+      ]
+    },
+    {
+      "dex_no": "147",
+      "icon_name": "灵狐",
+      "icon_128_path": "icons_128/group_145-160/147_灵狐.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0147_83d032",
+          "elf_name": "灵狐"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0147_83d032",
+          "elf_name": "灵狐"
+        }
+      ]
+    },
+    {
+      "dex_no": "148",
+      "icon_name": "九尾狐",
+      "icon_128_path": "icons_128/group_145-160/148_九尾狐.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0148_789e81",
+          "elf_name": "九尾狐"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0148_789e81",
+          "elf_name": "九尾狐"
+        }
+      ]
+    },
+    {
+      "dex_no": "149",
+      "icon_name": "尖嘴狐仙",
+      "icon_128_path": "icons_128/group_145-160/149_尖嘴狐仙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0149_a8df32",
+          "elf_name": "尖嘴狐仙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0149_a8df32",
+          "elf_name": "尖嘴狐仙"
+        }
+      ]
+    },
+    {
+      "dex_no": "150",
+      "icon_name": "里奥",
+      "icon_128_path": "icons_128/group_145-160/150_里奥.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0150_68abad",
+          "elf_name": "里奥"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0150_68abad",
+          "elf_name": "里奥"
+        }
+      ]
+    },
+    {
+      "dex_no": "151",
+      "icon_name": "灵羽勇士",
+      "icon_128_path": "icons_128/group_145-160/151_灵羽勇士.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0151_0cde03",
+          "elf_name": "灵羽勇士"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0151_0cde03",
+          "elf_name": "灵羽勇士"
+        }
+      ]
+    },
+    {
+      "dex_no": "152",
+      "icon_name": "圣羽翼王",
+      "icon_128_path": "icons_128/group_145-160/152_圣羽翼王.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0152_bed95d",
+          "elf_name": "圣羽翼王"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0152_bed95d",
+          "elf_name": "圣羽翼王"
+        }
+      ]
+    },
+    {
+      "dex_no": "153",
+      "icon_name": "松仔",
+      "icon_128_path": "icons_128/group_145-160/153_松仔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0153_765b19",
+          "elf_name": "松仔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0153_765b19",
+          "elf_name": "松仔"
+        }
+      ]
+    },
+    {
+      "dex_no": "154",
+      "icon_name": "松叶羊",
+      "icon_128_path": "icons_128/group_145-160/154_松叶羊.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0154_d34fb8",
+          "elf_name": "松叶羊"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0154_d34fb8",
+          "elf_name": "松叶羊"
+        }
+      ]
+    },
+    {
+      "dex_no": "155",
+      "icon_name": "针叶巡林",
+      "icon_128_path": "icons_128/group_145-160/155_针叶巡林.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0155_28ad7b",
+          "elf_name": "针叶巡林"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0155_28ad7b",
+          "elf_name": "针叶巡林"
+        }
+      ]
+    },
+    {
+      "dex_no": "156",
+      "icon_name": "小勇狮",
+      "icon_128_path": "icons_128/group_145-160/156_小勇狮.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0156_fb7429",
+          "elf_name": "小勇狮"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0156_fb7429",
+          "elf_name": "小勇狮"
+        }
+      ]
+    },
+    {
+      "dex_no": "157",
+      "icon_name": "炽焰狮",
+      "icon_128_path": "icons_128/group_145-160/157_炽焰狮.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0157_6a73a7",
+          "elf_name": "炽焰狮"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0157_6a73a7",
+          "elf_name": "炽焰狮"
+        }
+      ]
+    },
+    {
+      "dex_no": "158",
+      "icon_name": "炽心勇狮",
+      "icon_128_path": "icons_128/group_145-160/158_炽心勇狮.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0158_5174ea",
+          "elf_name": "炽心勇狮"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0158_5174ea",
+          "elf_name": "炽心勇狮"
+        }
+      ]
+    },
+    {
+      "dex_no": "159",
+      "icon_name": "水滴蛇",
+      "icon_128_path": "icons_128/group_145-160/159_水滴蛇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0159_bd0804",
+          "elf_name": "水滴蛇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0159_bd0804",
+          "elf_name": "水滴蛇"
+        }
+      ]
+    },
+    {
+      "dex_no": "160",
+      "icon_name": "水蛇锁",
+      "icon_128_path": "icons_128/group_145-160/160_水蛇锁.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0160_60cae6",
+          "elf_name": "水蛇锁"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0160_60cae6",
+          "elf_name": "水蛇锁"
+        }
+      ]
+    },
+    {
+      "dex_no": "161",
+      "icon_name": "游蛇魔使",
+      "icon_128_path": "icons_128/group_161-176/161_游蛇魔使.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0161_7a69dc",
+          "elf_name": "游蛇魔使"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0161_7a69dc",
+          "elf_name": "游蛇魔使"
+        }
+      ]
+    },
+    {
+      "dex_no": "162",
+      "icon_name": "公平鸽",
+      "icon_128_path": "icons_128/group_161-176/162_公平鸽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0162_86bbd1",
+          "elf_name": "公平鸽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0162_86bbd1",
+          "elf_name": "公平鸽"
+        }
+      ]
+    },
+    {
+      "dex_no": "163",
+      "icon_name": "小怂猫",
+      "icon_128_path": "icons_128/group_161-176/163_小怂猫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0163_2b191a",
+          "elf_name": "小怂猫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0163_2b191a",
+          "elf_name": "小怂猫"
+        }
+      ]
+    },
+    {
+      "dex_no": "164",
+      "icon_name": "怒目怂猫",
+      "icon_128_path": "icons_128/group_161-176/164_怒目怂猫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0164_c0dac6",
+          "elf_name": "怒目怂猫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0164_c0dac6",
+          "elf_name": "怒目怂猫"
+        }
+      ]
+    },
+    {
+      "dex_no": "165",
+      "icon_name": "小狮鹫",
+      "icon_128_path": "icons_128/group_161-176/165_小狮鹫.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0165_701138",
+          "elf_name": "小狮鹫（崖间地的样子）（崖间地的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0165_538a43",
+          "elf_name": "小狮鹫（高山地的样子）（高山地的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0165_701138",
+          "elf_name": "小狮鹫（崖间地的样子）（崖间地的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0165_538a43",
+          "elf_name": "小狮鹫（高山地的样子）（高山地的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "166",
+      "icon_name": "神圣狮鹫",
+      "icon_128_path": "icons_128/group_161-176/166_神圣狮鹫.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0166_6f63ee",
+          "elf_name": "神圣狮鹫（崖间地的样子）（崖间地的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0166_c6f1af",
+          "elf_name": "神圣狮鹫（高山地的样子）（高山地的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0166_6f63ee",
+          "elf_name": "神圣狮鹫（崖间地的样子）（崖间地的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0166_c6f1af",
+          "elf_name": "神圣狮鹫（高山地的样子）（高山地的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "167",
+      "icon_name": "皇家狮鹫",
+      "icon_128_path": "icons_128/group_161-176/167_皇家狮鹫.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0167_d54901",
+          "elf_name": "皇家狮鹫（崖间地的样子）（崖间地的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0167_4bf599",
+          "elf_name": "皇家狮鹫（高山地的样子）（高山地的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0167_d54901",
+          "elf_name": "皇家狮鹫（崖间地的样子）（崖间地的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0167_4bf599",
+          "elf_name": "皇家狮鹫（高山地的样子）（高山地的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "168",
+      "icon_name": "圆眼蜘蛛",
+      "icon_128_path": "icons_128/group_161-176/168_圆眼蜘蛛.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0168_f2a3a4",
+          "elf_name": "圆眼蜘蛛"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0168_f2a3a4",
+          "elf_name": "圆眼蜘蛛"
+        }
+      ]
+    },
+    {
+      "dex_no": "169",
+      "icon_name": "尖角蜘蛛",
+      "icon_128_path": "icons_128/group_161-176/169_尖角蜘蛛.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0169_207fb4",
+          "elf_name": "尖角蜘蛛"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0169_207fb4",
+          "elf_name": "尖角蜘蛛"
+        }
+      ]
+    },
+    {
+      "dex_no": "170",
+      "icon_name": "芋香巨角蛛",
+      "icon_128_path": "icons_128/group_161-176/170_芋香巨角蛛.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0170_d0f2b9",
+          "elf_name": "芋香巨角蛛"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0170_d0f2b9",
+          "elf_name": "芋香巨角蛛"
+        }
+      ]
+    },
+    {
+      "dex_no": "171",
+      "icon_name": "波波螺",
+      "icon_128_path": "icons_128/group_161-176/171_波波螺.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0171_fa4904",
+          "elf_name": "波波螺"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0171_fa4904",
+          "elf_name": "波波螺"
+        },
+        {
+          "elf_id": "rocom_elf_0171_0baf67",
+          "elf_name": "波波螺（被污染的样子）（被污染的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "172",
+      "icon_name": "消波螺",
+      "icon_128_path": "icons_128/group_161-176/172_消波螺.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0172_23dc22",
+          "elf_name": "消波螺"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0172_23dc22",
+          "elf_name": "消波螺"
+        },
+        {
+          "elf_id": "rocom_elf_0172_5be9b4",
+          "elf_name": "消波螺（被污染的样子）（被污染的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "173",
+      "icon_name": "嗜波螺",
+      "icon_128_path": "icons_128/group_161-176/173_嗜波螺.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0173_f3e64e",
+          "elf_name": "嗜波螺"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0173_f3e64e",
+          "elf_name": "嗜波螺"
+        },
+        {
+          "elf_id": "rocom_elf_0173_97b6bb",
+          "elf_name": "嗜波螺（被污染的样子）（被污染的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "174",
+      "icon_name": "菇菇丁",
+      "icon_128_path": "icons_128/group_161-176/174_菇菇丁.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0174_c11cff",
+          "elf_name": "菇菇丁"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0174_c11cff",
+          "elf_name": "菇菇丁"
+        }
+      ]
+    },
+    {
+      "dex_no": "175",
+      "icon_name": "多菇丁",
+      "icon_128_path": "icons_128/group_161-176/175_多菇丁.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0175_0da7f8",
+          "elf_name": "多菇丁"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0175_0da7f8",
+          "elf_name": "多菇丁"
+        }
+      ]
+    },
+    {
+      "dex_no": "176",
+      "icon_name": "九幽菇",
+      "icon_128_path": "icons_128/group_161-176/176_九幽菇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0176_53b09c",
+          "elf_name": "九幽菇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0176_53b09c",
+          "elf_name": "九幽菇"
+        }
+      ]
+    },
+    {
+      "dex_no": "177",
+      "icon_name": "斑斑",
+      "icon_128_path": "icons_128/group_177-192/177_斑斑.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0177_3853bc",
+          "elf_name": "斑斑"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0177_3853bc",
+          "elf_name": "斑斑"
+        }
+      ]
+    },
+    {
+      "dex_no": "178",
+      "icon_name": "斑枭",
+      "icon_128_path": "icons_128/group_177-192/178_斑枭.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0178_0e423f",
+          "elf_name": "斑枭"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0178_0e423f",
+          "elf_name": "斑枭"
+        }
+      ]
+    },
+    {
+      "dex_no": "179",
+      "icon_name": "草头鸭",
+      "icon_128_path": "icons_128/group_177-192/179_草头鸭.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0179_bd587f",
+          "elf_name": "草头鸭"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0179_bd587f",
+          "elf_name": "草头鸭"
+        }
+      ]
+    },
+    {
+      "dex_no": "180",
+      "icon_name": "卷毛鸭",
+      "icon_128_path": "icons_128/group_177-192/180_卷毛鸭.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0180_c81102",
+          "elf_name": "卷毛鸭"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0180_c81102",
+          "elf_name": "卷毛鸭"
+        }
+      ]
+    },
+    {
+      "dex_no": "181",
+      "icon_name": "海豹战士",
+      "icon_128_path": "icons_128/group_177-192/181_海豹战士.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0181_51b947",
+          "elf_name": "海豹战士"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0181_51b947",
+          "elf_name": "海豹战士"
+        }
+      ]
+    },
+    {
+      "dex_no": "182",
+      "icon_name": "海豹船长",
+      "icon_128_path": "icons_128/group_177-192/182_海豹船长.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0182_855a60",
+          "elf_name": "海豹船长"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0182_855a60",
+          "elf_name": "海豹船长"
+        }
+      ]
+    },
+    {
+      "dex_no": "183",
+      "icon_name": "号儿鱼",
+      "icon_128_path": "icons_128/group_177-192/183_号儿鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0183_fe8a0d",
+          "elf_name": "号儿鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0183_fe8a0d",
+          "elf_name": "号儿鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "184",
+      "icon_name": "圆号鱼",
+      "icon_128_path": "icons_128/group_177-192/184_圆号鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0184_3c472d",
+          "elf_name": "圆号鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0184_3c472d",
+          "elf_name": "圆号鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "185",
+      "icon_name": "甜田螺",
+      "icon_128_path": "icons_128/group_177-192/185_甜田螺.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0185_74c75d",
+          "elf_name": "甜田螺"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0185_74c75d",
+          "elf_name": "甜田螺"
+        }
+      ]
+    },
+    {
+      "dex_no": "186",
+      "icon_name": "壳乙螺",
+      "icon_128_path": "icons_128/group_177-192/186_壳乙螺.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0186_381850",
+          "elf_name": "壳乙螺"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0186_381850",
+          "elf_name": "壳乙螺"
+        }
+      ]
+    },
+    {
+      "dex_no": "187",
+      "icon_name": "卡洛儿",
+      "icon_128_path": "icons_128/group_177-192/187_卡洛儿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0187_b4b250",
+          "elf_name": "卡洛儿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0187_b4b250",
+          "elf_name": "卡洛儿"
+        }
+      ]
+    },
+    {
+      "dex_no": "188",
+      "icon_name": "棋棋",
+      "icon_128_path": "icons_128/group_177-192/188_棋棋.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0188_c1bdb0",
+          "elf_name": "棋棋（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0188_a484ee",
+          "elf_name": "棋棋（黑子）（黑子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0188_c1bdb0",
+          "elf_name": "棋棋（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0188_a484ee",
+          "elf_name": "棋棋（黑子）（黑子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "189",
+      "icon_name": "棋骑士",
+      "icon_128_path": "icons_128/group_177-192/189_棋骑士.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0189_f95871",
+          "elf_name": "棋骑士（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0189_59bbb7",
+          "elf_name": "棋骑士（黑子）（黑子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0189_f95871",
+          "elf_name": "棋骑士（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0189_59bbb7",
+          "elf_name": "棋骑士（黑子）（黑子）"
+        },
+        {
+          "elf_id": "rocom_elf_0189_9706dd",
+          "elf_name": "棋契陛下（第1条）（第1条）"
+        },
+        {
+          "elf_id": "rocom_elf_0189_cba0ad",
+          "elf_name": "棋契陛下（黑子）（黑子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "190",
+      "icon_name": "棋齐垒",
+      "icon_128_path": "icons_128/group_177-192/190_棋齐垒.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0190_8c11e6",
+          "elf_name": "棋齐垒（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0190_3161ad",
+          "elf_name": "棋齐垒（黑子）（黑子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0190_8c11e6",
+          "elf_name": "棋齐垒（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0190_3161ad",
+          "elf_name": "棋齐垒（黑子）（黑子）"
+        },
+        {
+          "elf_id": "rocom_elf_0190_efbd3c",
+          "elf_name": "棋契陛下（第2条）（第2条）"
+        }
+      ]
+    },
+    {
+      "dex_no": "191",
+      "icon_name": "棋祈督",
+      "icon_128_path": "icons_128/group_177-192/191_棋祈督.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0191_5075fb",
+          "elf_name": "棋祈督（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0191_7c673e",
+          "elf_name": "棋祈督（黑子）（黑子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0191_5075fb",
+          "elf_name": "棋祈督（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0191_7c673e",
+          "elf_name": "棋祈督（黑子）（黑子）"
+        },
+        {
+          "elf_id": "rocom_elf_0191_c8e3b1",
+          "elf_name": "棋契陛下（第3条）（第3条）"
+        }
+      ]
+    },
+    {
+      "dex_no": "192",
+      "icon_name": "棋绮后",
+      "icon_128_path": "icons_128/group_177-192/192_棋绮后.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0192_0529a7",
+          "elf_name": "棋绮后（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0192_87f9f3",
+          "elf_name": "棋绮后（黑子）（黑子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0192_0529a7",
+          "elf_name": "棋绮后（白子）（白子）"
+        },
+        {
+          "elf_id": "rocom_elf_0192_87f9f3",
+          "elf_name": "棋绮后（黑子）（黑子）"
+        },
+        {
+          "elf_id": "rocom_elf_0192_0927b5",
+          "elf_name": "棋契陛下（第4条）（第4条）"
+        }
+      ]
+    },
+    {
+      "dex_no": "193",
+      "icon_name": "奔波鼠",
+      "icon_128_path": "icons_128/group_193-232_col1/193_奔波鼠.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0193_56ed8b",
+          "elf_name": "奔波鼠"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0193_56ed8b",
+          "elf_name": "奔波鼠"
+        }
+      ]
+    },
+    {
+      "dex_no": "194",
+      "icon_name": "流浪鼠",
+      "icon_128_path": "icons_128/group_193-232_col1/194_流浪鼠.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0194_c57993",
+          "elf_name": "流浪鼠"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0194_c57993",
+          "elf_name": "流浪鼠"
+        }
+      ]
+    },
+    {
+      "dex_no": "195",
+      "icon_name": "呆小路",
+      "icon_128_path": "icons_128/group_193-232_col1/195_呆小路.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0195_ae7515",
+          "elf_name": "呆小路"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0195_ae7515",
+          "elf_name": "呆小路"
+        }
+      ]
+    },
+    {
+      "dex_no": "196",
+      "icon_name": "舞动路路",
+      "icon_128_path": "icons_128/group_193-232_col1/196_舞动路路.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0196_8901b4",
+          "elf_name": "舞动路路"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0196_8901b4",
+          "elf_name": "舞动路路"
+        }
+      ]
+    },
+    {
+      "dex_no": "197",
+      "icon_name": "白发路路",
+      "icon_128_path": "icons_128/group_193-232_col1/197_白发路路.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0197_4a5f28",
+          "elf_name": "白发路路"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0197_4a5f28",
+          "elf_name": "白发路路"
+        }
+      ]
+    },
+    {
+      "dex_no": "198",
+      "icon_name": "逗逗",
+      "icon_128_path": "icons_128/group_193-232_col1/198_逗逗.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0198_bbb444",
+          "elf_name": "逗逗"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0198_bbb444",
+          "elf_name": "逗逗"
+        }
+      ]
+    },
+    {
+      "dex_no": "199",
+      "icon_name": "气球猫",
+      "icon_128_path": "icons_128/group_193-232_col1/199_气球猫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0199_5053c1",
+          "elf_name": "气球猫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0199_5053c1",
+          "elf_name": "气球猫"
+        }
+      ]
+    },
+    {
+      "dex_no": "200",
+      "icon_name": "梦想三三",
+      "icon_128_path": "icons_128/group_193-232_col1/200_梦想三三.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0200_4c347b",
+          "elf_name": "梦想三三"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0200_4c347b",
+          "elf_name": "梦想三三"
+        },
+        {
+          "elf_id": "rocom_elf_0200_9a96ae",
+          "elf_name": "奇梦咪"
+        }
+      ]
+    },
+    {
+      "dex_no": "225",
+      "icon_name": "翼龙",
+      "icon_128_path": "icons_128/group_193-232_col1/225_翼龙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0225_fdcb02",
+          "elf_name": "翼龙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0225_fdcb02",
+          "elf_name": "翼龙"
+        }
+      ]
+    },
+    {
+      "dex_no": "226",
+      "icon_name": "电动长颈鹿",
+      "icon_128_path": "icons_128/group_193-232_col1/226_电动长颈鹿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0226_e4027d",
+          "elf_name": "电动长颈鹿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0226_e4027d",
+          "elf_name": "电动长颈鹿"
+        }
+      ]
+    },
+    {
+      "dex_no": "227",
+      "icon_name": "奔乐鹿",
+      "icon_128_path": "icons_128/group_193-232_col1/227_奔乐鹿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0227_ca7942",
+          "elf_name": "奔乐鹿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0227_ca7942",
+          "elf_name": "奔乐鹿"
+        }
+      ]
+    },
+    {
+      "dex_no": "228",
+      "icon_name": "爵士鹿",
+      "icon_128_path": "icons_128/group_193-232_col1/228_爵士鹿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0228_56925d",
+          "elf_name": "爵士鹿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0228_56925d",
+          "elf_name": "爵士鹿"
+        },
+        {
+          "elf_id": "rocom_elf_0228_f52fbb",
+          "elf_name": "波普鹿"
+        }
+      ]
+    },
+    {
+      "dex_no": "229",
+      "icon_name": "缇塔",
+      "icon_128_path": "icons_128/group_193-232_col1/229_缇塔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0229_65bb6b",
+          "elf_name": "缇塔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0229_65bb6b",
+          "elf_name": "缇塔"
+        }
+      ]
+    },
+    {
+      "dex_no": "230",
+      "icon_name": "声波缇塔",
+      "icon_128_path": "icons_128/group_193-232_col1/230_声波缇塔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0230_a4b293",
+          "elf_name": "声波缇塔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0230_a4b293",
+          "elf_name": "声波缇塔"
+        }
+      ]
+    },
+    {
+      "dex_no": "231",
+      "icon_name": "小鹬",
+      "icon_128_path": "icons_128/group_193-232_col1/231_小鹬.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0231_e40fdb",
+          "elf_name": "小鹬"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0231_e40fdb",
+          "elf_name": "小鹬"
+        }
+      ]
+    },
+    {
+      "dex_no": "232",
+      "icon_name": "鄙目鹬",
+      "icon_128_path": "icons_128/group_193-232_col1/232_鄙目鹬.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0232_7f436d",
+          "elf_name": "鄙目鹬"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0232_7f436d",
+          "elf_name": "鄙目鹬"
+        }
+      ]
+    },
+    {
+      "dex_no": "201",
+      "icon_name": "花怨鳗",
+      "icon_128_path": "icons_128/group_201-240_col2/201_花怨鳗.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0201_5a32e0",
+          "elf_name": "花怨鳗"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0201_5a32e0",
+          "elf_name": "花怨鳗"
+        }
+      ]
+    },
+    {
+      "dex_no": "202",
+      "icon_name": "鳗尾兽",
+      "icon_128_path": "icons_128/group_201-240_col2/202_鳗尾兽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0202_1ae51b",
+          "elf_name": "鳗尾兽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0202_1ae51b",
+          "elf_name": "鳗尾兽"
+        }
+      ]
+    },
+    {
+      "dex_no": "203",
+      "icon_name": "伊雷龙",
+      "icon_128_path": "icons_128/group_201-240_col2/203_伊雷龙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0203_2368d5",
+          "elf_name": "伊雷龙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0203_2368d5",
+          "elf_name": "伊雷龙"
+        }
+      ]
+    },
+    {
+      "dex_no": "204",
+      "icon_name": "伊兰亚龙",
+      "icon_128_path": "icons_128/group_201-240_col2/204_伊兰亚龙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0204_198599",
+          "elf_name": "伊兰亚龙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0204_198599",
+          "elf_name": "伊兰亚龙"
+        },
+        {
+          "elf_id": "rocom_elf_0204_de57be",
+          "elf_name": "伊兰龙"
+        }
+      ]
+    },
+    {
+      "dex_no": "205",
+      "icon_name": "拉特",
+      "icon_128_path": "icons_128/group_201-240_col2/205_拉特.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0205_ad06ff",
+          "elf_name": "拉特"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0205_ad06ff",
+          "elf_name": "拉特"
+        }
+      ]
+    },
+    {
+      "dex_no": "206",
+      "icon_name": "酷拉",
+      "icon_128_path": "icons_128/group_201-240_col2/206_酷拉.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0206_067256",
+          "elf_name": "酷拉"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0206_067256",
+          "elf_name": "酷拉"
+        }
+      ]
+    },
+    {
+      "dex_no": "207",
+      "icon_name": "闪电环",
+      "icon_128_path": "icons_128/group_201-240_col2/207_闪电环.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0207_c6fba5",
+          "elf_name": "闪电环"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0207_c6fba5",
+          "elf_name": "闪电环"
+        }
+      ]
+    },
+    {
+      "dex_no": "208",
+      "icon_name": "刺电环",
+      "icon_128_path": "icons_128/group_201-240_col2/208_刺电环.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0208_efee2c",
+          "elf_name": "刺电环"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0208_efee2c",
+          "elf_name": "刺电环"
+        }
+      ]
+    },
+    {
+      "dex_no": "233",
+      "icon_name": "高脚鹬",
+      "icon_128_path": "icons_128/group_201-240_col2/233_高脚鹬.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0233_4027f4",
+          "elf_name": "高脚鹬"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0233_4027f4",
+          "elf_name": "高脚鹬"
+        },
+        {
+          "elf_id": "rocom_elf_0233_ac64ef",
+          "elf_name": "高帽鹬者"
+        }
+      ]
+    },
+    {
+      "dex_no": "234",
+      "icon_name": "脆筒甜甜",
+      "icon_128_path": "icons_128/group_201-240_col2/234_脆筒甜甜.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0234_bcdcb6",
+          "elf_name": "脆筒甜甜"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0234_bcdcb6",
+          "elf_name": "脆筒甜甜"
+        }
+      ]
+    },
+    {
+      "dex_no": "235",
+      "icon_name": "香草甜甜",
+      "icon_128_path": "icons_128/group_201-240_col2/235_香草甜甜.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0235_8f6971",
+          "elf_name": "香草甜甜"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0235_8f6971",
+          "elf_name": "香草甜甜"
+        },
+        {
+          "elf_id": "rocom_elf_0235_d1ec64",
+          "elf_name": "香草甜甜（杨桃饰品）（杨桃饰品）"
+        },
+        {
+          "elf_id": "rocom_elf_0235_5d489d",
+          "elf_name": "香草甜甜（蓝莓饰品）（蓝莓饰品）"
+        }
+      ]
+    },
+    {
+      "dex_no": "236",
+      "icon_name": "圣代甜甜",
+      "icon_128_path": "icons_128/group_201-240_col2/236_圣代甜甜.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0236_87674a",
+          "elf_name": "圣代甜甜"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0236_87674a",
+          "elf_name": "圣代甜甜"
+        },
+        {
+          "elf_id": "rocom_elf_0236_cc5041",
+          "elf_name": "圣代甜甜（樱桃草莓口味）（樱桃草莓口味）"
+        },
+        {
+          "elf_id": "rocom_elf_0236_aa893c",
+          "elf_name": "圣代甜甜（樱桃抹茶口味）（樱桃抹茶口味）"
+        },
+        {
+          "elf_id": "rocom_elf_0236_483c89",
+          "elf_name": "圣代甜甜（蓝莓巧克力口味）（蓝莓巧克力口味）"
+        },
+        {
+          "elf_id": "rocom_elf_0236_25f92d",
+          "elf_name": "圣代甜甜（蓝莓草莓口味）（蓝莓草莓口味）"
+        },
+        {
+          "elf_id": "rocom_elf_0236_0cd42e",
+          "elf_name": "圣代甜甜（蓝莓抹茶口味）（蓝莓抹茶口味）"
+        },
+        {
+          "elf_id": "rocom_elf_0236_6254d5",
+          "elf_name": "圣代甜甜（杨桃巧克力口味）（杨桃巧克力口味）"
+        },
+        {
+          "elf_id": "rocom_elf_0236_d73fdb",
+          "elf_name": "圣代甜甜（杨桃草莓口味）（杨桃草莓口味）"
+        },
+        {
+          "elf_id": "rocom_elf_0236_25db87",
+          "elf_name": "圣代甜甜（杨桃抹茶口味）（杨桃抹茶口味）"
+        }
+      ]
+    },
+    {
+      "dex_no": "237",
+      "icon_name": "刺轮砣",
+      "icon_128_path": "icons_128/group_201-240_col2/237_刺轮砣.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0237_0588f4",
+          "elf_name": "刺轮砣（上弦的样子）（上弦的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0237_1e3fce",
+          "elf_name": "刺轮砣（下弦的样子）（下弦的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0237_0588f4",
+          "elf_name": "刺轮砣（上弦的样子）（上弦的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0237_1e3fce",
+          "elf_name": "刺轮砣（下弦的样子）（下弦的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "238",
+      "icon_name": "月亮砣",
+      "icon_128_path": "icons_128/group_201-240_col2/238_月亮砣.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0238_cc8cf5",
+          "elf_name": "月亮砣（上弦的样子）（上弦的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0238_c72716",
+          "elf_name": "月亮砣（下弦的样子）（下弦的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0238_cc8cf5",
+          "elf_name": "月亮砣（上弦的样子）（上弦的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0238_c72716",
+          "elf_name": "月亮砣（下弦的样子）（下弦的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "239",
+      "icon_name": "豆丁鱼",
+      "icon_128_path": "icons_128/group_201-240_col2/239_豆丁鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0239_b412d9",
+          "elf_name": "豆丁鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0239_b412d9",
+          "elf_name": "豆丁鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "240",
+      "icon_name": "快鳍鱼",
+      "icon_128_path": "icons_128/group_201-240_col2/240_快鳍鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0240_e51463",
+          "elf_name": "快鳍鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0240_e51463",
+          "elf_name": "快鳍鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "209",
+      "icon_name": "荆棘电环",
+      "icon_128_path": "icons_128/group_209-248_col3/209_荆棘电环.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0209_6963e1",
+          "elf_name": "荆棘电环"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0209_6963e1",
+          "elf_name": "荆棘电环"
+        }
+      ]
+    },
+    {
+      "dex_no": "210",
+      "icon_name": "小箱怪",
+      "icon_128_path": "icons_128/group_209-248_col3/210_小箱怪.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0210_00b38f",
+          "elf_name": "小箱怪"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0210_00b38f",
+          "elf_name": "小箱怪"
+        }
+      ]
+    },
+    {
+      "dex_no": "211",
+      "icon_name": "迷迷箱怪",
+      "icon_128_path": "icons_128/group_209-248_col3/211_迷迷箱怪.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0211_5dcd5a",
+          "elf_name": "迷迷箱怪"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0211_5dcd5a",
+          "elf_name": "迷迷箱怪"
+        }
+      ]
+    },
+    {
+      "dex_no": "212",
+      "icon_name": "古钟蛇",
+      "icon_128_path": "icons_128/group_209-248_col3/212_古钟蛇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0212_0b9318",
+          "elf_name": "古钟蛇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0212_0b9318",
+          "elf_name": "古钟蛇"
+        }
+      ]
+    },
+    {
+      "dex_no": "213",
+      "icon_name": "寒音蛇",
+      "icon_128_path": "icons_128/group_209-248_col3/213_寒音蛇.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0213_4b502b",
+          "elf_name": "寒音蛇"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0213_4b502b",
+          "elf_name": "寒音蛇"
+        }
+      ]
+    },
+    {
+      "dex_no": "214",
+      "icon_name": "矮脚爬爬",
+      "icon_128_path": "icons_128/group_209-248_col3/214_矮脚爬爬.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0214_22a9ab",
+          "elf_name": "矮脚爬爬"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0214_22a9ab",
+          "elf_name": "矮脚爬爬"
+        }
+      ]
+    },
+    {
+      "dex_no": "215",
+      "icon_name": "恶魔红钻",
+      "icon_128_path": "icons_128/group_209-248_col3/215_恶魔红钻.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0215_d3d104",
+          "elf_name": "恶魔红钻"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0215_d3d104",
+          "elf_name": "恶魔红钻"
+        }
+      ]
+    },
+    {
+      "dex_no": "216",
+      "icon_name": "火尾瓦特",
+      "icon_128_path": "icons_128/group_209-248_col3/216_火尾瓦特.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0216_99c70f",
+          "elf_name": "火尾瓦特"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0216_99c70f",
+          "elf_name": "火尾瓦特"
+        }
+      ]
+    },
+    {
+      "dex_no": "241",
+      "icon_name": "龙鱼",
+      "icon_128_path": "icons_128/group_209-248_col3/241_龙鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0241_eb128e",
+          "elf_name": "龙鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0241_eb128e",
+          "elf_name": "龙鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "242",
+      "icon_name": "胆小鳗鱼",
+      "icon_128_path": "icons_128/group_209-248_col3/242_胆小鳗鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0242_bf0eac",
+          "elf_name": "胆小鳗鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0242_bf0eac",
+          "elf_name": "胆小鳗鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "243",
+      "icon_name": "闪电鳗鱼",
+      "icon_128_path": "icons_128/group_209-248_col3/243_闪电鳗鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0243_b1419e",
+          "elf_name": "闪电鳗鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0243_b1419e",
+          "elf_name": "闪电鳗鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "244",
+      "icon_name": "翡翠水母",
+      "icon_128_path": "icons_128/group_209-248_col3/244_翡翠水母.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0244_60d674",
+          "elf_name": "翡翠水母"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0244_60d674",
+          "elf_name": "翡翠水母"
+        }
+      ]
+    },
+    {
+      "dex_no": "245",
+      "icon_name": "琉璃水母",
+      "icon_128_path": "icons_128/group_209-248_col3/245_琉璃水母.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0245_0f3955",
+          "elf_name": "琉璃水母"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0245_0f3955",
+          "elf_name": "琉璃水母"
+        }
+      ]
+    },
+    {
+      "dex_no": "246",
+      "icon_name": "裘洛",
+      "icon_128_path": "icons_128/group_209-248_col3/246_裘洛.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0246_8e3351",
+          "elf_name": "裘洛"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0246_8e3351",
+          "elf_name": "裘洛"
+        }
+      ]
+    },
+    {
+      "dex_no": "247",
+      "icon_name": "裘力",
+      "icon_128_path": "icons_128/group_209-248_col3/247_裘力.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0247_aed77e",
+          "elf_name": "裘力"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0247_aed77e",
+          "elf_name": "裘力"
+        }
+      ]
+    },
+    {
+      "dex_no": "248",
+      "icon_name": "裘卡",
+      "icon_128_path": "icons_128/group_209-248_col3/248_裘卡.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0248_fe6ee7",
+          "elf_name": "裘卡"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0248_fe6ee7",
+          "elf_name": "裘卡"
+        }
+      ]
+    },
+    {
+      "dex_no": "217",
+      "icon_name": "火尾战士",
+      "icon_128_path": "icons_128/group_217-256_col4/217_火尾战士.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0217_6d19c0",
+          "elf_name": "火尾战士"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0217_6d19c0",
+          "elf_name": "火尾战士"
+        }
+      ]
+    },
+    {
+      "dex_no": "218",
+      "icon_name": "烈火守护",
+      "icon_128_path": "icons_128/group_217-256_col4/218_烈火守护.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0218_d67c16",
+          "elf_name": "烈火守护"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0218_d67c16",
+          "elf_name": "烈火守护"
+        }
+      ]
+    },
+    {
+      "dex_no": "219",
+      "icon_name": "里拉鳐",
+      "icon_128_path": "icons_128/group_217-256_col4/219_里拉鳐.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0219_3c8f95",
+          "elf_name": "里拉鳐"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0219_3c8f95",
+          "elf_name": "里拉鳐"
+        }
+      ]
+    },
+    {
+      "dex_no": "220",
+      "icon_name": "海枝枝",
+      "icon_128_path": "icons_128/group_217-256_col4/220_海枝枝.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0220_8011ec",
+          "elf_name": "海枝枝（碧蓝珊瑚）（碧蓝珊瑚）"
+        },
+        {
+          "elf_id": "rocom_elf_0220_a12a28",
+          "elf_name": "海枝枝（杏黄百合）（杏黄百合）"
+        },
+        {
+          "elf_id": "rocom_elf_0220_209f6d",
+          "elf_name": "海枝枝（洋红沙丁）（洋红沙丁）"
+        },
+        {
+          "elf_id": "rocom_elf_0220_01eb9f",
+          "elf_name": "海枝枝（翠绿纶布）（翠绿纶布）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0220_8011ec",
+          "elf_name": "海枝枝（碧蓝珊瑚）（碧蓝珊瑚）"
+        },
+        {
+          "elf_id": "rocom_elf_0220_a12a28",
+          "elf_name": "海枝枝（杏黄百合）（杏黄百合）"
+        },
+        {
+          "elf_id": "rocom_elf_0220_209f6d",
+          "elf_name": "海枝枝（洋红沙丁）（洋红沙丁）"
+        },
+        {
+          "elf_id": "rocom_elf_0220_01eb9f",
+          "elf_name": "海枝枝（翠绿纶布）（翠绿纶布）"
+        }
+      ]
+    },
+    {
+      "dex_no": "221",
+      "icon_name": "多西",
+      "icon_128_path": "icons_128/group_217-256_col4/221_多西.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0221_d09136",
+          "elf_name": "多西"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0221_d09136",
+          "elf_name": "多西"
+        }
+      ]
+    },
+    {
+      "dex_no": "222",
+      "icon_name": "库多西",
+      "icon_128_path": "icons_128/group_217-256_col4/222_库多西.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0222_b67f11",
+          "elf_name": "库多西"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0222_b67f11",
+          "elf_name": "库多西"
+        }
+      ]
+    },
+    {
+      "dex_no": "223",
+      "icon_name": "波多西",
+      "icon_128_path": "icons_128/group_217-256_col4/223_波多西.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0223_4dc17b",
+          "elf_name": "波多西"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0223_4dc17b",
+          "elf_name": "波多西"
+        }
+      ]
+    },
+    {
+      "dex_no": "224",
+      "icon_name": "小翼龙",
+      "icon_128_path": "icons_128/group_217-256_col4/224_小翼龙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0224_376a76",
+          "elf_name": "小翼龙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0224_376a76",
+          "elf_name": "小翼龙"
+        }
+      ]
+    },
+    {
+      "dex_no": "249",
+      "icon_name": "可爱猿",
+      "icon_128_path": "icons_128/group_217-256_col4/249_可爱猿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0249_53650f",
+          "elf_name": "可爱猿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0249_53650f",
+          "elf_name": "可爱猿"
+        }
+      ]
+    },
+    {
+      "dex_no": "250",
+      "icon_name": "炽热猿",
+      "icon_128_path": "icons_128/group_217-256_col4/250_炽热猿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0250_ad82a2",
+          "elf_name": "炽热猿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0250_ad82a2",
+          "elf_name": "炽热猿"
+        }
+      ]
+    },
+    {
+      "dex_no": "251",
+      "icon_name": "火焰猿",
+      "icon_128_path": "icons_128/group_217-256_col4/251_火焰猿.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0251_ca4cdb",
+          "elf_name": "火焰猿"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0251_ca4cdb",
+          "elf_name": "火焰猿"
+        }
+      ]
+    },
+    {
+      "dex_no": "252",
+      "icon_name": "布鲁斯",
+      "icon_128_path": "icons_128/group_217-256_col4/252_布鲁斯.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0252_6ded79",
+          "elf_name": "布鲁斯"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0252_6ded79",
+          "elf_name": "布鲁斯"
+        }
+      ]
+    },
+    {
+      "dex_no": "253",
+      "icon_name": "雪顶布鲁斯",
+      "icon_128_path": "icons_128/group_217-256_col4/253_雪顶布鲁斯.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0253_f5c1f0",
+          "elf_name": "雪顶布鲁斯"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0253_f5c1f0",
+          "elf_name": "雪顶布鲁斯"
+        }
+      ]
+    },
+    {
+      "dex_no": "254",
+      "icon_name": "冰钻布鲁斯",
+      "icon_128_path": "icons_128/group_217-256_col4/254_冰钻布鲁斯.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0254_1c722c",
+          "elf_name": "冰钻布鲁斯"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0254_1c722c",
+          "elf_name": "冰钻布鲁斯"
+        }
+      ]
+    },
+    {
+      "dex_no": "255",
+      "icon_name": "治愈兔",
+      "icon_128_path": "icons_128/group_217-256_col4/255_治愈兔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0255_736d6b",
+          "elf_name": "治愈兔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0255_736d6b",
+          "elf_name": "治愈兔"
+        }
+      ]
+    },
+    {
+      "dex_no": "256",
+      "icon_name": "红丝绒",
+      "icon_128_path": "icons_128/group_217-256_col4/256_红丝绒.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0256_8e16f2",
+          "elf_name": "红丝绒"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0256_8e16f2",
+          "elf_name": "红丝绒"
+        }
+      ]
+    },
+    {
+      "dex_no": "257",
+      "icon_name": "红绒十字",
+      "icon_128_path": "icons_128/group_257-272/257_红绒十字.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0257_d918a5",
+          "elf_name": "红绒十字"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0257_d918a5",
+          "elf_name": "红绒十字"
+        }
+      ]
+    },
+    {
+      "dex_no": "258",
+      "icon_name": "乌达",
+      "icon_128_path": "icons_128/group_257-272/258_乌达.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0258_3fce0c",
+          "elf_name": "乌达（极昼的样子）（极昼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0258_fc154e",
+          "elf_name": "乌达（极夜的样子）（极夜的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0258_3fce0c",
+          "elf_name": "乌达（极昼的样子）（极昼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0258_fc154e",
+          "elf_name": "乌达（极夜的样子）（极夜的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "259",
+      "icon_name": "迷你乌",
+      "icon_128_path": "icons_128/group_257-272/259_迷你乌.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0259_7f39f2",
+          "elf_name": "迷你乌（极昼的样子）（极昼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0259_69530a",
+          "elf_name": "迷你乌（极夜的样子）（极夜的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0259_7f39f2",
+          "elf_name": "迷你乌（极昼的样子）（极昼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0259_69530a",
+          "elf_name": "迷你乌（极夜的样子）（极夜的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "260",
+      "icon_name": "乌拉塔",
+      "icon_128_path": "icons_128/group_257-272/260_乌拉塔.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0260_951d0e",
+          "elf_name": "乌拉塔（极昼的样子）（极昼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0260_97e911",
+          "elf_name": "乌拉塔（极夜的样子）（极夜的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0260_951d0e",
+          "elf_name": "乌拉塔（极昼的样子）（极昼的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0260_97e911",
+          "elf_name": "乌拉塔（极夜的样子）（极夜的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "261",
+      "icon_name": "螺旋帕帕",
+      "icon_128_path": "icons_128/group_257-272/261_螺旋帕帕.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0261_084acf",
+          "elf_name": "螺旋帕帕"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0261_084acf",
+          "elf_name": "螺旋帕帕"
+        }
+      ]
+    },
+    {
+      "dex_no": "262",
+      "icon_name": "帕帕斯卡",
+      "icon_128_path": "icons_128/group_257-272/262_帕帕斯卡.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0262_5e9848",
+          "elf_name": "帕帕斯卡"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0262_5e9848",
+          "elf_name": "帕帕斯卡"
+        }
+      ]
+    },
+    {
+      "dex_no": "263",
+      "icon_name": "机械方方",
+      "icon_128_path": "icons_128/group_257-272/263_机械方方.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0263_1ba302",
+          "elf_name": "机械方方"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0263_1ba302",
+          "elf_name": "机械方方"
+        }
+      ]
+    },
+    {
+      "dex_no": "264",
+      "icon_name": "多彩方方",
+      "icon_128_path": "icons_128/group_257-272/264_多彩方方.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0264_8fd554",
+          "elf_name": "多彩方方"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0264_8fd554",
+          "elf_name": "多彩方方"
+        }
+      ]
+    },
+    {
+      "dex_no": "265",
+      "icon_name": "立方人",
+      "icon_128_path": "icons_128/group_257-272/265_立方人.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0265_c3d4ba",
+          "elf_name": "立方人"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0265_c3d4ba",
+          "elf_name": "立方人"
+        }
+      ]
+    },
+    {
+      "dex_no": "266",
+      "icon_name": "可立鸡",
+      "icon_128_path": "icons_128/group_257-272/266_可立鸡.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0266_dcfa43",
+          "elf_name": "可立鸡"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0266_dcfa43",
+          "elf_name": "可立鸡"
+        }
+      ]
+    },
+    {
+      "dex_no": "267",
+      "icon_name": "晕晕鸡",
+      "icon_128_path": "icons_128/group_257-272/267_晕晕鸡.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0267_a4f05b",
+          "elf_name": "晕晕鸡"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0267_a4f05b",
+          "elf_name": "晕晕鸡"
+        }
+      ]
+    },
+    {
+      "dex_no": "268",
+      "icon_name": "绅士鸡",
+      "icon_128_path": "icons_128/group_257-272/268_绅士鸡.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0268_72db8f",
+          "elf_name": "绅士鸡"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0268_72db8f",
+          "elf_name": "绅士鸡"
+        }
+      ]
+    },
+    {
+      "dex_no": "269",
+      "icon_name": "武者鸡",
+      "icon_128_path": "icons_128/group_257-272/269_武者鸡.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0269_a9d2cc",
+          "elf_name": "武者鸡"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0269_a9d2cc",
+          "elf_name": "武者鸡"
+        }
+      ]
+    },
+    {
+      "dex_no": "270",
+      "icon_name": "优优",
+      "icon_128_path": "icons_128/group_257-272/270_优优.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0270_386494",
+          "elf_name": "优优"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0270_386494",
+          "elf_name": "优优"
+        }
+      ]
+    },
+    {
+      "dex_no": "271",
+      "icon_name": "绒光优优",
+      "icon_128_path": "icons_128/group_257-272/271_绒光优优.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0271_016140",
+          "elf_name": "绒光优优"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0271_016140",
+          "elf_name": "绒光优优"
+        }
+      ]
+    },
+    {
+      "dex_no": "272",
+      "icon_name": "噼啪鸟",
+      "icon_128_path": "icons_128/group_257-272/272_噼啪鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0272_c05cf6",
+          "elf_name": "噼啪鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0272_c05cf6",
+          "elf_name": "噼啪鸟"
+        }
+      ]
+    },
+    {
+      "dex_no": "273",
+      "icon_name": "深蓝鲸",
+      "icon_128_path": "icons_128/group_273-288/273_深蓝鲸.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0273_e5dc4f",
+          "elf_name": "深蓝鲸"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0273_e5dc4f",
+          "elf_name": "深蓝鲸"
+        }
+      ]
+    },
+    {
+      "dex_no": "274",
+      "icon_name": "格兰种子",
+      "icon_128_path": "icons_128/group_273-288/274_格兰种子.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0274_0ec12f",
+          "elf_name": "格兰种子"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0274_0ec12f",
+          "elf_name": "格兰种子"
+        }
+      ]
+    },
+    {
+      "dex_no": "275",
+      "icon_name": "格兰花",
+      "icon_128_path": "icons_128/group_273-288/275_格兰花.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0275_d46114",
+          "elf_name": "格兰花"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0275_d46114",
+          "elf_name": "格兰花"
+        }
+      ]
+    },
+    {
+      "dex_no": "276",
+      "icon_name": "格兰球",
+      "icon_128_path": "icons_128/group_273-288/276_格兰球.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0276_ce8c64",
+          "elf_name": "格兰球"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0276_ce8c64",
+          "elf_name": "格兰球"
+        }
+      ]
+    },
+    {
+      "dex_no": "277",
+      "icon_name": "地鼠",
+      "icon_128_path": "icons_128/group_273-288/277_地鼠.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0277_10e039",
+          "elf_name": "地鼠（枯水期的样子）（枯水期的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0277_dbb612",
+          "elf_name": "地鼠（储水时的样子）（储水时的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0277_10e039",
+          "elf_name": "地鼠（枯水期的样子）（枯水期的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0277_dbb612",
+          "elf_name": "地鼠（储水时的样子）（储水时的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "278",
+      "icon_name": "遁鼠",
+      "icon_128_path": "icons_128/group_273-288/278_遁鼠.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0278_d2f3dd",
+          "elf_name": "遁鼠（枯水期的样子）（枯水期的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0278_54afc1",
+          "elf_name": "遁鼠（储水时的样子）（储水时的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0278_d2f3dd",
+          "elf_name": "遁鼠（枯水期的样子）（枯水期的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0278_54afc1",
+          "elf_name": "遁鼠（储水时的样子）（储水时的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "279",
+      "icon_name": "遁地鼠",
+      "icon_128_path": "icons_128/group_273-288/279_遁地鼠.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0279_9c89ff",
+          "elf_name": "遁地鼠（枯水期的样子）（枯水期的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0279_e06445",
+          "elf_name": "遁地鼠（储水时的样子）（储水时的样子）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0279_9c89ff",
+          "elf_name": "遁地鼠（枯水期的样子）（枯水期的样子）"
+        },
+        {
+          "elf_id": "rocom_elf_0279_e06445",
+          "elf_name": "遁地鼠（储水时的样子）（储水时的样子）"
+        }
+      ]
+    },
+    {
+      "dex_no": "280",
+      "icon_name": "墨鱿士",
+      "icon_128_path": "icons_128/group_273-288/280_墨鱿士.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0280_5c49f5",
+          "elf_name": "墨鱿士"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0280_5c49f5",
+          "elf_name": "墨鱿士"
+        }
+      ]
+    },
+    {
+      "dex_no": "281",
+      "icon_name": "混乱鱿彩",
+      "icon_128_path": "icons_128/group_273-288/281_混乱鱿彩.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0281_2544d0",
+          "elf_name": "混乱鱿彩"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0281_2544d0",
+          "elf_name": "混乱鱿彩"
+        }
+      ]
+    },
+    {
+      "dex_no": "282",
+      "icon_name": "秩序鱿墨",
+      "icon_128_path": "icons_128/group_273-288/282_秩序鱿墨.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0282_3fd0dc",
+          "elf_name": "秩序鱿墨"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0282_3fd0dc",
+          "elf_name": "秩序鱿墨"
+        }
+      ]
+    },
+    {
+      "dex_no": "283",
+      "icon_name": "小甲虫",
+      "icon_128_path": "icons_128/group_273-288/283_小甲虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0283_5248d5",
+          "elf_name": "小甲虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0283_5248d5",
+          "elf_name": "小甲虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "284",
+      "icon_name": "铠甲虫",
+      "icon_128_path": "icons_128/group_273-288/284_铠甲虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0284_bb6af3",
+          "elf_name": "铠甲虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0284_bb6af3",
+          "elf_name": "铠甲虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "285",
+      "icon_name": "圣剑侍从",
+      "icon_128_path": "icons_128/group_273-288/285_圣剑侍从.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0285_86e486",
+          "elf_name": "圣剑侍从"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0285_86e486",
+          "elf_name": "圣剑侍从"
+        }
+      ]
+    },
+    {
+      "dex_no": "286",
+      "icon_name": "圣剑-X",
+      "icon_128_path": "icons_128/group_273-288/286_圣剑-X.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0286_d29f8b",
+          "elf_name": "圣剑-X"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0286_d29f8b",
+          "elf_name": "圣剑-X"
+        },
+        {
+          "elf_id": "rocom_elf_0286_ad9116",
+          "elf_name": "圣剑骑士"
+        }
+      ]
+    },
+    {
+      "dex_no": "287",
+      "icon_name": "吸泥鸥",
+      "icon_128_path": "icons_128/group_273-288/287_吸泥鸥.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0287_cb1dc6",
+          "elf_name": "吸泥鸥"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0287_cb1dc6",
+          "elf_name": "吸泥鸥"
+        }
+      ]
+    },
+    {
+      "dex_no": "288",
+      "icon_name": "泥吼牙",
+      "icon_128_path": "icons_128/group_273-288/288_泥吼牙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0288_49cc78",
+          "elf_name": "泥吼牙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0288_49cc78",
+          "elf_name": "泥吼牙"
+        }
+      ]
+    },
+    {
+      "dex_no": "289",
+      "icon_name": "大头骨龙",
+      "icon_128_path": "icons_128/group_289-304/289_大头骨龙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0289_454a38",
+          "elf_name": "大头骨龙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0289_454a38",
+          "elf_name": "大头骨龙"
+        }
+      ]
+    },
+    {
+      "dex_no": "290",
+      "icon_name": "寂灭骨龙",
+      "icon_128_path": "icons_128/group_289-304/290_寂灭骨龙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0290_c69c28",
+          "elf_name": "寂灭骨龙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0290_c69c28",
+          "elf_name": "寂灭骨龙"
+        }
+      ]
+    },
+    {
+      "dex_no": "291",
+      "icon_name": "厉毒小萝",
+      "icon_128_path": "icons_128/group_289-304/291_厉毒小萝.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0291_6cd17c",
+          "elf_name": "厉毒小萝"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0291_6cd17c",
+          "elf_name": "厉毒小萝"
+        }
+      ]
+    },
+    {
+      "dex_no": "292",
+      "icon_name": "厉毒修萝",
+      "icon_128_path": "icons_128/group_289-304/292_厉毒修萝.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0292_6ff3f0",
+          "elf_name": "厉毒修萝"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0292_6ff3f0",
+          "elf_name": "厉毒修萝"
+        }
+      ]
+    },
+    {
+      "dex_no": "293",
+      "icon_name": "小帕尔",
+      "icon_128_path": "icons_128/group_289-304/293_小帕尔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0293_1750c0",
+          "elf_name": "小帕尔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0293_1750c0",
+          "elf_name": "小帕尔"
+        }
+      ]
+    },
+    {
+      "dex_no": "294",
+      "icon_name": "帕尔萨斯",
+      "icon_128_path": "icons_128/group_289-304/294_帕尔萨斯.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0294_df9bb4",
+          "elf_name": "帕尔萨斯"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0294_df9bb4",
+          "elf_name": "帕尔萨斯"
+        }
+      ]
+    },
+    {
+      "dex_no": "295",
+      "icon_name": "龙息帕尔",
+      "icon_128_path": "icons_128/group_289-304/295_龙息帕尔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0295_0d5a38",
+          "elf_name": "龙息帕尔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0295_0d5a38",
+          "elf_name": "龙息帕尔"
+        }
+      ]
+    },
+    {
+      "dex_no": "296",
+      "icon_name": "毛头小蛛",
+      "icon_128_path": "icons_128/group_289-304/296_毛头小蛛.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0296_5e0f4c",
+          "elf_name": "毛头小蛛"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0296_5e0f4c",
+          "elf_name": "毛头小蛛"
+        }
+      ]
+    },
+    {
+      "dex_no": "297",
+      "icon_name": "捕尘长绒",
+      "icon_128_path": "icons_128/group_289-304/297_捕尘长绒.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0297_936821",
+          "elf_name": "捕尘长绒"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0297_936821",
+          "elf_name": "捕尘长绒"
+        }
+      ]
+    },
+    {
+      "dex_no": "298",
+      "icon_name": "食尘短绒",
+      "icon_128_path": "icons_128/group_289-304/298_食尘短绒.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0298_8ecb5f",
+          "elf_name": "食尘短绒"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0298_8ecb5f",
+          "elf_name": "食尘短绒"
+        }
+      ]
+    },
+    {
+      "dex_no": "299",
+      "icon_name": "画精灵",
+      "icon_128_path": "icons_128/group_289-304/299_画精灵.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0299_4621f6",
+          "elf_name": "画精灵"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0299_4621f6",
+          "elf_name": "画精灵"
+        }
+      ]
+    },
+    {
+      "dex_no": "300",
+      "icon_name": "画像守护",
+      "icon_128_path": "icons_128/group_289-304/300_画像守护.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0300_bb0631",
+          "elf_name": "画像守护"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0300_bb0631",
+          "elf_name": "画像守护"
+        }
+      ]
+    },
+    {
+      "dex_no": "301",
+      "icon_name": "画间法师",
+      "icon_128_path": "icons_128/group_289-304/301_画间法师.png",
+      "match_status": "no_active_db_row",
+      "matched_db_elves": [],
+      "db_candidates_same_no": []
+    },
+    {
+      "dex_no": "302",
+      "icon_name": "画间沉铁兽",
+      "icon_128_path": "icons_128/group_289-304/302_画间沉铁兽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0302_7cb6c8",
+          "elf_name": "画间沉铁兽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0302_7cb6c8",
+          "elf_name": "画间沉铁兽"
+        }
+      ]
+    },
+    {
+      "dex_no": "303",
+      "icon_name": "书魔虫",
+      "icon_128_path": "icons_128/group_289-304/303_书魔虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0303_249477",
+          "elf_name": "书魔虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0303_249477",
+          "elf_name": "书魔虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "304",
+      "icon_name": "书卷守护",
+      "icon_128_path": "icons_128/group_289-304/304_书卷守护.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0304_52cfab",
+          "elf_name": "书卷守护"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0304_52cfab",
+          "elf_name": "书卷守护"
+        }
+      ]
+    },
+    {
+      "dex_no": "305",
+      "icon_name": "古卷执政官",
+      "icon_128_path": "icons_128/group_305-320/305_古卷执政官.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0305_22611d",
+          "elf_name": "古卷执政官"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0305_22611d",
+          "elf_name": "古卷执政官"
+        }
+      ]
+    },
+    {
+      "dex_no": "306",
+      "icon_name": "古卷匣魔像",
+      "icon_128_path": "icons_128/group_305-320/306_古卷匣魔像.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0306_6f88e4",
+          "elf_name": "古卷匣魔像"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0306_6f88e4",
+          "elf_name": "古卷匣魔像"
+        }
+      ]
+    },
+    {
+      "dex_no": "307",
+      "icon_name": "绒绒",
+      "icon_128_path": "icons_128/group_305-320/307_绒绒.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0307_89723d",
+          "elf_name": "绒绒"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0307_89723d",
+          "elf_name": "绒绒"
+        }
+      ]
+    },
+    {
+      "dex_no": "308",
+      "icon_name": "小绒茧",
+      "icon_128_path": "icons_128/group_305-320/308_小绒茧.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0308_ebfe3d",
+          "elf_name": "小绒茧"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0308_ebfe3d",
+          "elf_name": "小绒茧"
+        }
+      ]
+    },
+    {
+      "dex_no": "309",
+      "icon_name": "绒仙子",
+      "icon_128_path": "icons_128/group_305-320/309_绒仙子.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0309_7ee202",
+          "elf_name": "绒仙子"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0309_7ee202",
+          "elf_name": "绒仙子"
+        }
+      ]
+    },
+    {
+      "dex_no": "310",
+      "icon_name": "犀角鸟",
+      "icon_128_path": "icons_128/group_305-320/310_犀角鸟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0310_ea3ea4",
+          "elf_name": "犀角鸟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0310_ea3ea4",
+          "elf_name": "犀角鸟"
+        }
+      ]
+    },
+    {
+      "dex_no": "311",
+      "icon_name": "光纤兽",
+      "icon_128_path": "icons_128/group_305-320/311_光纤兽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0311_37a4eb",
+          "elf_name": "光纤兽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0311_37a4eb",
+          "elf_name": "光纤兽"
+        }
+      ]
+    },
+    {
+      "dex_no": "312",
+      "icon_name": "疾光千兽",
+      "icon_128_path": "icons_128/group_305-320/312_疾光千兽.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0312_9e525d",
+          "elf_name": "疾光千兽"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0312_9e525d",
+          "elf_name": "疾光千兽"
+        }
+      ]
+    },
+    {
+      "dex_no": "313",
+      "icon_name": "果冻",
+      "icon_128_path": "icons_128/group_305-320/313_果冻.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0313_3a7043",
+          "elf_name": "果冻"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0313_3a7043",
+          "elf_name": "果冻"
+        }
+      ]
+    },
+    {
+      "dex_no": "314",
+      "icon_name": "抹茶布丁",
+      "icon_128_path": "icons_128/group_305-320/314_抹茶布丁.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0314_23a2a1",
+          "elf_name": "抹茶布丁"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0314_23a2a1",
+          "elf_name": "抹茶布丁"
+        }
+      ]
+    },
+    {
+      "dex_no": "315",
+      "icon_name": "椰浆布丁",
+      "icon_128_path": "icons_128/group_305-320/315_椰浆布丁.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0315_0aae28",
+          "elf_name": "椰浆布丁"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0315_0aae28",
+          "elf_name": "椰浆布丁"
+        }
+      ]
+    },
+    {
+      "dex_no": "316",
+      "icon_name": "熔岩布丁",
+      "icon_128_path": "icons_128/group_305-320/316_熔岩布丁.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0316_33e24f",
+          "elf_name": "熔岩布丁"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0316_33e24f",
+          "elf_name": "熔岩布丁"
+        }
+      ]
+    },
+    {
+      "dex_no": "317",
+      "icon_name": "星尘虫",
+      "icon_128_path": "icons_128/group_305-320/317_星尘虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0317_23659d",
+          "elf_name": "星尘虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0317_23659d",
+          "elf_name": "星尘虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "318",
+      "icon_name": "落星虫",
+      "icon_128_path": "icons_128/group_305-320/318_落星虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0318_335a2e",
+          "elf_name": "落星虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0318_335a2e",
+          "elf_name": "落星虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "319",
+      "icon_name": "陨星虫",
+      "icon_128_path": "icons_128/group_305-320/319_陨星虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0319_4d6252",
+          "elf_name": "陨星虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0319_4d6252",
+          "elf_name": "陨星虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "320",
+      "icon_name": "双灯鱼",
+      "icon_128_path": "icons_128/group_305-320/320_双灯鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0320_60b8c3",
+          "elf_name": "双灯鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0320_60b8c3",
+          "elf_name": "双灯鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "321",
+      "icon_name": "利灯鱼",
+      "icon_128_path": "icons_128/group_321-328/321_利灯鱼.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0321_940eb2",
+          "elf_name": "利灯鱼"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0321_940eb2",
+          "elf_name": "利灯鱼"
+        }
+      ]
+    },
+    {
+      "dex_no": "322",
+      "icon_name": "月牙雪熊",
+      "icon_128_path": "icons_128/group_321-328/322_月牙雪熊.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0322_fd7548",
+          "elf_name": "月牙雪熊"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0322_fd7548",
+          "elf_name": "月牙雪熊"
+        }
+      ]
+    },
+    {
+      "dex_no": "323",
+      "icon_name": "嗜光嗡嗡",
+      "icon_128_path": "icons_128/group_321-328/323_嗜光嗡嗡.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0323_8f5b41",
+          "elf_name": "嗜光嗡嗡"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0323_8f5b41",
+          "elf_name": "嗜光嗡嗡"
+        }
+      ]
+    },
+    {
+      "dex_no": "324",
+      "icon_name": "窃光蚊",
+      "icon_128_path": "icons_128/group_321-328/324_窃光蚊.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0324_f50851",
+          "elf_name": "窃光蚊"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0324_f50851",
+          "elf_name": "窃光蚊"
+        }
+      ]
+    },
+    {
+      "dex_no": "325",
+      "icon_name": "柴渣虫",
+      "icon_128_path": "icons_128/group_321-328/325_柴渣虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0325_78c922",
+          "elf_name": "柴渣虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0325_78c922",
+          "elf_name": "柴渣虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "326",
+      "icon_name": "燃薪虫",
+      "icon_128_path": "icons_128/group_321-328/326_燃薪虫.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0326_a405e9",
+          "elf_name": "燃薪虫"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0326_a405e9",
+          "elf_name": "燃薪虫"
+        }
+      ]
+    },
+    {
+      "dex_no": "327",
+      "icon_name": "空空颅",
+      "icon_128_path": "icons_128/group_321-328/327_空空颅.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0327_8d7e21",
+          "elf_name": "空空颅"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0327_8d7e21",
+          "elf_name": "空空颅"
+        }
+      ]
+    },
+    {
+      "dex_no": "328",
+      "icon_name": "夜宿颅",
+      "icon_128_path": "icons_128/group_321-328/328_夜宿颅.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0328_c7cc58",
+          "elf_name": "夜宿颅"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0328_c7cc58",
+          "elf_name": "夜宿颅"
+        }
+      ]
+    },
+    {
+      "dex_no": "329",
+      "icon_name": "夜枭",
+      "icon_128_path": "icons_128/group_329-336/329_夜枭.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0329_59cd7a",
+          "elf_name": "夜枭"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0329_59cd7a",
+          "elf_name": "夜枭"
+        }
+      ]
+    },
+    {
+      "dex_no": "330",
+      "icon_name": "粉粉星",
+      "icon_128_path": "icons_128/group_329-336/330_粉粉星.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0330_0130e0",
+          "elf_name": "粉粉星"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0330_0130e0",
+          "elf_name": "粉粉星"
+        }
+      ]
+    },
+    {
+      "dex_no": "331",
+      "icon_name": "小皮球",
+      "icon_128_path": "icons_128/group_329-336/331_小皮球.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0331_12b8d7",
+          "elf_name": "小皮球"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0331_12b8d7",
+          "elf_name": "小皮球"
+        }
+      ]
+    },
+    {
+      "dex_no": "332",
+      "icon_name": "贝瑟",
+      "icon_128_path": "icons_128/group_329-336/332_贝瑟.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0332_56015f",
+          "elf_name": "贝瑟"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0332_56015f",
+          "elf_name": "贝瑟"
+        }
+      ]
+    },
+    {
+      "dex_no": "333",
+      "icon_name": "贝加尔",
+      "icon_128_path": "icons_128/group_329-336/333_贝加尔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0333_db10de",
+          "elf_name": "贝加尔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0333_db10de",
+          "elf_name": "贝加尔"
+        }
+      ]
+    },
+    {
+      "dex_no": "334",
+      "icon_name": "贝古斯",
+      "icon_128_path": "icons_128/group_329-336/334_贝古斯.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0334_21d832",
+          "elf_name": "贝古斯"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0334_21d832",
+          "elf_name": "贝古斯"
+        }
+      ]
+    },
+    {
+      "dex_no": "335",
+      "icon_name": "粉星仔",
+      "icon_128_path": "icons_128/group_329-336/335_粉星仔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0335_f03a77",
+          "elf_name": "粉星仔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0335_f03a77",
+          "elf_name": "粉星仔"
+        }
+      ]
+    },
+    {
+      "dex_no": "336",
+      "icon_name": "粉耳星兔",
+      "icon_128_path": "icons_128/group_329-336/336_粉耳星兔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0336_beecbd",
+          "elf_name": "粉耳星兔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0336_beecbd",
+          "elf_name": "粉耳星兔"
+        }
+      ]
+    },
+    {
+      "dex_no": "337",
+      "icon_name": "落陨星兔",
+      "icon_128_path": "icons_128/group_337-344/337_落陨星兔.png",
+      "match_status": "base_name_without_form_suffix",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0337_fdc404",
+          "elf_name": "落陨星兔（信使精灵）（信使精灵）"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0337_fdc404",
+          "elf_name": "落陨星兔（信使精灵）（信使精灵）"
+        }
+      ]
+    },
+    {
+      "dex_no": "338",
+      "icon_name": "布瓜蝌",
+      "icon_128_path": "icons_128/group_337-344/338_布瓜蝌.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0338_78e211",
+          "elf_name": "布瓜蝌"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0338_78e211",
+          "elf_name": "布瓜蝌"
+        }
+      ]
+    },
+    {
+      "dex_no": "339",
+      "icon_name": "上岸蛙",
+      "icon_128_path": "icons_128/group_337-344/339_上岸蛙.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0339_7e6756",
+          "elf_name": "上岸蛙"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0339_7e6756",
+          "elf_name": "上岸蛙"
+        }
+      ]
+    },
+    {
+      "dex_no": "340",
+      "icon_name": "火红尾",
+      "icon_128_path": "icons_128/group_337-344/340_火红尾.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0340_d6317e",
+          "elf_name": "火红尾"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0340_d6317e",
+          "elf_name": "火红尾"
+        }
+      ]
+    },
+    {
+      "dex_no": "341",
+      "icon_name": "雅丹鬃",
+      "icon_128_path": "icons_128/group_337-344/341_雅丹鬃.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0341_b367fd",
+          "elf_name": "雅丹鬃"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0341_b367fd",
+          "elf_name": "雅丹鬃"
+        }
+      ]
+    },
+    {
+      "dex_no": "342",
+      "icon_name": "春团",
+      "icon_128_path": "icons_128/group_337-344/342_春团.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0342_252456",
+          "elf_name": "春团"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0342_252456",
+          "elf_name": "春团"
+        }
+      ]
+    },
+    {
+      "dex_no": "343",
+      "icon_name": "春兔",
+      "icon_128_path": "icons_128/group_337-344/343_春兔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0343_2440be",
+          "elf_name": "春兔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0343_2440be",
+          "elf_name": "春兔"
+        }
+      ]
+    },
+    {
+      "dex_no": "344",
+      "icon_name": "春花兔",
+      "icon_128_path": "icons_128/group_337-344/344_春花兔.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0344_4e67a0",
+          "elf_name": "春花兔"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0344_4e67a0",
+          "elf_name": "春花兔"
+        }
+      ]
+    },
+    {
+      "dex_no": "345",
+      "icon_name": "幽星光",
+      "icon_128_path": "icons_128/group_345-347/345_幽星光.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0345_c884ee",
+          "elf_name": "幽星光"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0345_c884ee",
+          "elf_name": "幽星光"
+        }
+      ]
+    },
+    {
+      "dex_no": "346",
+      "icon_name": "曜星光",
+      "icon_128_path": "icons_128/group_345-347/346_曜星光.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0346_479da9",
+          "elf_name": "曜星光"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0346_479da9",
+          "elf_name": "曜星光"
+        }
+      ]
+    },
+    {
+      "dex_no": "347",
+      "icon_name": "暮星辰",
+      "icon_128_path": "icons_128/group_345-347/347_暮星辰.png",
+      "match_status": "exact",
+      "matched_db_elves": [
+        {
+          "elf_id": "rocom_elf_0347_b1b245",
+          "elf_name": "暮星辰"
+        }
+      ],
+      "db_candidates_same_no": [
+        {
+          "elf_id": "rocom_elf_0347_b1b245",
+          "elf_name": "暮星辰"
+        }
+      ]
+    }
+  ]
+}

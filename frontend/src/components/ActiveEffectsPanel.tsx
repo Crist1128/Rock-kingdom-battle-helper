@@ -8,6 +8,13 @@ import { buildEffectLayerSummary } from "@/lib/effectLayerSummary";
 import { effectCategoryName, ownerScopeName, sideName } from "@/lib/utils";
 import type { BattleEffectInstanceDict } from "@/types/api";
 
+type EffectGroup = {
+  key: string;
+  label: string;
+  match: (effect: BattleEffectInstanceDict) => boolean;
+  hideWhenEmpty?: boolean;
+};
+
 export function ActiveEffectsPanel({
   battleId,
   effects,
@@ -57,19 +64,53 @@ export function ActiveEffectsPanel({
   });
   const defById = Object.fromEntries(definitions.map((item) => [item.effect_id, item]));
 
-  const groups = [
-    { key: "elf:self", label: "我方精灵", match: (e: BattleEffectInstanceDict) => e.owner_scope === "elf" && e.owner_side === "self" },
-    { key: "elf:enemy", label: "敌方精灵", match: (e: BattleEffectInstanceDict) => e.owner_scope === "elf" && e.owner_side === "enemy" },
-    { key: "side", label: "队伍侧/印记", match: (e: BattleEffectInstanceDict) => e.owner_scope === "side" },
-    { key: "field", label: "天气/战场", match: (e: BattleEffectInstanceDict) => e.owner_scope === "field" },
-    { key: "skill_slot", label: "技能槽", match: (e: BattleEffectInstanceDict) => e.owner_scope === "skill_slot" },
-    { key: "turn", label: "回合临时", match: (e: BattleEffectInstanceDict) => e.owner_scope === "turn" },
+  const groups: EffectGroup[] = [
+    {
+      key: "elf:self",
+      label: "我方精灵",
+      match: (e) => e.owner_scope === "elf" && e.owner_side === "self",
+    },
+    {
+      key: "elf:enemy",
+      label: "敌方精灵",
+      match: (e) => e.owner_scope === "elf" && e.owner_side === "enemy",
+    },
+    {
+      key: "side:self",
+      label: "我方队伍侧/印记",
+      match: (e) => e.owner_scope === "side" && e.owner_side === "self",
+    },
+    {
+      key: "side:enemy",
+      label: "敌方队伍侧/印记",
+      match: (e) => e.owner_scope === "side" && e.owner_side === "enemy",
+    },
+    {
+      key: "side:unknown",
+      label: "未指定队伍侧/印记",
+      match: (e) => e.owner_scope === "side" && !e.owner_side,
+      hideWhenEmpty: true,
+    },
+    { key: "field", label: "天气/战场", match: (e) => e.owner_scope === "field" },
+    {
+      key: "skill_slot",
+      label: "技能槽（高级）",
+      match: (e) => e.owner_scope === "skill_slot",
+      hideWhenEmpty: true,
+    },
+    {
+      key: "turn",
+      label: "回合临时（高级）",
+      match: (e) => e.owner_scope === "turn",
+      hideWhenEmpty: true,
+    },
   ];
 
   return (
     <div className="space-y-3">
       {groups.map((group) => {
         const items = effects.filter(group.match);
+        if (group.hideWhenEmpty && items.length === 0) return null;
         return (
           <div key={group.key} className="rounded-2xl border bg-white p-3">
             <div className="mb-2 flex items-center justify-between">

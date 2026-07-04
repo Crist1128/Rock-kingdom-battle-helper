@@ -22,6 +22,7 @@ from app.schemas.battle import (
     LineupInput,
     LineupOut,
     RuntimeFormChangeInput,
+    SkillSlotRuntimeUpdateInput,
     StartBattleInput,
     SwitchElfInput,
 )
@@ -146,6 +147,22 @@ def change_runtime_form(
     """手动调整精灵运行时有效形态，不触发切换/返场副作用。"""
     try:
         return BattleService(db).change_runtime_form(battle_id, state_id, payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/{battle_id}/skill-slots/{slot_id}/runtime", response_model=BattleStateOut)
+def update_skill_slot_runtime(
+    battle_id: str,
+    slot_id: str,
+    payload: SkillSlotRuntimeUpdateInput,
+    db: Session = Depends(get_db),
+) -> BattleStateOut:
+    """手动调整技能槽运行时威力/能耗，并让后续预览和伤害计算优先使用覆盖值。"""
+    try:
+        return BattleService(db).update_skill_slot_runtime(battle_id, slot_id, payload)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

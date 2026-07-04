@@ -6,6 +6,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ElfSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { ElfCard } from "@/components/ElfCard";
@@ -14,6 +15,7 @@ import { EstimatePanel, type EstimatePanelSelection } from "@/components/Estimat
 import { EventTimeline } from "@/components/EventTimeline";
 import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
+import { HealthBar } from "@/components/HealthBar";
 import { cn, elementTypeName, phaseName, sideName, skillCategoryName } from "@/lib/utils";
 import type { BattleElfStateDict, BattleEventOut, BattleSkillSlotDict, BattleSpeedPreview, DamageEventCreateResult, EndTurnResult, Side, SkillDefinitionOut, SpeedPreviewRow, SpeedPreviewTarget, StatBlock } from "@/types/api";
 
@@ -231,8 +233,10 @@ export function BattleWorkbenchPage() {
                 <CardTitle>当前对位</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <SpeedPreviewPanel preview={state.speed_preview} />
                 <div className="grid grid-cols-2 gap-4">
                   <ActiveSide
+                    battleId={state.battle.battle_id}
                     title="我方上场"
                     elf={selfActive}
                     skillSlots={state.skill_slots.filter(
@@ -245,6 +249,7 @@ export function BattleWorkbenchPage() {
                   onSkillQuickSelect={(skill) => quickSelectSkillAction("self", skill)}
                 />
                   <ActiveSide
+                    battleId={state.battle.battle_id}
                     title="敌方上场"
                     elf={enemyActive}
                     skillSlots={state.skill_slots.filter(
@@ -261,7 +266,6 @@ export function BattleWorkbenchPage() {
                   onSkillQuickSelect={(skill) => quickSelectSkillAction("enemy", skill)}
                 />
                 </div>
-                <SpeedPreviewPanel preview={state.speed_preview} />
               </CardContent>
             </Card>
 
@@ -1049,10 +1053,12 @@ function TeamPanel({
 }
 
 function SkillSlotRuntimeList({
+  battleId,
   ownerSide,
   skillSlots,
   onSkillQuickSelect,
 }: {
+  battleId: string;
   ownerSide?: Side;
   skillSlots: BattleSkillSlotDict[];
   onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
@@ -1080,6 +1086,7 @@ function SkillSlotRuntimeList({
             key={slot?.slot_id ?? `empty-${index}`}
             label={isEnemy ? (slot ? `已发现 ${index + 1}` : `未知 ${index + 1}`) : `携带 ${index + 1}`}
             slot={slot}
+            battleId={battleId}
             emptyText={emptyText}
             onSkillQuickSelect={onSkillQuickSelect}
           />
@@ -1097,6 +1104,7 @@ function SkillSlotRuntimeList({
                 key={slot.slot_id}
                 label={`${isEnemy ? "已发现额外" : "已确认额外"} ${index + 1}`}
                 slot={slot}
+                battleId={battleId}
                 emptyText={emptyText}
                 onSkillQuickSelect={onSkillQuickSelect}
               />
@@ -1150,14 +1158,34 @@ function SkillSlotRuntimeList({
 function SkillSlotCard({
   label,
   slot,
+  battleId,
   emptyText = "未配置携带技能",
   onSkillQuickSelect,
 }: {
   label: string;
   slot: BattleSkillSlotDict | null;
+  battleId: string;
   emptyText?: string;
   onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
 }) {
+  const queryClient = useQueryClient();
+  const [runtimeExpanded, setRuntimeExpanded] = useState(false);
+  const [powerDraft, setPowerDraft] = useState("");
+  const updateRuntime = useMutation({
+    mutationFn: ({ slotId, currentPower }: { slotId: string; currentPower: number | null }) =>
+      api.battles.updateSkillSlotRuntime(battleId, slotId, {
+        current_power: currentPower,
+        notes: currentPower === null ? "手动清除技能槽威力覆盖" : "手动填写技能槽威力覆盖",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", battleId] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
+      queryClient.invalidateQueries({ queryKey: ["enemy-estimate-evidence"] });
+      setRuntimeExpanded(false);
+    },
+  });
+
   if (!slot) {
     return (
       <div className="min-h-28 rounded-xl border border-dashed bg-slate-50 p-3 text-xs text-muted-foreground">
@@ -1200,9 +1228,80 @@ function SkillSlotCard({
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-muted-foreground">
         <span>费用 {slot.effective_energy_cost ?? slot.current_energy_cost ?? slot.base_energy_cost ?? "--"}</span>
-        <span>基础 {slot.static_base_power ?? "--"}</span>
+        <span>
+          威力 {slot.current_power ?? slot.static_base_power ?? "--"}
+          {slot.current_power !== null && slot.current_power !== undefined ? "（覆盖）" : ""}
+        </span>
       </div>
+      <div
+        className="mt-2"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs text-primary hover:underline"
+          onClick={() => {
+            setPowerDraft(slot.current_power !== null && slot.current_power !== undefined ? String(slot.current_power) : "");
+            setRuntimeExpanded((current) => !current);
+          }}
+        >
+          {runtimeExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          调整技能威力
+        </button>
+        {runtimeExpanded ? (
+          <div className="mt-2 rounded-lg border bg-white p-2">
+            <div className="text-[11px] text-muted-foreground">
+              手动填写后会优先参与理论伤害和伤害事件计算；留空并清除则回到技能基础威力。
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Input
+                className="h-8 w-24"
+                type="number"
+                min={0}
+                max={999}
+                value={powerDraft}
+                placeholder={slot.static_base_power !== null && slot.static_base_power !== undefined ? String(slot.static_base_power) : "威力"}
+                onChange={(event) => setPowerDraft(event.target.value)}
+              />
+              <Button
+                size="sm"
+                className="h-8"
+                disabled={updateRuntime.isPending}
+                onClick={() => {
+                  const trimmed = powerDraft.trim();
+                  if (!trimmed) return;
+                  const nextPower = Math.max(0, Math.min(999, Math.trunc(Number(trimmed))));
+                  if (!Number.isFinite(nextPower)) return;
+                  updateRuntime.mutate({ slotId: slot.slot_id, currentPower: nextPower });
+                }}
+              >
+                保存
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8"
+                disabled={updateRuntime.isPending || slot.current_power === null || slot.current_power === undefined}
+                onClick={() => updateRuntime.mutate({ slotId: slot.slot_id, currentPower: null })}
+              >
+                清除
+              </Button>
+            </div>
+            {updateRuntime.error ? (
+              <div className="mt-2 text-[11px] text-red-600">
+                保存失败：{String((updateRuntime.error as Error).message)}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      <SkillPowerPreviewLine
+        preview={slot.power_preview}
+        fallbackPower={slot.current_power ?? slot.static_base_power}
+      />
       <SkillDamagePreviewPanel slot={slot} />
+      <SkillTeamDamagePreviewPanel slot={slot} />
     </div>
   );
 }
@@ -1211,8 +1310,6 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
   const [expanded, setExpanded] = useState(false);
   const preview = slot.damage_preview;
   const currentTarget = preview?.current_target ?? null;
-  const targets = preview?.targets ?? [];
-  const canExpand = targets.length > 1;
 
   if (!preview || preview.status === "skill_definition_missing") {
     return <div className="mt-2 text-xs text-muted-foreground">理论伤害 --</div>;
@@ -1230,34 +1327,61 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
 
   return (
     <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-muted-foreground">理论伤害</span>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 text-left"
+        onClick={(event) => {
+          event.stopPropagation();
+          setExpanded((value) => !value);
+        }}
+      >
+        <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+          {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+          <span>理论伤害</span>
+        </span>
         <span className="font-semibold text-emerald-700">{damageTargetText(currentTarget)}</span>
-      </div>
-      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
-        <span>{currentTarget.elf_name ?? compactEventValue(currentTarget.elf_id)}</span>
-        <span>HP {currentTarget.defender_max_hp ?? "--"}</span>
-        <span>克制 x{String(currentTarget.multipliers?.type ?? "1")}</span>
-        <span>本系 x{String(currentTarget.multipliers?.stab ?? "1")}</span>
-      </div>
-      {currentTarget.unknown_factors?.length ? (
-        <div className="mt-1 text-amber-700">未纳入：{currentTarget.unknown_factors.join("、")}</div>
+      </button>
+      {expanded ? (
+        <div className="mt-2 space-y-2 border-t pt-2">
+          <div className="flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
+            <span>{currentTarget.elf_name ?? compactEventValue(currentTarget.elf_id)}</span>
+            <span>HP {currentTarget.defender_max_hp ?? "--"}</span>
+            <span>克制 x{String(currentTarget.multipliers?.type ?? "1")}</span>
+            <span>本系 x{String(currentTarget.multipliers?.stab ?? "1")}</span>
+          </div>
+          {currentTarget.unknown_factors?.length ? (
+            <div className="text-amber-700">未纳入：{currentTarget.unknown_factors.join("、")}</div>
+          ) : null}
+        </div>
       ) : null}
-      {canExpand ? (
-        <Button
-          className="mt-2 h-7 w-full justify-center gap-1"
-          variant="ghost"
-          size="sm"
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            setExpanded((value) => !value);
-          }}
-        >
-          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          {expanded ? "收起全队伤害" : "展开全队伤害"}
-        </Button>
-      ) : null}
+    </div>
+  );
+}
+
+function SkillTeamDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
+  const [expanded, setExpanded] = useState(false);
+  const preview = slot.damage_preview;
+  const targets = preview?.targets ?? [];
+  if (!preview || preview.status === "skill_definition_missing" || preview.status === "not_attack_skill") {
+    return null;
+  }
+  if (targets.length <= 1) return null;
+
+  return (
+    <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 text-left"
+        onClick={(event) => {
+          event.stopPropagation();
+          setExpanded((value) => !value);
+        }}
+      >
+        <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+          {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+          <span>全场伤害</span>
+        </span>
+      </button>
       {expanded ? (
         <div className="mt-2 space-y-1 border-t pt-2">
           {targets.map((target) => (
@@ -1291,6 +1415,7 @@ function SkillPowerPreviewLine({
   preview?: BattleSkillSlotDict["power_preview"];
   fallbackPower?: number | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (!preview || preview.status === "skill_definition_missing") {
     return <div className="mt-2 text-xs text-muted-foreground">威力预览 --</div>;
   }
@@ -1301,16 +1426,28 @@ function SkillPowerPreviewLine({
   const effectivePower = preview.effective_display_power_text ?? preview.effective_display_power ?? fallbackPower ?? "--";
   return (
     <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-muted-foreground">估算威力</span>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 text-left"
+        onClick={(event) => {
+          event.stopPropagation();
+          setExpanded((value) => !value);
+        }}
+      >
+        <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+          {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+          <span>估算威力</span>
+        </span>
         <span className="font-semibold text-emerald-700">{effectivePower}</span>
-      </div>
-      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
-        <span>本系 x{multipliers.stab ?? "1"}</span>
-        <span>攻防状态 x{multipliers.stat_stage ?? "1"}</span>
-        <span>天气 x{multipliers.weather ?? "1"}</span>
-        <span>威力状态 x{multipliers.skill_power ?? "1"}</span>
-      </div>
+      </button>
+      {expanded ? (
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 border-t pt-2 text-muted-foreground">
+          <span>本系 x{multipliers.stab ?? "1"}</span>
+          <span>攻防状态 x{multipliers.stat_stage ?? "1"}</span>
+          <span>天气 x{multipliers.weather ?? "1"}</span>
+          <span>威力状态 x{multipliers.skill_power ?? "1"}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1420,6 +1557,7 @@ function RuntimeFormControl({
 }
 
 function ActiveSide({
+  battleId,
   title,
   elf,
   skillSlots = [],
@@ -1431,6 +1569,7 @@ function ActiveSide({
   runtimeFormChanging = false,
   onSkillQuickSelect,
 }: {
+  battleId: string;
   title: string;
   elf?: any;
   skillSlots?: BattleSkillSlotDict[];
@@ -1443,8 +1582,11 @@ function ActiveSide({
   onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
 }) {
   const hasRuntimeStats = hasPanelStats(elf?.panel_stats_json);
+  const runtimeStats = statBlockFromStatsJson(elf?.panel_stats_json);
   const backendEffectiveStats = statBlockFromUnknown(elf?.effective_panel_stats);
   const displayEstimatedStats = !hasRuntimeStats ? estimatedStats ?? backendEffectiveStats : undefined;
+  const hpStats = hasRuntimeStats ? runtimeStats ?? backendEffectiveStats : displayEstimatedStats;
+  const hpSourceLabel = !hasRuntimeStats && hpStats ? "按当前估计配置显示" : null;
   const natureName =
     typeof elf?.nature_name === "string" && elf.nature_name
       ? elf.nature_name
@@ -1455,7 +1597,15 @@ function ActiveSide({
       {elf ? (
         <div className="space-y-3">
           <div className="text-lg font-semibold">{elf.elf_name ?? elf.elf_id}</div>
-          <div className="text-sm text-muted-foreground">HP {elf.current_hp_percent ?? "--"}% · 能量 {elf.energy ?? 0}</div>
+          <div className="rounded-xl border bg-slate-50 p-2">
+            <HealthBar
+              currentHpValue={typeof elf.current_hp_value === "number" ? elf.current_hp_value : null}
+              currentHpPercent={typeof elf.current_hp_percent === "number" ? elf.current_hp_percent : null}
+              maxHp={typeof hpStats?.hp === "number" ? hpStats.hp : null}
+              sourceLabel={hpSourceLabel}
+            />
+            <div className="mt-2 text-xs text-muted-foreground">能量 {elf.energy ?? 0}</div>
+          </div>
           <div className="rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
             性格：<span className="font-medium text-slate-900">{natureName ?? "未知"}</span>
             {elf.nature_source ? <span className="ml-2">来源：{natureSourceName(String(elf.nature_source))}</span> : null}
@@ -1467,6 +1617,7 @@ function ActiveSide({
           />
           <StatGrid statsJson={hasRuntimeStats ? elf.panel_stats_json : undefined} stats={displayEstimatedStats} compact />
           <SkillSlotRuntimeList
+            battleId={battleId}
             ownerSide={elf.side}
             skillSlots={skillSlots}
             onSkillQuickSelect={onSkillQuickSelect}
@@ -1495,7 +1646,7 @@ function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null })
   const [expanded, setExpanded] = useState(false);
   if (!preview || preview.status !== "resolved" || !preview.self) {
     return (
-      <div className="rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
+      <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-muted-foreground">
         速度观察：当前信息不足。
       </div>
     );
@@ -1517,7 +1668,7 @@ function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null })
     : "暂无敌方速度档位";
 
   return (
-    <div className="rounded-xl border bg-slate-50 p-2 text-xs">
+    <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs">
       <Button
         type="button"
         variant="ghost"
@@ -1648,6 +1799,15 @@ function hasPanelStats(rawJson?: string | null): boolean {
     );
   } catch {
     return false;
+  }
+}
+
+function statBlockFromStatsJson(rawJson?: string | null): StatBlock | undefined {
+  if (!rawJson) return undefined;
+  try {
+    return statBlockFromUnknown(JSON.parse(rawJson));
+  } catch {
+    return undefined;
   }
 }
 

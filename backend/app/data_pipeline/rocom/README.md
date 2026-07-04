@@ -210,6 +210,24 @@ python -m app.data_pipeline.rocom.scraper --with-images
 
 下载目录位于 `data/rocom/raw/images/`，已通过 `.gitignore` 排除。
 
+## 准备页敌方头像识别（离线初版）
+
+`avatar_recognizer.py` 用于离线验证对战准备页敌方 6 个头像的模板匹配。它只读取截图和 `data/rocom/recognition/elf_icons_128/` 下的本地头像素材，输出 Top N 候选和可选标注图，不写数据库、不修改战斗阵容。
+
+```bash
+cd backend
+python -m app.data_pipeline.rocom.avatar_recognizer \
+  --image ../战斗准备测试照片.png \
+  --icons-dir ../data/rocom/recognition/elf_icons_128 \
+  --top-k 5 \
+  --output-json ../data/rocom/recognition/debug/enemy_recognition_result.json \
+  --annotated-output ../data/rocom/recognition/debug/enemy_recognition_top1.png \
+  --debug-crop-dir ../data/rocom/recognition/debug/enemy_crops
+```
+
+默认头像框以 1150x643 测试截图为参考尺寸等比缩放。如果后续 UI 尺寸或截图来源变化，可用 `--boxes-json` 传入自定义头像框。当前版本仍属于低置信度初版，匹配分数由分块颜色直方图、全局颜色直方图、像素距离和感知哈希组合而来；纯头像相似度仍可能被颜色相近的精灵干扰，应先作为候选推荐给人工确认。
+
+
 ## Git 注意事项
 
 数据库、爬虫 raw/cleaned 产物、图片和 `.env` 不应提交。已在 `.gitignore` 中加入：

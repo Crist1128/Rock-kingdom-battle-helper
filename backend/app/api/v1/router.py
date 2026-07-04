@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     admin_battles,
+    assets,
     battles,
     data_updates,
     effects,
@@ -17,6 +18,7 @@ from app.api.v1.endpoints import (
     natures,
     observations,
     player_builds,
+    recognition,
     skills,
     team_presets,
 )
@@ -33,6 +35,8 @@ router.include_router(team_presets.router, prefix="/team-presets", tags=["team-p
 router.include_router(battles.router, prefix="/battles", tags=["battles"])
 router.include_router(estimates.router, prefix="/estimates", tags=["estimates"])
 router.include_router(observations.router, prefix="/observations", tags=["observations"])
+router.include_router(assets.router, prefix="/assets", tags=["assets"])
+router.include_router(recognition.router, prefix="/recognition", tags=["recognition"])
 router.include_router(
     data_updates.router, prefix="/admin/data-updates", tags=["admin-data-updates"]
 )

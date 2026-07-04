@@ -215,6 +215,7 @@ class BattleEventType(StrEnum):
         WEATHER_CHANGE: 天气变化
         MARK_CHANGE: 印记变化
         EFFECT_TRIGGER: 状态触发
+        SKILL_SLOT_RUNTIME_CHANGE: 技能槽运行时修正
         TURN_END: 回合结束
     """
     SKILL_USE = "skill_use"
@@ -235,4 +236,5 @@ class BattleEventType(StrEnum):
     MARK_CHANGE = "mark_change"
     EFFECT_TRIGGER = "effect_trigger"
     ACTION_INTERRUPTED = "action_interrupted"
+    SKILL_SLOT_RUNTIME_CHANGE = "skill_slot_runtime_change"
     TURN_END = "turn_end"

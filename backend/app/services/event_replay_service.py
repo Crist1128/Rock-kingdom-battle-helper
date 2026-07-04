@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.default_skills import DEFAULT_INITIAL_ENERGY
 from app.core.enums import BattleEventType, Side
 from app.db.base import utc_now
-from app.models.battle import Battle, BattleElfState
+from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
 from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import ElfDefinition
@@ -89,6 +89,15 @@ class EventReplayService:
         initial_active = self._initial_active_elf_ids(battle)
         self._restore_runtime_form_baseline(states, events)
         self._reset_runtime_states(battle, states, initial_active)
+        skill_slots = list(
+            self.db.scalars(
+                select(BattleSkillSlot)
+                .where(BattleSkillSlot.battle_id == battle.battle_id)
+                .order_by(BattleSkillSlot.side, BattleSkillSlot.elf_id, BattleSkillSlot.slot_index)
+            ).all()
+        )
+        skill_slot_by_id = {slot.slot_id: slot for slot in skill_slots}
+        self._reset_skill_slots(skill_slots)
 
         event_ids = [event.event_id for event in events]
         self._soft_delete_event_snapshots(battle.battle_id, event_ids)
@@ -119,6 +128,7 @@ class EventReplayService:
         switch_event_count = 0
         resource_event_count = 0
         effect_change_event_count = 0
+        skill_slot_runtime_event_count = 0
         damage_fallback_count = 0
         skipped_runtime_event_count = 0
         unsupported_event_types: set[str] = set()
@@ -133,6 +143,8 @@ class EventReplayService:
             self._apply_runtime_form_event(state_by_key, event)
             if event.event_type == BattleEventType.TURN_END.value:
                 replayed_turn_number = self._turn_number_after_event(event, replayed_turn_number)
+            if self._apply_skill_slot_runtime_event(skill_slot_by_id, event):
+                skill_slot_runtime_event_count += 1
 
             effect_changes = effect_changes_by_event_id.get(event.event_id, [])
             for change in effect_changes:
@@ -192,6 +204,7 @@ class EventReplayService:
             "runtime_switch_event_count": switch_event_count,
             "runtime_resource_event_count": resource_event_count,
             "runtime_effect_change_event_count": effect_change_event_count,
+            "runtime_skill_slot_event_count": skill_slot_runtime_event_count,
             "runtime_active_effect_count": active_effect_count,
             "runtime_snapshot_id": runtime_snapshot_id,
             "runtime_snapshot_rebuilt_count": snapshot_rebuilt_count,
@@ -238,6 +251,15 @@ class EventReplayService:
         battle.enemy_active_elf_id = initial_active.get(Side.ENEMY.value)
 
     @staticmethod
+    def _reset_skill_slots(skill_slots: list[BattleSkillSlot]) -> None:
+        """重放前清空可由事件恢复的技能槽运行时覆盖值。"""
+        for slot in skill_slots:
+            slot.current_power = None
+            slot.current_energy_cost = None
+            slot.cooldown_remaining = None
+            slot.manual_override = False
+
+    @staticmethod
     def _restore_runtime_form_baseline(
         states: list[BattleElfState],
         events: list[BattleEvent],
@@ -281,6 +303,56 @@ class EventReplayService:
             Side.SELF.value: battle.self_active_elf_id,
             Side.ENEMY.value: battle.enemy_active_elf_id,
         }
+
+    def _apply_skill_slot_runtime_event(
+        self,
+        skill_slot_by_id: dict[str, BattleSkillSlot],
+        event: BattleEvent,
+    ) -> bool:
+        """按事件负载恢复技能槽运行时威力/能耗覆盖。"""
+        payload = loads_json(event.payload_json, {}) or {}
+        if not isinstance(payload, dict):
+            return False
+        if event.event_type == BattleEventType.SKILL_SLOT_RUNTIME_CHANGE.value:
+            slot_id = payload.get("slot_id")
+            after = payload.get("after")
+            if not slot_id or not isinstance(after, dict):
+                return False
+            slot = skill_slot_by_id.get(str(slot_id))
+            if slot is None:
+                return False
+            if "current_power" in after:
+                slot.current_power = self._optional_int(after.get("current_power"))
+            if "current_energy_cost" in after:
+                slot.current_energy_cost = self._optional_int(after.get("current_energy_cost"))
+            slot.manual_override = bool(after.get("manual_override", True))
+            return True
+
+        skill_runtime = payload.get("skill_runtime")
+        if not isinstance(skill_runtime, dict):
+            return False
+        slot_id = skill_runtime.get("slot_id")
+        if not slot_id:
+            return False
+        slot = skill_slot_by_id.get(str(slot_id))
+        if slot is None:
+            return False
+        hook_results = skill_runtime.get("hook_results")
+        if not isinstance(hook_results, list):
+            return False
+        changed = False
+        for result in hook_results:
+            if not isinstance(result, dict) or result.get("status") != "executed":
+                continue
+            field = result.get("field")
+            after = self._optional_int(result.get("after"))
+            if field == "current_power":
+                slot.current_power = after
+                changed = True
+            elif field == "current_energy_cost":
+                slot.current_energy_cost = after
+                changed = True
+        return changed
 
     def _apply_switch_event(
         self,
@@ -543,6 +615,7 @@ class EventReplayService:
             BattleEventType.HEAL.value,
             BattleEventType.ENERGY_CHANGE.value,
             BattleEventType.RUNTIME_FORM_CHANGE.value,
+            BattleEventType.SKILL_SLOT_RUNTIME_CHANGE.value,
             "resource_change",
         }
 
@@ -577,6 +650,15 @@ class EventReplayService:
             return None
         try:
             return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _optional_int(value: Any) -> int | None:
+        if value is None:
+            return None
+        try:
+            return int(value)
         except (TypeError, ValueError):
             return None
 

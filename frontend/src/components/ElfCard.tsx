@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AvatarImage } from "@/components/ui/avatar";
-import { compactId, percentText } from "@/lib/utils";
+import { HealthBar } from "@/components/HealthBar";
+import { compactId } from "@/lib/utils";
 import type { BattleElfStateDict } from "@/types/api";
 
 export function ElfCard({
@@ -18,6 +19,7 @@ export function ElfCard({
   onSelectEstimate?: () => void;
 }) {
   const name = elf.elf_name ?? elf.elf_id;
+  const maxHp = maxHpFromBattleElf(elf);
   return (
     <div className={active ? "rounded-xl border-2 border-primary bg-white p-2 shadow-sm" : "rounded-xl border bg-white p-2 shadow-sm"}>
       <div className="flex items-center gap-2">
@@ -29,8 +31,15 @@ export function ElfCard({
         {active ? <Badge>上场</Badge> : null}
       </div>
       <div className="mt-2 grid grid-cols-2 gap-1 text-[11px]">
-        <div className="rounded-lg bg-slate-50 px-1.5 py-1">HP {percentText(elf.current_hp_percent)}</div>
-        <div className="rounded-lg bg-slate-50 px-1.5 py-1">能量 {elf.energy ?? 0}</div>
+        <div className="col-span-2 rounded-lg bg-slate-50 px-1.5 py-1">
+          <HealthBar
+            compact
+            currentHpValue={elf.current_hp_value}
+            currentHpPercent={elf.current_hp_percent}
+            maxHp={maxHp}
+          />
+        </div>
+        <div className="col-span-2 rounded-lg bg-slate-50 px-1.5 py-1">能量 {elf.energy ?? 0}</div>
       </div>
       <div className="mt-2 flex gap-1">
         {!active && onSwitch ? <Button className="h-7 flex-1 px-2 text-xs" variant="outline" size="sm" onClick={onSwitch}>切换</Button> : null}
@@ -39,4 +48,21 @@ export function ElfCard({
       </div>
     </div>
   );
+}
+
+function maxHpFromBattleElf(elf: BattleElfStateDict): number | null {
+  const effectiveHp = hpFromUnknownStats(elf.effective_panel_stats);
+  if (effectiveHp != null) return effectiveHp;
+  if (!elf.panel_stats_json) return null;
+  try {
+    return hpFromUnknownStats(JSON.parse(elf.panel_stats_json));
+  } catch {
+    return null;
+  }
+}
+
+function hpFromUnknownStats(value: unknown): number | null {
+  if (!value || typeof value !== "object") return null;
+  const hp = (value as { hp?: unknown }).hp;
+  return typeof hp === "number" && Number.isFinite(hp) ? hp : null;
 }

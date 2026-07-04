@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -11,7 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { AvatarImage } from "@/components/ui/avatar";
 import { ElfSearchSelect } from "@/components/EntitySearchSelect";
 import { compactId, elementTypeNames, parseElementTypes, phaseName } from "@/lib/utils";
-import type { LineupElfInput, PlayerElfBuildOut, TeamPresetOut } from "@/types/api";
+import type {
+  EnemyAvatarMatchedElfOut,
+  EnemyLineupRecognitionOut,
+  LineupElfInput,
+  PlayerElfBuildOut,
+  TeamPresetOut,
+} from "@/types/api";
 
 interface SelfSlot { build_id: string; elf_id: string; active: boolean }
 interface EnemySlot {
@@ -22,6 +29,35 @@ interface EnemySlot {
   element_types_json?: string | null;
 }
 
+interface ScreenCapturePreview {
+  file: File;
+  url: string;
+  width: number;
+  height: number;
+}
+
+interface CropSelection {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+async function canvasToPngFile(canvas: HTMLCanvasElement, fileName: string): Promise<File> {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("截图生成失败：浏览器未能导出 PNG");
+  return new File([blob], fileName, { type: "image/png" });
+}
+
+async function loadImage(url: string): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  return image;
+}
+
 export function PreparationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -29,6 +65,20 @@ export function PreparationPage() {
   const [battleIdInput, setBattleIdInput] = useState(currentBattleId ?? "");
   const [selfSlots, setSelfSlots] = useState<SelfSlot[]>(Array.from({ length: 6 }, () => ({ build_id: "", elf_id: "", active: false })));
   const [enemySlots, setEnemySlots] = useState<EnemySlot[]>(Array.from({ length: 6 }, () => ({ elf_id: "", active: false })));
+  const [recognitionFile, setRecognitionFile] = useState<File | null>(null);
+  const [recognitionResult, setRecognitionResult] = useState<EnemyLineupRecognitionOut | null>(null);
+  const [hidePageBeforeCapture, setHidePageBeforeCapture] = useState(false);
+  const [screenCapture, setScreenCapture] = useState<ScreenCapturePreview | null>(null);
+  const [cropSelection, setCropSelection] = useState<CropSelection | null>(null);
+  const [cropDragStart, setCropDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const capturePreviewRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (screenCapture) URL.revokeObjectURL(screenCapture.url);
+    };
+  }, [screenCapture]);
 
   const battleId = currentBattleId;
   const battle = useQuery({ queryKey: ["battle", battleId], queryFn: () => api.battles.get(battleId!), enabled: Boolean(battleId) });
@@ -40,6 +90,11 @@ export function PreparationPage() {
   const enemyTeamPresets = useQuery({
     queryKey: ["team-presets", "preparation", "enemy"],
     queryFn: () => api.teamPresets.list({ side_usage: "enemy" }),
+  });
+
+  const recognizeEnemyLineup = useMutation({
+    mutationFn: (file: File) => api.recognition.enemyLineup(file, 5),
+    onSuccess: (result) => setRecognitionResult(result),
   });
 
   const submitAndStartBattle = useMutation({
@@ -97,6 +152,159 @@ export function PreparationPage() {
       if (firstFilledIndex >= 0) next[firstFilledIndex].active = true;
     }
     setEnemySlots(next);
+  };
+
+  const applyRecognizedEnemy = (slotIndex: number, elf: EnemyAvatarMatchedElfOut) => {
+    setEnemySlots((current) =>
+      current.map((slot, index) =>
+        index === slotIndex
+          ? {
+              ...slot,
+              elf_id: elf.elf_id,
+              elf_name: elf.elf_name,
+              avatar: elf.avatar,
+              element_types_json: elf.element_types_json,
+              active: slot.active || !current.some((item) => item.active),
+            }
+          : slot,
+      ),
+    );
+  };
+
+  const applyTopRecognitionCandidates = () => {
+    if (!recognitionResult) return;
+    const next = [...enemySlots];
+    recognitionResult.slots.forEach((slot) => {
+      const matched = slot.candidates.find((candidate) => candidate.matched_elves.length > 0)?.matched_elves[0];
+      const index = slot.slot_index - 1;
+      if (!matched || index < 0 || index >= next.length) return;
+      next[index] = {
+        ...next[index],
+        elf_id: matched.elf_id,
+        elf_name: matched.elf_name,
+        avatar: matched.avatar,
+        element_types_json: matched.element_types_json,
+      };
+    });
+    if (!next.some((slot) => slot.active)) {
+      const firstFilledIndex = next.findIndex((slot) => slot.elf_id);
+      if (firstFilledIndex >= 0) next[firstFilledIndex].active = true;
+    }
+    setEnemySlots(next);
+  };
+
+  const captureScreenFrame = async () => {
+    setCaptureError(null);
+    setRecognitionResult(null);
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setCaptureError("当前浏览器不支持屏幕捕获，请改用上传截图。");
+      return;
+    }
+
+    let stream: MediaStream | null = null;
+    const oldOpacity = document.documentElement.style.opacity;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+      await video.play();
+
+      if (hidePageBeforeCapture) {
+        document.documentElement.style.opacity = "0";
+        await wait(600);
+      }
+
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (!width || !height) throw new Error("截图失败：未获取到有效画面尺寸");
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("截图失败：浏览器未能创建画布");
+      context.drawImage(video, 0, 0, width, height);
+
+      const file = await canvasToPngFile(canvas, "screen-capture.png");
+      const url = URL.createObjectURL(file);
+      setScreenCapture({ file, url, width, height });
+      setCropSelection(null);
+      setRecognitionFile(file);
+    } catch (error) {
+      setCaptureError(error instanceof Error ? error.message : "屏幕捕获已取消或失败");
+    } finally {
+      document.documentElement.style.opacity = oldOpacity;
+      stream?.getTracks().forEach((track) => track.stop());
+    }
+  };
+
+  const getCapturePoint = (event: MouseEvent<HTMLDivElement>) => {
+    const image = capturePreviewRef.current;
+    if (!image || !screenCapture) return null;
+    const rect = image.getBoundingClientRect();
+    const rawX = ((event.clientX - rect.left) / rect.width) * screenCapture.width;
+    const rawY = ((event.clientY - rect.top) / rect.height) * screenCapture.height;
+    return {
+      x: Math.max(0, Math.min(screenCapture.width, rawX)),
+      y: Math.max(0, Math.min(screenCapture.height, rawY)),
+    };
+  };
+
+  const startCropDrag = (event: MouseEvent<HTMLDivElement>) => {
+    const point = getCapturePoint(event);
+    if (!point) return;
+    setCropDragStart(point);
+    setCropSelection({ x: point.x, y: point.y, width: 0, height: 0 });
+  };
+
+  const updateCropDrag = (event: MouseEvent<HTMLDivElement>) => {
+    if (!cropDragStart) return;
+    const point = getCapturePoint(event);
+    if (!point) return;
+    setCropSelection({
+      x: Math.min(cropDragStart.x, point.x),
+      y: Math.min(cropDragStart.y, point.y),
+      width: Math.abs(point.x - cropDragStart.x),
+      height: Math.abs(point.y - cropDragStart.y),
+    });
+  };
+
+  const recognizeCapturedImage = async (useSelection: boolean) => {
+    if (!screenCapture) return;
+    setCaptureError(null);
+    try {
+      let file = screenCapture.file;
+      const shouldCrop =
+        useSelection && cropSelection && cropSelection.width >= 16 && cropSelection.height >= 16;
+
+      if (shouldCrop) {
+        const image = await loadImage(screenCapture.url);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(cropSelection.width);
+        canvas.height = Math.round(cropSelection.height);
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("裁剪失败：浏览器未能创建画布");
+        context.drawImage(
+          image,
+          cropSelection.x,
+          cropSelection.y,
+          cropSelection.width,
+          cropSelection.height,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
+        file = await canvasToPngFile(canvas, "game-window-crop.png");
+      }
+
+      setRecognitionFile(file);
+      recognizeEnemyLineup.mutate(file);
+    } catch (error) {
+      setCaptureError(error instanceof Error ? error.message : "裁剪截图失败");
+    }
   };
 
   return (
@@ -200,6 +408,192 @@ export function PreparationPage() {
             <CardDescription>敌方只确认精灵种类，不输入性格、个体资质和技能组。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="rounded-2xl border border-dashed bg-slate-50 p-3">
+              <div className="mb-2">
+                <div className="text-sm font-semibold">截图识别敌方阵容（候选确认）</div>
+                <div className="text-xs text-muted-foreground">
+                  可上传图片，也可调用浏览器截屏。识别只生成每个槽位的 Top 候选；需要手动点击候选才会写入下方阵容。
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  className="max-w-xs"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    setRecognitionFile(event.target.files?.[0] ?? null);
+                    setRecognitionResult(null);
+                    setCaptureError(null);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  disabled={!recognitionFile || recognizeEnemyLineup.isPending}
+                  onClick={() => recognitionFile && recognizeEnemyLineup.mutate(recognitionFile)}
+                >
+                  {recognizeEnemyLineup.isPending ? "识别中..." : "识别敌方阵容"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={!recognitionResult}
+                  onClick={applyTopRecognitionCandidates}
+                >
+                  采用每槽首个可映射候选
+                </Button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  disabled={recognizeEnemyLineup.isPending}
+                  onClick={captureScreenFrame}
+                >
+                  截屏/选择游戏窗口
+                </Button>
+                <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={hidePageBeforeCapture}
+                    onChange={(event) => setHidePageBeforeCapture(event.target.checked)}
+                  />
+                  捕获前临时隐藏本页面 0.6 秒
+                </label>
+                <span className="text-[11px] text-muted-foreground">
+                  浏览器会弹出授权框；建议选择游戏窗口，若选择整个屏幕可在下方框选游戏区域。
+                </span>
+              </div>
+              {captureError ? (
+                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+                  截屏提示：{captureError}
+                </div>
+              ) : null}
+              {screenCapture ? (
+                <div className="mt-3 rounded-xl border bg-white p-2">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs text-muted-foreground">
+                      已捕获 {screenCapture.width}×{screenCapture.height}。按住鼠标在预览图上拖拽框选游戏界面。
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={recognizeEnemyLineup.isPending}
+                        onClick={() => recognizeCapturedImage(false)}
+                      >
+                        识别整张截图
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={
+                          !cropSelection ||
+                          cropSelection.width < 16 ||
+                          cropSelection.height < 16 ||
+                          recognizeEnemyLineup.isPending
+                        }
+                        onClick={() => recognizeCapturedImage(true)}
+                      >
+                        识别框选区域
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="max-h-[360px] overflow-auto rounded-lg border bg-black">
+                    <div
+                      className="relative inline-block cursor-crosshair"
+                      onMouseDown={startCropDrag}
+                      onMouseMove={updateCropDrag}
+                      onMouseUp={() => setCropDragStart(null)}
+                      onMouseLeave={() => setCropDragStart(null)}
+                    >
+                      <img
+                        ref={capturePreviewRef}
+                        src={screenCapture.url}
+                        alt="屏幕捕获预览"
+                        draggable={false}
+                        className="block max-h-[360px] max-w-full select-none object-contain"
+                      />
+                      {cropSelection && cropSelection.width > 0 && cropSelection.height > 0 ? (
+                        <div
+                          className="pointer-events-none absolute border-2 border-sky-400 bg-sky-400/20"
+                          style={{
+                            left: `${(cropSelection.x / screenCapture.width) * 100}%`,
+                            top: `${(cropSelection.y / screenCapture.height) * 100}%`,
+                            width: `${(cropSelection.width / screenCapture.width) * 100}%`,
+                            height: `${(cropSelection.height / screenCapture.height) * 100}%`,
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {recognizeEnemyLineup.error ? (
+                <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                  识别失败：{recognizeEnemyLineup.error.message}
+                </div>
+              ) : null}
+              {recognitionResult ? (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    截图尺寸 {recognitionResult.source_image_size[0]}×{recognitionResult.source_image_size[1]}，
+                    模板 {recognitionResult.icon_template_count} 个。请逐槽确认，Top1 不一定总是正确。
+                  </div>
+                  {recognitionResult.warnings.map((warning) => (
+                    <div key={warning} className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                      {warning}
+                    </div>
+                  ))}
+                  <div className="grid gap-2">
+                    {recognitionResult.slots.map((slot) => (
+                      <div key={slot.slot_index} className="rounded-xl border bg-white p-2">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-semibold">槽位 {slot.slot_index}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {slot.location_method} · 定位 {slot.location_confidence.toFixed(2)} · 框 ({slot.box.x1},{slot.box.y1})-({slot.box.x2},{slot.box.y2})
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {slot.candidates.map((candidate, candidateIndex) => (
+                            <div key={`${slot.slot_index}-${candidate.file_name}`} className="rounded-lg border bg-slate-50 p-2">
+                              <div className="flex items-center gap-2">
+                                <AvatarImage
+                                  src={candidate.icon_url}
+                                  alt={candidate.elf_name}
+                                  fallback={candidate.elf_name}
+                                  className="h-10 w-10 rounded-full"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-xs font-semibold">
+                                    Top{candidateIndex + 1} {candidate.dex_no} {candidate.elf_name}
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground">
+                                    综合 {candidate.score.toFixed(3)} · {candidate.confidence_level}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {candidate.matched_elves.length > 0 ? (
+                                  candidate.matched_elves.map((elf) => (
+                                    <Button
+                                      key={elf.elf_id}
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => applyRecognizedEnemy(slot.slot_index - 1, elf)}
+                                    >
+                                      采用：{elf.elf_name}
+                                    </Button>
+                                  ))
+                                ) : (
+                                  <span className="text-[11px] text-amber-700">该候选暂未映射到数据库</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             {enemySlots.map((slot, index) => (
               <div key={index} className="rounded-2xl border bg-white p-3">
                 <div className="mb-2 flex items-center justify-between"><span className="font-medium">槽位 {index + 1}</span>{slot.active ? <Badge>首发</Badge> : null}</div>
