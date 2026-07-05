@@ -101,3 +101,44 @@ class RocomCheckResponse(BaseModel):
     new_elves_truncated: bool = False
     remote_fingerprint: str
     note: str
+
+
+class StaticSkillRuleSyncItem(BaseModel):
+    """待同步的 structured 技能规则条目。"""
+
+    skill_id: str
+    skill_name: str
+    review_status: str
+    review_notes: str | None = None
+    changed_fields: list[str] = Field(default_factory=list)
+    has_damage_rule: bool = False
+    has_hit_rule: bool = False
+    has_effect_operations: bool = False
+
+
+class StaticSkillRuleSyncRequest(BaseModel):
+    """静态技能规则同步请求。"""
+
+    commit: bool = Field(default=False, description="是否实际提交数据库事务；False 为 dry-run")
+    skill_ids: list[str] | None = Field(
+        default=None,
+        description="只同步指定技能；为空表示同步所有待同步 structured 技能",
+    )
+
+
+class StaticSkillRuleSyncResponse(BaseModel):
+    """静态技能规则同步检查/执行响应。"""
+
+    source: str
+    total_rows: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    structured_total: int
+    up_to_date_count: int
+    pending_count: int
+    pending_items: list[StaticSkillRuleSyncItem] = Field(default_factory=list)
+    pending_items_truncated: bool = False
+    missing_skills: list[dict[str, Any]] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    applied_skill_ids: list[str] = Field(default_factory=list)
+    applied_count: int = 0
+    transaction: str

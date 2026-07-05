@@ -619,6 +619,269 @@ def test_side_skill_modifier_mark_changes_runtime_energy_cost(
         assert payload["skill_runtime"]["effective_energy_cost"] == 1
 
 
+def test_one_use_cost_modifier_is_consumed_after_skill_use(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """一次性费用修正参与扣能后应扣减 remaining_uses 并失效。"""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.add_all(
+            [
+                SkillDefinition(
+                    skill_id="skill_once_cost",
+                    skill_name="once cost skill",
+                    element_type="normal",
+                    skill_category="physical",
+                    base_power=50,
+                    base_energy_cost=3,
+                    priority_modifier=0,
+                ),
+                EffectDefinition(
+                    effect_id="effect_team_energy_cost_down_layered",
+                    effect_name="team cost down",
+                    category="skill_modifier",
+                    polarity="positive",
+                    display_group="skill_modifier",
+                    display_priority=1,
+                    owner_scope="side",
+                    target_scope="side",
+                    attach_target_type="side",
+                    skill_modifier_json=dumps_json(
+                        {
+                            "modifier_type": "energy_cost_delta",
+                            "energy_cost_delta_per_layer": -1,
+                        }
+                    ),
+                ),
+                Battle(
+                    battle_id="battle_once_cost",
+                    phase=BattlePhase.BATTLE.value,
+                    turn_number=1,
+                    self_active_elf_id="elf_self",
+                    enemy_active_elf_id="elf_enemy",
+                ),
+            ]
+        )
+        session.flush()
+        session.add(_elf_state("battle_once_cost", "self", "elf_self", energy=10))
+        session.add(_elf_state("battle_once_cost", "enemy", "elf_enemy", energy=10))
+        session.add(
+            BattleEffectInstance(
+                instance_id="effect_once_cost",
+                battle_id="battle_once_cost",
+                effect_id="effect_team_energy_cost_down_layered",
+                category="skill_modifier",
+                owner_scope="side",
+                owner_side="self",
+                layers=2,
+                remaining_uses=1,
+                is_active=True,
+                applied_turn=1,
+            )
+        )
+        session.commit()
+
+        event = BattleService(session).create_event(
+            "battle_once_cost",
+            BattleEventCreate(
+                turn_number=1,
+                event_type=BattleEventType.SKILL_USE.value,
+                actor_side="self",
+                actor_elf_id="elf_self",
+                target_side="enemy",
+                target_elf_id="elf_enemy",
+                skill_id="skill_once_cost",
+                skill_confirmed=True,
+                manual_override=True,
+            ),
+        )
+
+        state = session.scalar(
+            select(BattleElfState).where(
+                BattleElfState.battle_id == "battle_once_cost",
+                BattleElfState.side == "self",
+                BattleElfState.elf_id == "elf_self",
+            )
+        )
+        assert state is not None
+        assert state.energy == 9
+        instance = session.get(BattleEffectInstance, "effect_once_cost")
+        assert instance is not None
+        assert instance.is_active is False
+        assert instance.remaining_uses == 0
+        payload = loads_json(event.payload_json, {})
+        assert payload["skill_runtime"]["effective_energy_cost"] == 1
+        assert payload["skill_runtime"]["consumed_skill_modifier_effects"][0]["status"] == (
+            "consumed"
+        )
+
+
+def test_damage_event_applies_and_consumes_one_use_power_modifier(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """下一次攻击威力修正应进入伤害上下文，并在伤害事件后消耗。"""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.add_all(
+            [
+                SkillDefinition(
+                    skill_id="skill_power_once",
+                    skill_name="once power skill",
+                    element_type="普通",
+                    skill_category="physical",
+                    base_power=50,
+                    base_energy_cost=0,
+                    priority_modifier=0,
+                ),
+                EffectDefinition(
+                    effect_id="effect_skill_power_up_layered",
+                    effect_name="skill power up",
+                    category="skill_modifier",
+                    polarity="positive",
+                    display_group="skill_modifier",
+                    display_priority=1,
+                    owner_scope="elf",
+                    target_scope="single_elf",
+                    attach_target_type="elf",
+                    skill_modifier_json=dumps_json(
+                        {
+                            "modifier_type": "skill_power_add",
+                            "power_add_per_layer": 10,
+                        }
+                    ),
+                ),
+                Battle(
+                    battle_id="battle_once_power",
+                    phase=BattlePhase.BATTLE.value,
+                    turn_number=1,
+                    self_active_elf_id="elf_self",
+                    enemy_active_elf_id="elf_enemy",
+                ),
+            ]
+        )
+        session.flush()
+        session.add(_elf_state("battle_once_power", "self", "elf_self", energy=10))
+        session.add(_elf_state("battle_once_power", "enemy", "elf_enemy", energy=10))
+        session.add(
+            BattleEffectInstance(
+                instance_id="effect_once_power",
+                battle_id="battle_once_power",
+                effect_id="effect_skill_power_up_layered",
+                category="skill_modifier",
+                owner_scope="elf",
+                owner_side="self",
+                owner_elf_id="elf_self",
+                layers=7,
+                remaining_uses=1,
+                is_active=True,
+                applied_turn=1,
+            )
+        )
+        session.commit()
+
+        result = DamageEventService(session).create_damage_event(
+            "battle_once_power",
+            DamageEventCreate(
+                turn_number=1,
+                attacker_side="self",
+                attacker_elf_id="elf_self",
+                defender_side="enemy",
+                defender_elf_id="elf_enemy",
+                skill_id="skill_power_once",
+                skill_confirmed=True,
+                damage_display_type=DamageDisplayType.SINGLE_DAMAGE,
+                damage_value=100,
+                sync_observation=False,
+            ),
+        )
+
+        context = loads_json(result.damage_event.formula_context_json, {})
+        skill_modifier = context["rule_resolution_details"]["skill_modifier"][0]
+        assert skill_modifier["effect_instance_id"] == "effect_once_power"
+        assert skill_modifier["power_add"] == "70"
+        assert str(context["flat_power_bonus"]) == "70"
+        instance = session.get(BattleEffectInstance, "effect_once_power")
+        assert instance is not None
+        assert instance.is_active is False
+        assert instance.remaining_uses == 0
+        event_payload = loads_json(result.battle_event.payload_json, {})
+        assert event_payload["consumed_skill_modifier_effects"][0]["effect_instance_id"] == (
+            "effect_once_power"
+        )
+
+
+def test_combo_damage_event_uses_manual_hit_count_for_total_and_context(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """连击伤害事件应以手动连击数为准，并用单段×次数更新总伤害。"""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.flush()
+        skill = session.get(SkillDefinition, "skill_attack")
+        assert skill is not None
+        skill.hit_rule_json = dumps_json(
+            {
+                "damage_display_type": "combo_repeated_damage",
+                "runtime_record_strategy": "per_hit_damage",
+                "hit_count": 3,
+            }
+        )
+        session.add(
+            Battle(
+                battle_id="battle_combo_damage",
+                phase=BattlePhase.BATTLE.value,
+                turn_number=1,
+                self_active_elf_id="elf_self",
+                enemy_active_elf_id="elf_enemy",
+            )
+        )
+        session.flush()
+        session.add(_elf_state("battle_combo_damage", "self", "elf_self", energy=10))
+        session.add(_elf_state("battle_combo_damage", "enemy", "elf_enemy", energy=10))
+        session.commit()
+
+        result = DamageEventService(session).create_damage_event(
+            "battle_combo_damage",
+            DamageEventCreate(
+                turn_number=1,
+                attacker_side="self",
+                attacker_elf_id="elf_self",
+                defender_side="enemy",
+                defender_elf_id="elf_enemy",
+                skill_id="skill_attack",
+                skill_confirmed=True,
+                damage_display_type=DamageDisplayType.COMBO_REPEATED_DAMAGE,
+                per_hit_damage_value=45,
+                hit_count=2,
+                sync_observation=False,
+            ),
+        )
+
+        assert result.damage_event.damage_value == 90
+        assert result.damage_event.computed_total_damage_value == 90
+        context = loads_json(result.damage_event.formula_context_json, {})
+        assert context["hit_count"] == 2
+        assert context["rule_resolution_details"]["hit_rule"]["source"] == "manual_payload"
+        assert context["rule_resolution_details"]["hit_rule"]["skill_hit_count"] == 3
+        enemy_state = session.scalar(
+            select(BattleElfState).where(
+                BattleElfState.battle_id == "battle_combo_damage",
+                BattleElfState.side == "enemy",
+                BattleElfState.elf_id == "elf_enemy",
+            )
+        )
+        assert enemy_state is not None
+        assert enemy_state.current_hp_value == 410
+        resource_event = session.scalar(
+            select(ResourceChangeEvent).where(
+                ResourceChangeEvent.battle_id == "battle_combo_damage",
+                ResourceChangeEvent.resource_type == "hp",
+            )
+        )
+        assert resource_event is not None
+        assert resource_event.value == 90
+
+
 def test_conditional_mark_skill_modifiers_require_matching_flags(
     session_factory: sessionmaker[Session],
 ) -> None:

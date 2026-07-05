@@ -187,16 +187,29 @@ class ModifierResolver:
             if decimal_reduction is None:
                 context.unknown_factors.append(f"damage_reduction_value_invalid:{index}")
                 continue
+            dynamic_detail = self._resolve_dynamic_damage_reduction(context, item, index)
+            if dynamic_detail is not None:
+                if dynamic_detail["status"] == "resolved":
+                    decimal_reduction += dynamic_detail["bonus_reduction"]
+                    if decimal_reduction > Decimal("1"):
+                        decimal_reduction = Decimal("1")
+                        dynamic_detail["capped"] = True
+                    else:
+                        dynamic_detail["capped"] = False
+                elif dynamic_detail["status"] == "unknown":
+                    context.unknown_factors.append(
+                        f"dynamic_damage_reduction_unknown:{index}:{dynamic_detail['reason']}"
+                    )
             reductions.append(decimal_reduction)
-            normalized_sources.append(
-                {
-                    "source_id": item.get("source_id") or item.get("skill_id")
-                    or item.get("effect_id"),
-                    "source_type": item.get("source_type"),
-                    "reduction": str(decimal_reduction),
-                    "certainty": item.get("certainty", "known"),
-                }
-            )
+            normalized_source = {
+                "source_id": item.get("source_id") or item.get("skill_id") or item.get("effect_id"),
+                "source_type": item.get("source_type"),
+                "reduction": str(decimal_reduction),
+                "certainty": item.get("certainty", "known"),
+            }
+            if dynamic_detail is not None:
+                normalized_source["dynamic_reduction"] = self._stringify_detail(dynamic_detail)
+            normalized_sources.append(normalized_source)
 
         context.damage_reductions = reductions
         details["damage_reductions"] = {
@@ -438,7 +451,149 @@ class ModifierResolver:
             "response_target": response_target,
             "certainty": rule.get("certainty", "known"),
             "raw_description": rule.get("raw_description"),
+            "dynamic_reduction_rule": rule.get("dynamic_reduction_rule"),
         }
+
+    def _resolve_dynamic_damage_reduction(
+        self,
+        context: DamageFormulaContext,
+        source: dict[str, Any],
+        index: int,
+    ) -> dict[str, Any] | None:
+        """解析“按目标状态层数追加减伤”的防御技能分支。"""
+        raw_rule = source.get("dynamic_reduction_rule")
+        if not isinstance(raw_rule, dict):
+            return None
+        source_effect_id = raw_rule.get("source_effect_id")
+        if not isinstance(source_effect_id, str) or not source_effect_id:
+            return {"status": "unknown", "reason": "source_effect_id_missing"}
+
+        per_layer = self._normalize_reduction(raw_rule.get("damage_reduction_per_layer"))
+        if per_layer is None:
+            return {"status": "unknown", "reason": "damage_reduction_per_layer_invalid"}
+
+        layer_result = self._snapshot_layers_for_dynamic_rule(
+            context,
+            source_effect_id=source_effect_id,
+            source_target=str(raw_rule.get("source_target") or "attacker_active_elf"),
+        )
+        if layer_result["status"] != "resolved":
+            return {
+                "status": layer_result["status"],
+                "reason": layer_result["reason"],
+                "source_effect_id": source_effect_id,
+                "source_target": raw_rule.get("source_target"),
+            }
+
+        layers = layer_result["layers"]
+        bonus = per_layer * layers
+        return {
+            "status": "resolved",
+            "source_effect_id": source_effect_id,
+            "source_target": raw_rule.get("source_target"),
+            "source_index": index,
+            "layers": layers,
+            "damage_reduction_per_layer": per_layer,
+            "bonus_reduction": bonus,
+            "matched_instances": layer_result["matched_instances"],
+        }
+
+    def _snapshot_layers_for_dynamic_rule(
+        self,
+        context: DamageFormulaContext,
+        *,
+        source_effect_id: str,
+        source_target: str,
+    ) -> dict[str, Any]:
+        """从历史快照中读取动态规则指定目标的状态层数。"""
+        if not isinstance(context.snapshot_payload, list):
+            return {"status": "unknown", "reason": "snapshot_payload_missing"}
+        target = self._dynamic_source_target(context, source_target)
+        if target is None:
+            return {"status": "unknown", "reason": "source_target_unsupported"}
+
+        total_layers = Decimal("0")
+        matched_instances: list[dict[str, Any]] = []
+        for item in context.snapshot_payload:
+            if not isinstance(item, dict) or item.get("effect_id") != source_effect_id:
+                continue
+            if not self._snapshot_item_matches_target(item, target):
+                continue
+            layers = self._snapshot_layers(item)
+            total_layers += layers
+            matched_instances.append(
+                {
+                    "instance_id": item.get("instance_id"),
+                    "owner_scope": item.get("owner_scope"),
+                    "owner_side": item.get("owner_side"),
+                    "owner_elf_id": item.get("owner_elf_id"),
+                    "layers": layers,
+                }
+            )
+        return {
+            "status": "resolved",
+            "layers": total_layers,
+            "matched_instances": matched_instances,
+        }
+
+    @staticmethod
+    def _dynamic_source_target(
+        context: DamageFormulaContext,
+        source_target: str,
+    ) -> dict[str, str | None] | None:
+        if source_target in {
+            "opponent_active_elf",
+            "attacker_active_elf",
+            "attack_source_active_elf",
+        }:
+            return {
+                "owner_side": context.attacker_side,
+                "owner_elf_id": context.attacker_elf_id,
+            }
+        if source_target in {
+            "self_active_elf",
+            "defender_active_elf",
+            "defense_owner_active_elf",
+        }:
+            return {
+                "owner_side": context.defender_side,
+                "owner_elf_id": context.defender_elf_id,
+            }
+        return None
+
+    @staticmethod
+    def _snapshot_item_matches_target(
+        item: dict[str, Any],
+        target: dict[str, str | None],
+    ) -> bool:
+        owner_scope = item.get("owner_scope")
+        owner_side = item.get("owner_side")
+        owner_elf_id = item.get("owner_elf_id")
+        target_side = target.get("owner_side")
+        target_elf_id = target.get("owner_elf_id")
+        if owner_scope == "field":
+            return True
+        if owner_side != target_side:
+            return False
+        if owner_scope == "side":
+            return True
+        if owner_scope == "elf":
+            return target_elf_id is None or owner_elf_id == target_elf_id
+        return False
+
+    @staticmethod
+    def _stringify_detail(value: Any) -> Any:
+        """把 Decimal 细节转成字符串，便于写入 evidence/JSON。"""
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, dict):
+            return {
+                str(key): ModifierResolver._stringify_detail(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [ModifierResolver._stringify_detail(item) for item in value]
+        return value
 
     @staticmethod
     def _source_active(item: dict[str, Any], payload: dict[str, Any]) -> bool | None:

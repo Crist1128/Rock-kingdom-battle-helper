@@ -56,8 +56,8 @@
   {
     "skill_id": "rocom_skill_910fb31af5",
     "skill_name": "不可接触",
-    "review_status": "partial",
-    "review_notes": "已写入基础减伤50%和应对攻击条件；“敌方每1层中毒减伤+10%”缺少按状态层数动态修正的防御规则结构，暂不参与计算。",
+    "review_status": "structured",
+    "review_notes": "基础减伤50%和应对攻击条件已可执行；动态减伤已接入快照层数读取：敌方当前中毒每1层追加减伤10%。",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
@@ -71,16 +71,15 @@
         "source_effect_id": "effect_poison",
         "source_target": "opponent_active_elf",
         "damage_reduction_per_layer": 0.1,
-        "status": "not_executable_yet"
+        "status": "executable",
+        "notes": "从伤害事件快照读取攻击方当前中毒层数。"
       },
       "raw_description": "减伤50%，敌方每有1层中毒效果，本技能减伤+10%，应对攻击。",
       "source": "manual_review_20260611"
     },
     "hit_rule": null,
     "effect_operations": null,
-    "structure_gaps": [
-      "dynamic_damage_reduction_from_effect_layers"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_65a693e694",
@@ -274,15 +273,29 @@
   {
     "skill_id": "rocom_skill_6899ed83ec",
     "skill_name": "以毒攻毒",
-    "review_status": "partial",
-    "review_notes": "规则为敌方每1层中毒，自己获得魔攻+30%；缺少“按敌方异常层数生成等量可叠属性修正并在公式中按层数乘算”的闭环，暂不执行。",
-    "clear_damage_rule": true,
+    "review_status": "structured",
+    "review_notes": "已接入动态层数读取：按敌方当前中毒层数，自己获得等量×3 的魔攻增加层数，每层标准属性修正为 10%。",
     "hit_rule": null,
-    "effect_operations": null,
-    "structure_gaps": [
-      "dynamic_stat_modifier_from_enemy_effect_layers",
-      "stat_modifier_layer_multiplier"
-    ]
+    "effect_operations": [
+      {
+        "op_type": "dynamic_apply_effect",
+        "effect_id": "effect_magic_attack_up_layered",
+        "target": "self",
+        "layers_from": "opponent_existing_effect_layers",
+        "source_effect_id": "effect_poison",
+        "layers_multiplier": 3,
+        "timing": "on_skill_use",
+        "notes": "敌方每1层中毒转为自己3层魔攻增加；标准层数每层魔攻+10%。",
+        "standardized_from_effect_id": "effect_magic_attack_up_30"
+      }
+    ],
+    "structure_gaps": [],
+    "damage_rule": {
+      "status": "no_direct_damage",
+      "damage_type": "status_only",
+      "raw_description": "敌方每有1层中毒，自己获得魔攻+30%。",
+      "source": "manual_review_20260611"
+    }
   },
   {
     "skill_id": "rocom_skill_40114f9d10",
@@ -361,15 +374,23 @@
   {
     "skill_id": "rocom_skill_6c23bd7435",
     "skill_name": "伺机而动",
-    "review_status": "needs_review",
-    "review_notes": "下一次攻击时技能威力+70；需要一次性下次攻击威力修正、消耗时机和重放扣减，目前结构未闭环。",
+    "review_status": "structured",
+    "review_notes": "Structured: next attack gains +70 display power via a one-use skill power modifier.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
-    "structure_gaps": [
-      "next_attack_power_add_once",
-      "remaining_uses_consumption"
-    ]
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_skill_power_up_layered",
+        "target": "actor_side",
+        "layers": 7,
+        "remaining_uses": 1,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "next attack skill power +70"
+      }
+    ],
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_3863def5c1",
@@ -411,18 +432,26 @@
   {
     "skill_id": "rocom_skill_a74fd51c36",
     "skill_name": "倾泻",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；“未被防御技能应对则驱散双方所有印记”需要标准化防御应对失败旗标和双边清除封装，暂不写可执行操作。",
+    "review_status": "structured",
+    "review_notes": "Structured: when defense response is explicitly failed, clear all active mark effects on both sides.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611"
     },
-    "effect_operations": null,
-    "structure_gaps": [
-      "defense_response_failed_condition",
-      "clear_both_sides_marks_operation"
-    ]
+    "effect_operations": [
+      {
+        "op_type": "clear_effects",
+        "target": "field",
+        "categories": [
+          "mark"
+        ],
+        "condition": "response_defense_failed",
+        "timing": "on_skill_use",
+        "notes": "clear all marks when not answered by a defense skill"
+      }
+    ],
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_e311866de9",
@@ -440,8 +469,8 @@
   {
     "skill_id": "rocom_skill_b09e6a23f6",
     "skill_name": "假寐",
-    "review_status": "partial",
-    "review_notes": "自己回复2能量可执行；“己方队伍获得1次奉献：能耗-2”缺队伍侧一次性技能能耗修正和消耗计数，暂不执行。",
+    "review_status": "structured",
+    "review_notes": "Structured: gain 2 energy and grant one team-side all-skill energy cost -2 modifier.",
     "clear_damage_rule": true,
     "hit_rule": null,
     "effect_operations": [
@@ -454,13 +483,20 @@
         "target": "actor_side",
         "condition": "always",
         "timing": "on_skill_use",
-        "notes": "自己回复2能量。"
+        "notes": "gain 2 energy"
+      },
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_team_energy_cost_down_layered",
+        "target": "actor_side",
+        "layers": 2,
+        "remaining_uses": 1,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "team side gains one all-skill energy cost -2 use"
       }
     ],
-    "structure_gaps": [
-      "team_side_once_cost_reduction",
-      "remaining_uses_consumption"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_ca6386c7cf",
@@ -489,8 +525,8 @@
   {
     "skill_id": "rocom_skill_a0d18cc7bb",
     "skill_name": "偷袭",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态成功时本次技能威力变为3倍的结构已记录，但攻击技能自身 response_rule 尚未自动装载到公式上下文。",
+    "review_status": "structured",
+    "review_notes": "Structured: attack skill response_rule is auto-loaded by RuleResolver; response_status_success applies x3 power.",
     "damage_rule": {
       "status": "formula_unavailable",
       "damage_type": "normal_formula",
@@ -512,9 +548,7 @@
       "source": "manual_review_20260611"
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_5196ddfc69",
@@ -689,18 +723,25 @@
   {
     "skill_id": "rocom_skill_e10c4ddd42",
     "skill_name": "冰冻光线",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；敌方全技能能耗+2需要技能槽/全技能能耗修正和费用结算层，暂不执行。",
+    "review_status": "structured",
+    "review_notes": "Structured: apply all-skill energy cost +2 to enemy active elf.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611"
     },
-    "effect_operations": null,
-    "structure_gaps": [
-      "all_skill_cost_modifier",
-      "cost_modifier_not_consumed"
-    ]
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_energy_cost_up_layered",
+        "target": "enemy_side",
+        "layers": 2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "enemy all skills cost +2"
+      }
+    ],
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_2b7125c863",
@@ -767,76 +808,74 @@
   {
     "skill_id": "rocom_skill_caa21aff33",
     "skill_name": "冰封",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；敌方每1层冻结自己回复1能量需要按目标状态层数动态资源变化。",
+    "review_status": "structured",
+    "review_notes": "Structured: gain energy equal to enemy active freeze layers.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_02"
     },
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "resource_change_from_effect_layers",
+        "op_type": "resource_change_from_effect_layers",
         "source_effect_id": "effect_freeze",
         "source_target": "enemy_side",
         "resource_type": "energy",
         "change_type": "gain",
         "value_per_layer": 1,
-        "status": "reserved"
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "gain 1 energy per enemy freeze layer"
       }
     ],
-    "structure_gaps": [
-      "dynamic_resource_change_from_effect_layers"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_b1031554ca",
     "skill_name": "冰捆缚",
-    "review_status": "needs_review",
-    "review_notes": "状态技能描述为2连击且每次连击使敌方全技能能耗+1；需要状态技能多段应用和全技能费用修正。",
+    "review_status": "structured",
+    "review_notes": "Structured: two status applications are represented as enemy all-skill energy cost +2.",
     "clear_damage_rule": true,
     "hit_rule": {
       "effect_application_count": 2,
       "source": "manual_review_20260611_02"
     },
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "all_skill_cost_modifier",
+        "op_type": "apply_effect",
+        "effect_id": "effect_energy_cost_up_layered",
         "target": "enemy_side",
-        "cost_delta_per_application": 1,
-        "applications": 2,
-        "status": "reserved"
+        "layers": 2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "2 applications, each adds enemy all-skill cost +1"
       }
     ],
-    "structure_gaps": [
-      "status_skill_multi_application",
-      "all_skill_cost_modifier"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_5c67891d7c",
     "skill_name": "冰晶坠",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；敌方全技能能耗+1需要技能费用修正结构。",
+    "review_status": "structured",
+    "review_notes": "Structured: apply all-skill energy cost +1 to enemy active elf.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_02"
     },
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "all_skill_cost_modifier",
+        "op_type": "apply_effect",
+        "effect_id": "effect_energy_cost_up_layered",
         "target": "enemy_side",
-        "cost_delta": 1,
-        "status": "reserved"
+        "layers": 1,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "enemy all skills cost +1"
       }
     ],
-    "structure_gaps": [
-      "all_skill_cost_modifier"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_3f6782a767",
@@ -949,27 +988,25 @@
   {
     "skill_id": "rocom_skill_5d97316c31",
     "skill_name": "冰雹",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态额外使敌方全技能能耗+3需要费用修正结构。",
+    "review_status": "structured",
+    "review_notes": "Structured: response_status_success applies enemy all-skill energy cost +3.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_02"
     },
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "all_skill_cost_modifier",
+        "op_type": "apply_effect",
+        "effect_id": "effect_energy_cost_up_layered",
         "target": "enemy_side",
-        "cost_delta": 3,
-        "trigger": "response_status_success",
-        "status": "reserved"
+        "layers": 3,
+        "condition": "response_status_success",
+        "timing": "on_skill_use",
+        "notes": "on response status success, enemy all skills cost +3"
       }
     ],
-    "structure_gaps": [
-      "all_skill_cost_modifier",
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_c27e3e6367",
@@ -5163,8 +5200,8 @@
   {
     "skill_id": "rocom_skill_d8efff3de0",
     "skill_name": "水环",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed executable part is kept; unsupported dynamic/branch mechanics are reserved in future_hooks and structure_gaps.",
+    "review_status": "structured",
+    "review_notes": "Structured: response_attack_success applies self all-skill energy cost -2.",
     "review_source": "manual_review_20260612_04",
     "reviewed_at": "2026-06-12",
     "damage_rule": {
@@ -5180,19 +5217,18 @@
       "source": "manual_review_20260612_04"
     },
     "hit_rule": null,
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "all_skill_cost_modifier",
+        "op_type": "apply_effect",
+        "effect_id": "effect_energy_cost_down_layered",
         "target": "actor_side",
-        "cost_delta": -2,
-        "trigger": "response_attack_success",
-        "status": "reserved"
+        "layers": 2,
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "notes": "on response attack success, self all skills cost -2"
       }
     ],
-    "structure_gaps": [
-      "all_skill_cost_modifier"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_41ddd0b60e",

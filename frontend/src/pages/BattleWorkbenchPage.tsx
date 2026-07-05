@@ -61,6 +61,7 @@ export function BattleWorkbenchPage() {
   const [lastDamageEventResult, setLastDamageEventResult] = useState<DamageEventCreateResult | null>(null);
   const [plannedActions, setPlannedActions] = useState<PlannedActions>(() => createEmptyActions());
   const [enemyEstimateSelection, setEnemyEstimateSelection] = useState<EstimatePanelSelection | null>(null);
+  const [damagePreviewRefreshing, setDamagePreviewRefreshing] = useState(false);
   const stateQuery = useQuery({
     queryKey: ["battle-state", currentBattleId],
     queryFn: () => api.battles.state(currentBattleId!),
@@ -77,6 +78,8 @@ export function BattleWorkbenchPage() {
   const activeEnemyEstimate =
     enemyEstimateSelection?.elfId === state?.battle.enemy_active_elf_id ? enemyEstimateSelection : null;
   const enemyEstimatedStats = activeEnemyEstimate?.stats ?? null;
+  const activeDamagePreviewRefreshing =
+    damagePreviewRefreshing && estimateElfId === state?.battle.enemy_active_elf_id;
 
   useEffect(() => {
     setPlannedActions(createEmptyActions());
@@ -242,6 +245,7 @@ export function BattleWorkbenchPage() {
                     skillSlots={state.skill_slots.filter(
                       (slot) => slot.side === "self" && slot.elf_id === state.battle.self_active_elf_id,
                     )}
+                    damagePreviewRefreshing={activeDamagePreviewRefreshing}
                   onRuntimeFormChange={(stateId, effectiveElfId) =>
                     changeRuntimeForm.mutate({ stateId, effectiveElfId })
                   }
@@ -259,6 +263,7 @@ export function BattleWorkbenchPage() {
                     estimateSource={activeEnemyEstimate?.source ?? "unknown"}
                     estimateMatchedCount={activeEnemyEstimate?.matchedCount ?? 0}
                     estimateNatureName={activeEnemyEstimate?.natureName}
+                    damagePreviewRefreshing={activeDamagePreviewRefreshing}
                   onRuntimeFormChange={(stateId, effectiveElfId) =>
                     changeRuntimeForm.mutate({ stateId, effectiveElfId })
                   }
@@ -308,6 +313,7 @@ export function BattleWorkbenchPage() {
               battleId={currentBattleId}
               elfId={estimateElfId}
               onEstimateChange={setEnemyEstimateSelection}
+              onDefaultConfigRefreshingChange={setDamagePreviewRefreshing}
             />
             <Card>
               <CardHeader><CardTitle>测试能力</CardTitle></CardHeader>
@@ -895,6 +901,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return isRecord(value) ? value : null;
 }
 
+function asString(value: unknown): string | null {
+  return typeof value === "string" && value ? value : null;
+}
+
 function formatOptionalBool(value: unknown) {
   if (value === true) return "成功";
   if (value === false) return "失败";
@@ -1056,11 +1066,13 @@ function SkillSlotRuntimeList({
   battleId,
   ownerSide,
   skillSlots,
+  damagePreviewRefreshing = false,
   onSkillQuickSelect,
 }: {
   battleId: string;
   ownerSide?: Side;
   skillSlots: BattleSkillSlotDict[];
+  damagePreviewRefreshing?: boolean;
   onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
 }) {
   const [extraSkillId, setExtraSkillId] = useState<string | null>(null);
@@ -1088,6 +1100,7 @@ function SkillSlotRuntimeList({
             slot={slot}
             battleId={battleId}
             emptyText={emptyText}
+            damagePreviewRefreshing={damagePreviewRefreshing}
             onSkillQuickSelect={onSkillQuickSelect}
           />
         ))}
@@ -1106,6 +1119,7 @@ function SkillSlotRuntimeList({
                 slot={slot}
                 battleId={battleId}
                 emptyText={emptyText}
+                damagePreviewRefreshing={damagePreviewRefreshing}
                 onSkillQuickSelect={onSkillQuickSelect}
               />
             ))}
@@ -1123,6 +1137,16 @@ function SkillSlotRuntimeList({
         />
         {extraPreview ? (
           <div className="mt-2 space-y-2">
+            {shouldShowSkillEffectPreview(
+              extraSkill?.skill_category,
+              extraSkill?.raw_description,
+              extraSkill?.effect_operations_json,
+            ) ? (
+              <SkillEffectPreviewPanel
+                description={extraSkill?.raw_description}
+                rawOperationsJson={extraSkill?.effect_operations_json}
+              />
+            ) : null}
             <SkillPowerPreviewLine preview={extraPreview} />
             {onSkillQuickSelect ? (
               <Button
@@ -1160,12 +1184,14 @@ function SkillSlotCard({
   slot,
   battleId,
   emptyText = "未配置携带技能",
+  damagePreviewRefreshing = false,
   onSkillQuickSelect,
 }: {
   label: string;
   slot: BattleSkillSlotDict | null;
   battleId: string;
   emptyText?: string;
+  damagePreviewRefreshing?: boolean;
   onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
 }) {
   const queryClient = useQueryClient();
@@ -1296,14 +1322,88 @@ function SkillSlotCard({
           </div>
         ) : null}
       </div>
+      {shouldShowSkillEffectPreview(
+        slot.skill_category,
+        slot.skill_description,
+        slot.effect_operations_json,
+      ) ? (
+        <SkillEffectPreviewPanel
+          description={slot.skill_description}
+          rawOperationsJson={slot.effect_operations_json}
+        />
+      ) : null}
       <SkillPowerPreviewLine
         preview={slot.power_preview}
         fallbackPower={slot.current_power ?? slot.static_base_power}
       />
-      <SkillDamagePreviewPanel slot={slot} />
-      <SkillTeamDamagePreviewPanel slot={slot} />
+      {damagePreviewRefreshing ? (
+        <DamagePreviewRefreshingNotice />
+      ) : (
+        <>
+          <SkillDamagePreviewPanel slot={slot} />
+          <SkillTeamDamagePreviewPanel slot={slot} />
+        </>
+      )}
     </div>
   );
+}
+
+function DamagePreviewRefreshingNotice() {
+  return (
+    <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-xs text-sky-700">
+      <span className="inline-flex items-center gap-2">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-sky-500" />
+        理论伤害刷新中，暂时隐藏旧数值...
+      </span>
+    </div>
+  );
+}
+
+function SkillEffectPreviewPanel({
+  description,
+  rawOperationsJson,
+}: {
+  description?: string | null;
+  rawOperationsJson?: string | null;
+}) {
+  const displayDescription = description ?? originalDescriptionFromRawOperations(rawOperationsJson);
+  return (
+    <div className="mt-2 rounded-lg border bg-slate-50 px-2 py-1.5 text-xs text-slate-800">
+      {displayDescription ?? "暂无原始技能描述"}
+    </div>
+  );
+}
+
+function shouldShowSkillEffectPreview(
+  skillCategory?: string | null,
+  description?: string | null,
+  rawOperationsJson?: string | null,
+) {
+  return Boolean(
+    description
+    || rawOperationsJson
+    || skillCategory === "status"
+    || skillCategory === "change"
+    || skillCategory === "support"
+    || skillCategory === "状态"
+    || skillCategory === "变化"
+    || skillCategory === "辅助",
+  );
+}
+
+function originalDescriptionFromRawOperations(rawOperationsJson?: string | null): string | null {
+  if (!rawOperationsJson) return null;
+  try {
+    const operations = JSON.parse(rawOperationsJson);
+    if (!Array.isArray(operations)) return null;
+    const descriptions = operations
+      .filter(isRecord)
+      .map((operation) => asString(operation.raw_description) ?? asString(operation.notes))
+      .filter((value): value is string => Boolean(value));
+    return descriptions.length > 0 ? [...new Set(descriptions)].join("；") : null;
+  } catch {
+    return null;
+  }
 }
 
 function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
@@ -1348,6 +1448,12 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
             <span>HP {currentTarget.defender_max_hp ?? "--"}</span>
             <span>克制 x{String(currentTarget.multipliers?.type ?? "1")}</span>
             <span>本系 x{String(currentTarget.multipliers?.stab ?? "1")}</span>
+            {(currentTarget.hit_count ?? 1) > 1 ? (
+              <span>
+                连击 {currentTarget.hit_count} 段
+                {currentTarget.hit_count_source ? `（${currentTarget.hit_count_source}）` : ""}
+              </span>
+            ) : null}
           </div>
           {currentTarget.unknown_factors?.length ? (
             <div className="text-amber-700">未纳入：{currentTarget.unknown_factors.join("、")}</div>
@@ -1405,6 +1511,9 @@ function damageTargetText(target: NonNullable<BattleSkillSlotDict["damage_previe
     return missing;
   }
   const percent = typeof target.damage_percent === "number" ? `${target.damage_percent}%` : "--";
+  if ((target.hit_count ?? 1) > 1) {
+    return `${target.single_damage ?? "--"}×${target.hit_count}=${target.total_damage ?? target.damage_value ?? "--"} / ${percent}`;
+  }
   return `${target.damage_value ?? "--"} / ${percent}`;
 }
 
@@ -1565,6 +1674,7 @@ function ActiveSide({
   estimateSource = "unknown",
   estimateMatchedCount = 0,
   estimateNatureName,
+  damagePreviewRefreshing = false,
   onRuntimeFormChange,
   runtimeFormChanging = false,
   onSkillQuickSelect,
@@ -1577,6 +1687,7 @@ function ActiveSide({
   estimateSource?: "default_config" | "expanded_config" | "base_talent" | "unknown";
   estimateMatchedCount?: number;
   estimateNatureName?: string | null;
+  damagePreviewRefreshing?: boolean;
   onRuntimeFormChange?: (stateId: string, effectiveElfId: string | null) => void;
   runtimeFormChanging?: boolean;
   onSkillQuickSelect?: (skill: Pick<BattleSkillSlotDict, "skill_id" | "skill_name" | "skill_category">) => void;
@@ -1620,6 +1731,7 @@ function ActiveSide({
             battleId={battleId}
             ownerSide={elf.side}
             skillSlots={skillSlots}
+            damagePreviewRefreshing={damagePreviewRefreshing}
             onSkillQuickSelect={onSkillQuickSelect}
           />
           {!hasRuntimeStats && displayEstimatedStats ? (

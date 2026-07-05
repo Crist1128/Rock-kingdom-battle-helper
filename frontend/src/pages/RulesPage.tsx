@@ -304,6 +304,10 @@ function SkillRuleCard({ skill, adminToken }: { skill: SkillRuleReviewOut; admin
         <Badge variant={skill.has_hit_rule ? "success" : "outline"}>命中/连击</Badge>
         {damageStatus ? <Badge variant="warning">{damageStatus}</Badge> : null}
       </div>
+      <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+        <span className="font-medium">技能原文：</span>
+        {skill.raw_description?.trim() || "暂无原文描述"}
+      </div>
       <div className="mt-4 grid gap-3 xl:grid-cols-3">
         <label className="space-y-1">
           <span className="text-sm font-medium">伤害 / 应对规则 JSON</span>

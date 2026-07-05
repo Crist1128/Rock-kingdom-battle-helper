@@ -44,6 +44,8 @@ import type {
   SkillRuleReviewOut,
   SkillUseEventCreate,
   StartBattleInput,
+  StaticSkillRuleSyncRequest,
+  StaticSkillRuleSyncResponse,
   SwitchElfInput,
   TeamPresetCreate,
   TeamPresetOut,
@@ -56,10 +58,34 @@ export class ApiError extends Error {
   detail: unknown;
 
   constructor(status: number, detail: unknown) {
-    super(typeof detail === "string" ? detail : `API request failed: ${status}`);
+    super(formatApiErrorMessage(status, detail));
     this.status = status;
     this.detail = detail;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function formatValidationDetail(detail: unknown): string {
+  if (!isRecord(detail)) return String(detail);
+  const msg = typeof detail.msg === "string" ? detail.msg : String(detail.type ?? "请求参数校验失败");
+  const loc = Array.isArray(detail.loc) ? detail.loc.map(String).join(".") : "";
+  return loc ? `${loc}: ${msg}` : msg;
+}
+
+function formatApiErrorMessage(status: number, detail: unknown): string {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) return detail.map(formatValidationDetail).join("；");
+  if (isRecord(detail)) {
+    const fastApiDetail = detail.detail;
+    if (typeof fastApiDetail === "string" && fastApiDetail.trim()) return fastApiDetail;
+    if (Array.isArray(fastApiDetail)) return fastApiDetail.map(formatValidationDetail).join("；");
+    if (isRecord(fastApiDetail)) return JSON.stringify(fastApiDetail);
+    if (typeof detail.message === "string" && detail.message.trim()) return detail.message;
+  }
+  return `API request failed: ${status}`;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -347,6 +373,19 @@ export const api = {
     listRocomJobs: (adminToken?: string) =>
       request<RocomDataUpdateJobStatus[]>("/admin/data-updates/rocom/jobs", {
         headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+      }),
+    checkStaticSkillRules: (params: { limit?: number } = {}, adminToken?: string) =>
+      request<StaticSkillRuleSyncResponse>(
+        `/admin/data-updates/static-rules/skill-reviews/check${qs({ limit: params.limit ?? 100 })}`,
+        {
+          headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        },
+      ),
+    syncStaticSkillRules: (payload: StaticSkillRuleSyncRequest, adminToken?: string) =>
+      request<StaticSkillRuleSyncResponse>("/admin/data-updates/static-rules/skill-reviews/sync", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        body: JSON.stringify(payload),
       }),
   },
 

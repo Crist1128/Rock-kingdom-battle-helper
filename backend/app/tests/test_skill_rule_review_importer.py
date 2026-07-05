@@ -7,6 +7,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.data_pipeline.skill_rule_reviews.importer import import_skill_rule_reviews
+from app.data_pipeline.static_rule_sync import (
+    check_structured_skill_rule_sync,
+    sync_structured_skill_rules,
+)
 from app.db.base import Base
 from app.models import battle as _battle_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
@@ -154,6 +158,67 @@ def test_import_skill_rule_reviews_falls_back_to_unique_skill_name(
     assert skill is not None
     operations = loads_json(skill.effect_operations_json, [])
     assert operations[0]["layers"] == 10
+
+
+def test_static_rule_sync_checks_and_commits_structured_rules(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    """同步检查器只列出 structured 差异，并由 commit 显式写库。"""
+    db_session.add(_skill("skill_sync", skill_name="同步测试"))
+    db_session.add(_skill("skill_partial", skill_name="未完备测试"))
+    db_session.commit()
+    reviews_json = tmp_path / "reviews.json"
+    reviews_json.write_text(
+        dumps_json(
+            [
+                {
+                    "skill_id": "skill_sync",
+                    "skill_name": "同步测试",
+                    "review_status": "structured",
+                    "review_notes": "确认减伤。",
+                    "damage_rule": {"damage_type": "defense_modifier", "damage_reduction": 0.5},
+                    "hit_rule": {"damage_display_type": "single_damage"},
+                    "effect_operations": None,
+                },
+                {
+                    "skill_id": "skill_partial",
+                    "skill_name": "未完备测试",
+                    "review_status": "partial",
+                    "structure_gaps": ["future_rule"],
+                    "damage_rule": {"damage_type": "normal_formula"},
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    plan = check_structured_skill_rule_sync(db_session, reviews_json=reviews_json)
+    assert plan["pending_count"] == 1
+    assert plan["pending_items"][0]["skill_id"] == "skill_sync"
+
+    dry_run = sync_structured_skill_rules(
+        db_session,
+        skill_ids=["skill_sync"],
+        commit=False,
+        reviews_json=reviews_json,
+    )
+    assert dry_run["applied_count"] == 1
+    assert dry_run["transaction"] == "rolled_back_dry_run"
+    assert db_session.get(SkillDefinition, "skill_sync").damage_rule_json is None
+
+    committed = sync_structured_skill_rules(
+        db_session,
+        skill_ids=["skill_sync"],
+        commit=True,
+        reviews_json=reviews_json,
+    )
+    assert committed["applied_count"] == 1
+    assert committed["transaction"] == "committed"
+    skill = db_session.get(SkillDefinition, "skill_sync")
+    assert skill is not None
+    assert loads_json(skill.damage_rule_json, {})["manual_review"]["status"] == "structured"
+    assert loads_json(skill.hit_rule_json, {})["damage_display_type"] == "single_damage"
 
 
 def _skill(

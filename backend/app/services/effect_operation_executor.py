@@ -30,6 +30,7 @@ class EffectOperationExecutor:
         "clear_effects",
         "change_weather",
         "resource_change",
+        "resource_change_from_effect_layers",
         "heal_from_damage_dealt",
         "multiply_layers",
         "multiply_layers_by_polarity",
@@ -124,6 +125,12 @@ class EffectOperationExecutor:
             return self._execute_conditional_branch(battle_event, operation, operation_index)
         if operation_type == "resource_change":
             return self._execute_resource_change(battle_event, operation, operation_index)
+        if operation_type == "resource_change_from_effect_layers":
+            return self._execute_resource_change_from_effect_layers(
+                battle_event,
+                operation,
+                operation_index,
+            )
         if operation_type == "heal_from_damage_dealt":
             return self._execute_heal_from_damage_dealt(battle_event, operation, operation_index)
         if operation_type == "clear_effects":
@@ -830,6 +837,107 @@ class EffectOperationExecutor:
             "after_value": after_value,
         }
 
+    def _execute_resource_change_from_effect_layers(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """按指定目标当前状态层数执行资源变化。"""
+        source_effect_id = operation.get("source_effect_id") or operation.get("effect_id")
+        if not isinstance(source_effect_id, str) or not source_effect_id:
+            return self._skipped(operation, operation_index, "source_effect_id_missing")
+        source_definition = self.db.get(EffectDefinition, source_effect_id)
+        if source_definition is None or source_definition.deleted_at is not None:
+            return self._skipped(operation, operation_index, "source_effect_definition_missing")
+
+        source_target = self._resolve_target(
+            battle_event,
+            operation.get("source_target") or operation.get("target"),
+            source_definition,
+        )
+        if source_target["status"] != "resolved":
+            return self._skipped(operation, operation_index, source_target["reason"])
+        layer_result = self._sum_active_effect_layers(source_definition, source_target)
+        if layer_result["layers"] <= 0:
+            return {
+                "status": "skipped",
+                "reason": "source_effect_layers_zero",
+                "operation_index": operation_index,
+                "operation": "resource_change_from_effect_layers",
+                "source_effect_id": source_effect_id,
+                "source_target": operation.get("source_target"),
+                "matched_instances": layer_result["matched_instances"],
+            }
+
+        value_per_layer = operation.get("value_per_layer", 1)
+        if not isinstance(value_per_layer, int | float):
+            return self._skipped(operation, operation_index, "value_per_layer_invalid")
+        value = int(layer_result["layers"] * value_per_layer)
+        if value <= 0:
+            return self._skipped(operation, operation_index, "resource_value_zero")
+
+        resource_operation = dict(operation)
+        resource_operation.update(
+            {
+                "op_type": "resource_change",
+                "value_type": "value",
+                "value": value,
+                "target": operation.get("target") or "actor_side",
+            }
+        )
+        result = self._execute_resource_change(battle_event, resource_operation, operation_index)
+        result.update(
+            {
+                "operation": "resource_change_from_effect_layers",
+                "source_effect_id": source_effect_id,
+                "source_target": operation.get("source_target"),
+                "source_layers": layer_result["layers"],
+                "value_per_layer": value_per_layer,
+                "matched_instances": layer_result["matched_instances"],
+            }
+        )
+        return result
+
+    def _sum_active_effect_layers(
+        self,
+        definition: EffectDefinition,
+        target: dict,
+    ) -> dict:
+        """汇总同一挂载目标上的 active 状态层数。"""
+        stmt = select(BattleEffectInstance).where(
+            BattleEffectInstance.battle_id == str(target.get("battle_id")),
+            BattleEffectInstance.effect_id == definition.effect_id,
+            BattleEffectInstance.owner_scope == definition.owner_scope,
+            BattleEffectInstance.is_active.is_(True),
+        )
+        if definition.owner_scope == OwnerScope.FIELD.value:
+            stmt = stmt.where(BattleEffectInstance.field_id == target.get("field_id"))
+        else:
+            stmt = stmt.where(BattleEffectInstance.owner_side == target.get("owner_side"))
+            if definition.owner_scope == OwnerScope.ELF.value:
+                stmt = stmt.where(BattleEffectInstance.owner_elf_id == target.get("owner_elf_id"))
+            if definition.owner_scope == OwnerScope.SKILL_SLOT.value:
+                stmt = stmt.where(
+                    BattleEffectInstance.owner_skill_slot_id == target.get("owner_skill_slot_id")
+                )
+        instances = self.db.scalars(stmt).all()
+        matched = [
+            {
+                "effect_instance_id": item.instance_id,
+                "owner_scope": item.owner_scope,
+                "owner_side": item.owner_side,
+                "owner_elf_id": item.owner_elf_id,
+                "owner_skill_slot_id": item.owner_skill_slot_id,
+                "layers": item.layers,
+            }
+            for item in instances
+        ]
+        return {
+            "layers": sum(max(int(item.layers or 0), 0) for item in instances),
+            "matched_instances": matched,
+        }
+
     @staticmethod
     def _damage_value_from_event_payload(
         battle_event: BattleEvent,
@@ -879,6 +987,21 @@ class EffectOperationExecutor:
             return "matched"
         if False in values:
             return "condition_not_met"
+        if condition.endswith("_failed"):
+            success_condition = f"{condition[:-7]}_success"
+            success_values = [
+                payload.get(success_condition),
+                manual_flags.get(success_condition) if isinstance(manual_flags, dict) else None,
+                (
+                    condition_flags.get(success_condition)
+                    if isinstance(condition_flags, dict)
+                    else None
+                ),
+            ]
+            if False in success_values:
+                return "matched"
+            if True in success_values:
+                return "condition_not_met"
         return "unknown"
 
     def _resolve_target(
@@ -1050,6 +1173,7 @@ class EffectOperationExecutor:
             "existing_effect_layers",
             "target_existing_effect_layers",
             "enemy_existing_starfall_layers",
+            "opponent_existing_effect_layers",
         }:
             return {"status": "unknown", "reason": "unsupported_layers_from"}
         source_effect_id = operation.get("source_effect_id") or operation.get("effect_id")
@@ -1058,20 +1182,84 @@ class EffectOperationExecutor:
         source_definition = self.db.get(EffectDefinition, source_effect_id)
         if source_definition is None or source_definition.deleted_at is not None:
             return {"status": "unknown", "reason": "source_effect_definition_missing"}
+        source_target = self._resolve_dynamic_layers_source_target(
+            layers_from,
+            target,
+            source_definition,
+        )
+        if source_target["status"] != "resolved":
+            return {"status": "unknown", "reason": source_target["reason"]}
         existing = self._find_existing_instance(
-            battle_id=str(target.get("battle_id")),
+            battle_id=str(source_target.get("battle_id")),
             definition=source_definition,
-            owner_side=target.get("owner_side"),
-            owner_elf_id=target.get("owner_elf_id"),
-            owner_skill_slot_id=target.get("owner_skill_slot_id"),
-            field_id=target.get("field_id"),
+            owner_side=source_target.get("owner_side"),
+            owner_elf_id=source_target.get("owner_elf_id"),
+            owner_skill_slot_id=source_target.get("owner_skill_slot_id"),
+            field_id=source_target.get("field_id"),
         )
         if existing is None or existing.layers <= 0:
             return {"status": "skipped", "reason": "dynamic_layers_zero"}
-        layers = existing.layers
+        layers = int(existing.layers * self._resolve_layers_multiplier(operation))
+        if layers <= 0:
+            return {"status": "skipped", "reason": "dynamic_layers_zero"}
         if definition.max_layers is not None:
             layers = min(layers, definition.max_layers)
         return {"status": "resolved", "layers": layers}
+
+    def _resolve_dynamic_layers_source_target(
+        self,
+        layers_from: object,
+        target: dict,
+        source_definition: EffectDefinition,
+    ) -> dict:
+        """解析动态层数读取源，默认读取本次操作目标，必要时读取对方当前精灵。"""
+        if layers_from == "opponent_existing_effect_layers":
+            battle_id = str(target.get("battle_id") or "")
+            battle = self.db.get(Battle, battle_id)
+            if battle is None or battle.deleted_at is not None:
+                return {"status": "unknown", "reason": "battle_missing"}
+            owner_side = self._opposite_side(target.get("owner_side"))
+            if owner_side is None:
+                return {"status": "unknown", "reason": "opponent_side_missing"}
+            owner_elf_id = None
+            if source_definition.owner_scope == OwnerScope.ELF.value:
+                owner_elf_id = (
+                    battle.self_active_elf_id
+                    if owner_side == Side.SELF.value
+                    else battle.enemy_active_elf_id
+                )
+                if owner_elf_id is None:
+                    return {"status": "unknown", "reason": "opponent_active_elf_missing"}
+            return {
+                "status": "resolved",
+                "battle_id": battle_id,
+                "owner_side": owner_side,
+                "owner_elf_id": owner_elf_id,
+                "owner_skill_slot_id": None,
+                "field_id": None,
+            }
+        return {
+            "status": "resolved",
+            "battle_id": target.get("battle_id"),
+            "owner_side": target.get("owner_side"),
+            "owner_elf_id": target.get("owner_elf_id"),
+            "owner_skill_slot_id": target.get("owner_skill_slot_id"),
+            "field_id": target.get("field_id"),
+        }
+
+    @staticmethod
+    def _resolve_layers_multiplier(operation: dict) -> int:
+        """解析动态层数倍率；用于“每层异常转为多层属性修正”。"""
+        raw_multiplier = (
+            operation.get("layers_multiplier")
+            or operation.get("layers_per_source_layer")
+            or 1
+        )
+        try:
+            multiplier = int(raw_multiplier)
+        except (TypeError, ValueError):
+            return 1
+        return max(multiplier, 0)
 
     def _clear_matching_effects(
         self,

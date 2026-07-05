@@ -134,6 +134,7 @@ class SkillDefinition(TimestampMixin, Base):
         skill_name: 技能显示名称
         alias_names_json: 别名列表（JSON 格式）
         skill_icon: 技能图标路径
+        raw_description: 技能图鉴原始中文效果描述
         element_type: 技能系别类型
         skill_category: 技能类别（物理/魔法/状态/特殊）
         base_power: 基础威力
@@ -153,6 +154,7 @@ class SkillDefinition(TimestampMixin, Base):
     skill_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     alias_names_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     skill_icon: Mapped[str | None] = mapped_column(String, nullable=True)
+    raw_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # 技能属性
     element_type: Mapped[str] = mapped_column(String, nullable=False)

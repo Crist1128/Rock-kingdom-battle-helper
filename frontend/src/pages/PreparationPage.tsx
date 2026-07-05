@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -29,6 +29,13 @@ interface EnemySlot {
   element_types_json?: string | null;
 }
 
+interface PreparationValidationResult {
+  issues: string[];
+  elves: LineupElfInput[];
+  selfActiveElfId?: string;
+  enemyActiveElfId?: string;
+}
+
 interface ScreenCapturePreview {
   file: File;
   url: string;
@@ -44,6 +51,24 @@ interface CropSelection {
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+const isSelfSlotComplete = (slot: SelfSlot) => Boolean(slot.build_id && slot.elf_id);
+const isEnemySlotComplete = (slot: EnemySlot) => Boolean(slot.elf_id);
+
+function duplicateValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  values.forEach((value) => {
+    if (!value) return;
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  });
+  return [...duplicates];
+}
+
+function showPreparationRequiredAlert(issues: string[]) {
+  window.alert(`提交前请先完成：\n${issues.map((item) => `- ${item}`).join("\n")}`);
+}
 
 async function canvasToPngFile(canvas: HTMLCanvasElement, fileName: string): Promise<File> {
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
@@ -72,6 +97,7 @@ export function PreparationPage() {
   const [cropSelection, setCropSelection] = useState<CropSelection | null>(null);
   const [cropDragStart, setCropDragStart] = useState<{ x: number; y: number } | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [preparationIssues, setPreparationIssues] = useState<string[]>([]);
   const capturePreviewRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -97,20 +123,111 @@ export function PreparationPage() {
     onSuccess: (result) => setRecognitionResult(result),
   });
 
+  const validatePreparation = (): PreparationValidationResult => {
+    const issues: string[] = [];
+    const completeSelfSlots = selfSlots
+      .map((slot, index) => ({ slot, index }))
+      .filter(({ slot }) => isSelfSlotComplete(slot));
+    const completeEnemySlots = enemySlots
+      .map((slot, index) => ({ slot, index }))
+      .filter(({ slot }) => isEnemySlotComplete(slot));
+    const selfActiveSlots = selfSlots.map((slot, index) => ({ slot, index })).filter(({ slot }) => slot.active);
+    const enemyActiveSlots = enemySlots.map((slot, index) => ({ slot, index })).filter(({ slot }) => slot.active);
+    const validSelfActiveSlots = completeSelfSlots.filter(({ slot }) => slot.active);
+    const validEnemyActiveSlots = completeEnemySlots.filter(({ slot }) => slot.active);
+
+    if (!battleId) {
+      issues.push("请先从首页创建战斗，或输入 battle_id 后点击“使用此战斗”。");
+    }
+    if (battle.isLoading) {
+      issues.push("当前战斗信息仍在读取，请稍后再提交。");
+    }
+    if (battle.error) {
+      issues.push(`当前战斗读取失败：${battle.error.message}`);
+    }
+    if (battle.data?.phase && battle.data.phase !== "preparation") {
+      issues.push(`当前战斗阶段是“${phaseName(battle.data.phase)}”，只有准备阶段可以直接录入阵容。`);
+    }
+
+    if (completeSelfSlots.length === 0) {
+      issues.push("己方阵容至少需要选择 1 个完整配置。");
+    }
+    if (completeEnemySlots.length === 0) {
+      issues.push("敌方阵容至少需要选择 1 只精灵。");
+    }
+    if (completeSelfSlots.length > 6 || completeEnemySlots.length > 6) {
+      issues.push("每个阵营最多只能录入 6 只精灵。");
+    }
+
+    const incompleteSelfActiveSlots = selfActiveSlots.filter(({ slot }) => !isSelfSlotComplete(slot));
+    if (incompleteSelfActiveSlots.length > 0) {
+      issues.push(
+        `己方槽位 ${incompleteSelfActiveSlots.map(({ index }) => index + 1).join("、")} 被设为首发，但还没有选择完整配置。`,
+      );
+    }
+    const incompleteEnemyActiveSlots = enemyActiveSlots.filter(({ slot }) => !isEnemySlotComplete(slot));
+    if (incompleteEnemyActiveSlots.length > 0) {
+      issues.push(
+        `敌方槽位 ${incompleteEnemyActiveSlots.map(({ index }) => index + 1).join("、")} 被设为首发，但还没有选择精灵。`,
+      );
+    }
+    if (validSelfActiveSlots.length === 0) {
+      issues.push("请把 1 个已选择配置的己方槽位设为首发。");
+    } else if (validSelfActiveSlots.length > 1) {
+      issues.push("己方只能有 1 个首发槽位。");
+    }
+    if (validEnemyActiveSlots.length === 0) {
+      issues.push("请把 1 个已选择精灵的敌方槽位设为首发。");
+    } else if (validEnemyActiveSlots.length > 1) {
+      issues.push("敌方只能有 1 个首发槽位。");
+    }
+
+    const duplicateSelfElfIds = duplicateValues(completeSelfSlots.map(({ slot }) => slot.elf_id));
+    if (duplicateSelfElfIds.length > 0) {
+      issues.push(`己方阵容中有重复精灵：${duplicateSelfElfIds.join("、")}。`);
+    }
+    const duplicateEnemyElfIds = duplicateValues(completeEnemySlots.map(({ slot }) => slot.elf_id));
+    if (duplicateEnemyElfIds.length > 0) {
+      issues.push(`敌方阵容中有重复精灵：${duplicateEnemyElfIds.join("、")}。`);
+    }
+
+    const elves: LineupElfInput[] = [
+      ...completeSelfSlots.map(({ slot }) => ({
+        side: "self" as const,
+        elf_id: slot.elf_id,
+        build_id: slot.build_id,
+        is_active_elf: slot.active,
+      })),
+      ...completeEnemySlots.map(({ slot }) => ({
+        side: "enemy" as const,
+        elf_id: slot.elf_id,
+        is_active_elf: slot.active,
+      })),
+    ];
+
+    return {
+      issues,
+      elves,
+      selfActiveElfId: validSelfActiveSlots[0]?.slot.elf_id,
+      enemyActiveElfId: validEnemyActiveSlots[0]?.slot.elf_id,
+    };
+  };
+
   const submitAndStartBattle = useMutation({
     mutationFn: async () => {
       if (!battleId) throw new Error("缺少 battle_id");
-      const elves: LineupElfInput[] = [
-        ...selfSlots.filter((item) => item.build_id && item.elf_id).map((item) => ({ side: "self" as const, elf_id: item.elf_id, build_id: item.build_id, is_active_elf: item.active })),
-        ...enemySlots.filter((item) => item.elf_id).map((item) => ({ side: "enemy" as const, elf_id: item.elf_id, is_active_elf: item.active })),
-      ];
-      await api.battles.setupLineup(battleId, { elves });
+      const preparation = validatePreparation();
+      if (preparation.issues.length > 0) {
+        throw new Error(`准备阶段必做项未完成：${preparation.issues.join("；")}`);
+      }
+      await api.battles.setupLineup(battleId, { elves: preparation.elves });
       return api.battles.start(battleId, {
-        self_active_elf_id: selfSlots.find((item) => item.active)?.elf_id,
-        enemy_active_elf_id: enemySlots.find((item) => item.active)?.elf_id,
+        self_active_elf_id: preparation.selfActiveElfId,
+        enemy_active_elf_id: preparation.enemyActiveElfId,
       });
     },
     onSuccess: () => {
+      setPreparationIssues([]);
       queryClient.invalidateQueries({ queryKey: ["battle", battleId] });
       queryClient.invalidateQueries({ queryKey: ["battle-state", battleId] });
       queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
@@ -118,7 +235,18 @@ export function PreparationPage() {
     },
   });
 
-  const canSubmit = useMemo(() => Boolean(battleId && selfSlots.some((item) => item.build_id && item.active) && enemySlots.some((item) => item.elf_id && item.active)), [battleId, selfSlots, enemySlots]);
+  const handleSubmitAndStart = () => {
+    const preparation = validatePreparation();
+    if (preparation.issues.length > 0) {
+      submitAndStartBattle.reset();
+      setPreparationIssues(preparation.issues);
+      showPreparationRequiredAlert(preparation.issues);
+      return;
+    }
+    submitAndStartBattle.reset();
+    setPreparationIssues([]);
+    submitAndStartBattle.mutate();
+  };
 
   const applySelfTeamPreset = (preset: TeamPresetOut) => {
     const next = Array.from({ length: 6 }, (_, index) => {
@@ -617,16 +745,32 @@ export function PreparationPage() {
       </div>
 
       <Card>
-        <CardContent className="flex items-center justify-between pt-5">
-          <div className="text-sm text-muted-foreground">
-            阵容提交后，后端会初始化敌方面板估计档案。战斗开始后后端不允许直接重录阵容，应走后续纠错流程。
+        <CardContent className="space-y-3 pt-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-sm text-muted-foreground">
+              阵容提交后，后端会初始化敌方面板估计档案。战斗开始后后端不允许直接重录阵容，应走后续纠错流程。
+            </div>
+            <Button
+              disabled={submitAndStartBattle.isPending}
+              onClick={handleSubmitAndStart}
+            >
+              {submitAndStartBattle.isPending ? "提交并进入中..." : "提交阵容并进入战斗"}
+            </Button>
           </div>
-          <Button
-            disabled={!canSubmit || submitAndStartBattle.isPending}
-            onClick={() => submitAndStartBattle.mutate()}
-          >
-            {submitAndStartBattle.isPending ? "提交并进入中..." : "提交阵容并进入战斗"}
-          </Button>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            准备阶段必做项：选择当前战斗；己方至少 1 个完整配置；敌方至少 1 只精灵；双方各设置 1 个有效首发。
+            缺项时点击提交会弹窗列出具体问题。
+          </div>
+          {preparationIssues.length > 0 ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <div className="font-semibold">提交前请先完成：</div>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {preparationIssues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
       {submitAndStartBattle.error ? (

@@ -7,8 +7,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.data_pipeline.static_rule_sync import (
+    check_structured_skill_rule_sync,
+    sync_structured_skill_rules,
+)
+from app.db.session import get_db
 from app.schemas.data_update import (
     RocomCheckRequest,
     RocomCheckResponse,
@@ -16,6 +22,8 @@ from app.schemas.data_update import (
     RocomDataUpdateJobStatus,
     RocomDataUpdateRequest,
     RocomLocalImportRequest,
+    StaticSkillRuleSyncRequest,
+    StaticSkillRuleSyncResponse,
 )
 from app.services.rocom_data_update_service import (
     RocomCheckParams,
@@ -136,3 +144,37 @@ def list_rocom_sync_jobs(_: None = Depends(verify_admin_token)) -> list[RocomDat
     for job in jobs:
         job.pop("traceback", None)
     return [RocomDataUpdateJobStatus(**job) for job in jobs]
+
+
+@router.get(
+    "/static-rules/skill-reviews/check",
+    response_model=StaticSkillRuleSyncResponse,
+    summary="检查 structured 技能规则是否需要同步到数据库",
+)
+def check_static_skill_rule_sync(
+    limit: int = 100,
+    _: None = Depends(verify_admin_token),
+    db: Session = Depends(get_db),
+) -> StaticSkillRuleSyncResponse:
+    """只检查本地 seed 与数据库差异，不写库。"""
+    result = check_structured_skill_rule_sync(db, limit=limit)
+    return StaticSkillRuleSyncResponse(**result)
+
+
+@router.post(
+    "/static-rules/skill-reviews/sync",
+    response_model=StaticSkillRuleSyncResponse,
+    summary="同步 structured 技能规则到数据库",
+)
+def sync_static_skill_rules(
+    request: StaticSkillRuleSyncRequest,
+    _: None = Depends(verify_admin_token),
+    db: Session = Depends(get_db),
+) -> StaticSkillRuleSyncResponse:
+    """按用户确认同步 structured 技能规则；commit=false 时仍为 dry-run。"""
+    result = sync_structured_skill_rules(
+        db,
+        skill_ids=request.skill_ids,
+        commit=request.commit,
+    )
+    return StaticSkillRuleSyncResponse(**result)

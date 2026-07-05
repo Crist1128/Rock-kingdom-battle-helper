@@ -308,7 +308,7 @@ CREATE INDEX idx_nature_positive_negative ON nature_definition(positive_stat, ne
 
 ### 用途
 
-记录技能基础信息、伤害规则、连击 / 动画多段规则、效果操作和识别模板。
+记录技能基础信息、图鉴原始中文描述、伤害规则、连击 / 动画多段规则、效果操作和识别模板。
 
 ### 建表 SQL
 
@@ -318,6 +318,7 @@ CREATE TABLE skill_definition (
   skill_name TEXT NOT NULL,
   alias_names_json TEXT,
   skill_icon TEXT,
+  raw_description TEXT,
   element_type TEXT NOT NULL,
   skill_category TEXT NOT NULL,
   base_power INTEGER,
@@ -346,6 +347,7 @@ CREATE TABLE skill_definition (
 | `skill_name` | TEXT | 是 | 数据库录入 | 技能标准名称。 |
 | `alias_names_json` | TEXT(JSON) | 否 | 手动维护 | 技能别名和 OCR 常见误识别名。注意：技能允许别名，精灵不允许。 |
 | `skill_icon` | TEXT | 否 | 资源维护 | 技能图标路径或资源 ID。 |
+| `raw_description` | TEXT | 否 | rocom cleaner / 回填脚本 | BWIKI 技能图鉴原始中文效果描述，前端规则库和工作台技能卡优先展示该字段；不要用 `manual_review.notes` 冒充原文。 |
 | `element_type` | TEXT | 是 | 数据库录入 | 技能系别，用于属性克制和天气 / 印记规则。 |
 | `skill_category` | TEXT | 是 | 数据库录入 | 技能类型：`physical`、`magic`、`status`、`special`。 |
 | `base_power` | INTEGER | 条件 | 数据库录入 | 基础威力。攻击技能通常必填，状态技能可为空。 |

@@ -34,6 +34,12 @@ class AttackDamageCalculator:
         reductions = [self._to_decimal(item) for item in context.damage_reductions]
         reduction_product = self._product(Decimal("1") - item for item in reductions)
         hit_count = max(int(context.hit_count or 1), 1)
+        hit_rule_details = context.rule_resolution_details.get("hit_rule", {})
+        hit_count_source = (
+            hit_rule_details.get("source")
+            if isinstance(hit_rule_details, dict)
+            else "context"
+        )
         unstable_multiplier = self._to_decimal(context.unstable_multiplier)
 
         # 按当前数学建模文档：
@@ -67,6 +73,7 @@ class AttackDamageCalculator:
                 "raw_single_damage": str(raw_single),
                 "single_damage": single_damage,
                 "hit_count": hit_count,
+                "hit_count_source": hit_count_source or "context",
                 "total_damage": total_damage,
                 "rule_resolution_enabled": context.rule_resolution_enabled,
                 "rule_resolution_details": context.rule_resolution_details,

@@ -8,6 +8,7 @@ import type {
   RocomDataUpdateAccepted,
   RocomDataUpdateJobStatus,
   RocomJobProgress,
+  StaticSkillRuleSyncResponse,
 } from "@/types/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,10 @@ export function SettingsPage() {
   const [localUpdateMode, setLocalUpdateMode] = useState<"full" | "incremental">("full");
   const [lastCheckResult, setLastCheckResult] = useState<RocomCheckResponse | null>(null);
   const [lastAcceptedJob, setLastAcceptedJob] = useState<RocomDataUpdateAccepted | null>(null);
+  const [staticRuleCheckLimit, setStaticRuleCheckLimit] = useState("100");
+  const [lastStaticRuleResult, setLastStaticRuleResult] =
+    useState<StaticSkillRuleSyncResponse | null>(null);
+  const [selectedStaticRuleSkillIds, setSelectedStaticRuleSkillIds] = useState<string[]>([]);
 
   // 归档战斗清理表单状态。
   const [olderThanDays, setOlderThanDays] = useState("");
@@ -159,6 +164,34 @@ export function SettingsPage() {
     },
   });
 
+  const staticRuleCheckMutation = useMutation({
+    mutationFn: () =>
+      api.adminDataUpdates.checkStaticSkillRules(
+        { limit: toNumber(staticRuleCheckLimit, 100) },
+        adminToken || undefined,
+      ),
+    onSuccess: (result) => {
+      setLastStaticRuleResult(result);
+      setSelectedStaticRuleSkillIds(result.pending_items.map((item) => item.skill_id));
+    },
+  });
+
+  const staticRuleSyncMutation = useMutation({
+    mutationFn: (payload: { commit: boolean; skillIds: string[] | null }) =>
+      api.adminDataUpdates.syncStaticSkillRules(
+        {
+          commit: payload.commit,
+          skill_ids: payload.skillIds,
+        },
+        adminToken || undefined,
+      ),
+    onSuccess: async (result) => {
+      setLastStaticRuleResult(result);
+      setSelectedStaticRuleSkillIds(result.pending_items.map((item) => item.skill_id));
+      await refreshRuleQueries();
+    },
+  });
+
   const bulkPurgeMutation = useMutation({
     mutationFn: (dryRun: boolean) =>
       api.adminBattles.purgeArchived(
@@ -203,6 +236,8 @@ export function SettingsPage() {
   const checkError = getApiErrorText(checkMutation.error);
   const syncError = getApiErrorText(syncMutation.error);
   const importLocalError = getApiErrorText(importLocalMutation.error);
+  const staticRuleCheckError = getApiErrorText(staticRuleCheckMutation.error);
+  const staticRuleSyncError = getApiErrorText(staticRuleSyncMutation.error);
   const dataJobsError = getApiErrorText(dataUpdateJobs.error);
   const bulkError = getApiErrorText(bulkPurgeMutation.error);
   const singleError = getApiErrorText(singlePurgeMutation.error);
@@ -377,7 +412,89 @@ export function SettingsPage() {
 
           <section className="space-y-3 rounded-2xl border bg-white p-4">
             <div>
-              <h3 className="font-semibold">3. 远程爬取、清洗并导入</h3>
+              <h3 className="font-semibold">3. 同步已完备技能分支规则</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                只检查 seed 中 review_status = structured 且没有结构缺口的技能。默认先列出还没写入数据库或与 seed 不一致的规则，
+                你可以勾选后 dry-run 或提交写库。
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-sm font-medium">列表上限</span>
+                <Input
+                  value={staticRuleCheckLimit}
+                  placeholder="默认 100"
+                  onChange={(event) => setStaticRuleCheckLimit(event.target.value.replace(/[^0-9]/g, ""))}
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => staticRuleCheckMutation.mutate()}
+                disabled={staticRuleCheckMutation.isPending || staticRuleSyncMutation.isPending}
+              >
+                {staticRuleCheckMutation.isPending ? "检查中..." : "检查待同步规则"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  staticRuleSyncMutation.mutate({
+                    commit: false,
+                    skillIds: selectedStaticRuleSkillIds,
+                  })
+                }
+                disabled={
+                  staticRuleSyncMutation.isPending || selectedStaticRuleSkillIds.length === 0
+                }
+              >
+                预检查选中规则（dry-run）
+              </Button>
+              <Button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `确认写入 ${selectedStaticRuleSkillIds.length} 条已选 structured 技能规则？建议先 dry-run。`,
+                    )
+                  ) {
+                    staticRuleSyncMutation.mutate({
+                      commit: true,
+                      skillIds: selectedStaticRuleSkillIds,
+                    });
+                  }
+                }}
+                disabled={
+                  staticRuleSyncMutation.isPending || selectedStaticRuleSkillIds.length === 0
+                }
+              >
+                写入选中规则
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (window.confirm("确认写入所有待同步 structured 技能规则？建议先查看列表。")) {
+                    staticRuleSyncMutation.mutate({ commit: true, skillIds: null });
+                  }
+                }}
+                disabled={staticRuleSyncMutation.isPending || !lastStaticRuleResult?.pending_count}
+              >
+                写入全部待同步
+              </Button>
+            </div>
+            {staticRuleCheckError ? <ErrorBox text={staticRuleCheckError} /> : null}
+            {staticRuleSyncError ? <ErrorBox text={staticRuleSyncError} /> : null}
+            {lastStaticRuleResult ? (
+              <StaticSkillRuleSyncPanel
+                result={lastStaticRuleResult}
+                selectedSkillIds={selectedStaticRuleSkillIds}
+                onSelectionChange={setSelectedStaticRuleSkillIds}
+              />
+            ) : null}
+          </section>
+
+          <section className="space-y-3 rounded-2xl border bg-white p-4">
+            <div>
+              <h3 className="font-semibold">4. 远程爬取、清洗并导入</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 该操作会访问 BWIKI。默认按钮是 dry-run，不提交数据库；确认无误后再提交写库。提交时同样会补齐项目内置状态定义和人工技能规则。
               </p>
@@ -613,6 +730,99 @@ function RocomCheckResultPanel({ result }: { result: RocomCheckResponse }) {
           {result.new_elves_truncated ? <div className="mt-2 text-xs text-muted-foreground">结果已截断，请提高预览上限查看更多。</div> : null}
         </details>
       ) : null}
+    </div>
+  );
+}
+
+function StaticSkillRuleSyncPanel({
+  result,
+  selectedSkillIds,
+  onSelectionChange,
+}: {
+  result: StaticSkillRuleSyncResponse;
+  selectedSkillIds: string[];
+  onSelectionChange: (skillIds: string[]) => void;
+}) {
+  const selectedSet = new Set(selectedSkillIds);
+  const allVisibleSelected =
+    result.pending_items.length > 0 && result.pending_items.every((item) => selectedSet.has(item.skill_id));
+
+  const toggleOne = (skillId: string) => {
+    if (selectedSet.has(skillId)) {
+      onSelectionChange(selectedSkillIds.filter((item) => item !== skillId));
+    } else {
+      onSelectionChange([...selectedSkillIds, skillId]);
+    }
+  };
+
+  const toggleVisible = () => {
+    if (allVisibleSelected) {
+      const visible = new Set(result.pending_items.map((item) => item.skill_id));
+      onSelectionChange(selectedSkillIds.filter((item) => !visible.has(item)));
+      return;
+    }
+    onSelectionChange(Array.from(new Set([...selectedSkillIds, ...result.pending_items.map((item) => item.skill_id)])));
+  };
+
+  return (
+    <div className="rounded-2xl border bg-slate-50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-semibold">技能规则同步检查结果</div>
+        <Badge variant={result.pending_count > 0 ? "warning" : "success"}>
+          {result.pending_count > 0 ? `${result.pending_count} 条待同步` : "已同步"}
+        </Badge>
+      </div>
+      <div className="mt-3 grid gap-2 text-sm md:grid-cols-4">
+        <InfoMini label="structured" value={String(result.structured_total)} />
+        <InfoMini label="已一致" value={String(result.up_to_date_count)} />
+        <InfoMini label="待同步" value={String(result.pending_count)} />
+        <InfoMini label="已写入" value={String(result.applied_count)} />
+      </div>
+      <div className="mt-3 text-xs text-muted-foreground">
+        来源：{result.source} · transaction: {result.transaction}
+      </div>
+      {result.errors.length ? <ErrorBox text={result.errors.join("\n")} /> : null}
+      {result.applied_skill_ids.length ? (
+        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          已处理技能：{result.applied_skill_ids.join("、")}
+        </div>
+      ) : null}
+      {result.pending_items.length ? (
+        <div className="mt-4 space-y-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} />
+            选择/取消选择当前可见待同步规则
+          </label>
+          <div className="max-h-80 overflow-auto rounded-xl border bg-white">
+            {result.pending_items.map((item) => (
+              <label
+                key={item.skill_id}
+                className="flex cursor-pointer items-start gap-3 border-b p-3 text-sm last:border-b-0 hover:bg-slate-50"
+              >
+                <input
+                  className="mt-1"
+                  type="checkbox"
+                  checked={selectedSet.has(item.skill_id)}
+                  onChange={() => toggleOne(item.skill_id)}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{item.skill_name}</span>
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">{item.skill_id}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    变更字段：{item.changed_fields.join("、")}
+                    {item.review_notes ? ` · ${item.review_notes}` : ""}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {result.pending_items_truncated ? (
+            <div className="text-xs text-muted-foreground">待同步列表已截断，可提高列表上限查看更多。</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-3 text-sm text-muted-foreground">没有待同步的 structured 技能规则。</div>
+      )}
     </div>
   );
 }

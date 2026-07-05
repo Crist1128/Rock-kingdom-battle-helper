@@ -215,6 +215,54 @@ def test_modifier_resolver_uses_snapshot_effect_instances(db_session: Session) -
     assert context.damage_reductions == [Decimal("0.5")]
 
 
+def test_modifier_resolver_adds_dynamic_reduction_from_attacker_effect_layers() -> None:
+    """不可接触这类防御技能可按攻击方异常层数追加减伤。"""
+    context = DamageFormulaContext(
+        battle_id="battle_1",
+        attacker_side="self",
+        attacker_elf_id="elf_self",
+        defender_side="enemy",
+        defender_elf_id="elf_enemy",
+        snapshot_payload=[
+            {
+                "instance_id": "poison_self",
+                "effect_id": "effect_poison",
+                "owner_scope": "elf",
+                "owner_side": "self",
+                "owner_elf_id": "elf_self",
+                "layers": 2,
+            }
+        ],
+    )
+
+    details = ModifierResolver().resolve_formula_modifiers(
+        context,
+        {
+            "response_attack_success": True,
+            "defense_skill_rule": {
+                "source_id": "untouchable",
+                "damage_type": "defense_modifier",
+                "damage_reduction": 0.5,
+                "response_rule": {
+                    "target": "attack",
+                    "condition": "response_attack_success",
+                },
+                "dynamic_reduction_rule": {
+                    "source_effect_id": "effect_poison",
+                    "source_target": "opponent_active_elf",
+                    "damage_reduction_per_layer": 0.1,
+                },
+            },
+        },
+    )
+
+    assert context.damage_reductions == [Decimal("0.7")]
+    item = details["damage_reductions"]["items"][0]
+    assert item["reduction"] == "0.7"
+    assert item["dynamic_reduction"]["layers"] == "2"
+    assert item["dynamic_reduction"]["bonus_reduction"] == "0.2"
+
+
 def test_modifier_resolver_uses_rain_weather_multiplier(db_session: Session) -> None:
     """雨天应让水系攻击技能进入 1.75 天气倍率。"""
     context = DamageFormulaContext(

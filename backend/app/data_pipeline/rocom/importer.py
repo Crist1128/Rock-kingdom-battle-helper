@@ -71,6 +71,7 @@ SKILL_FIELDS = [
     "skill_name",
     "alias_names_json",
     "skill_icon",
+    "raw_description",
     "element_type",
     "skill_category",
     "base_power",
@@ -150,6 +151,10 @@ def upsert_skill(db: Session, row: dict[str, Any]) -> str:
     clean_row["effect_operations_json"] = _merged_effect_operations_json(
         current_json=skill.effect_operations_json,
         incoming_json=clean_row.get("effect_operations_json"),
+    )
+    clean_row["raw_description"] = _preserved_non_empty_value(
+        current_value=skill.raw_description,
+        incoming_value=clean_row.get("raw_description"),
     )
     for field in SKILL_FIELDS:
         setattr(skill, field, clean_row.get(field))

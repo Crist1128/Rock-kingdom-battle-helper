@@ -206,9 +206,41 @@ class DamageEventService:
             notes=payload.notes,
         )
         context = RuleResolver(self.db).resolve_damage_context(context, rule_payload)
+        skill_modifier = {"items": []}
+        if formula_type == "attack" and payload.skill_id:
+            slot_id = (
+                observed_skill_slot.get("slot_id")
+                if isinstance(observed_skill_slot, dict)
+                else None
+            )
+            skill_modifier = battle_service._skill_power_modifier_from_effects(
+                context,
+                loads_json(snapshot.full_snapshot_json, []),
+                str(slot_id or ""),
+            )
+            context.power_multiplier = (
+                Decimal(str(context.power_multiplier)) * skill_modifier["multiplier"]
+            )
+            context.flat_power_bonus = (
+                Decimal(str(context.flat_power_bonus)) + skill_modifier["flat_power_bonus"]
+            )
+            context.hit_count = max(
+                int(context.hit_count or 1) + int(skill_modifier["hit_count_delta"]),
+                1,
+            )
+            if skill_modifier["items"]:
+                context.rule_resolution_details["skill_modifier"] = skill_modifier["items"]
         damage_event.formula_context_json = dumps_json(context)
         damage_result = DamageCalculator().calculate(context)
         damage_event.calculation_confidence = damage_result.confidence
+        consumed_skill_modifiers = battle_service.consume_skill_modifier_effect_uses(
+            battle_event,
+            skill_modifier["items"],
+            reason="damage_event_skill_modifier_consumed",
+        )
+        if consumed_skill_modifiers:
+            effective_payload["consumed_skill_modifier_effects"] = consumed_skill_modifiers
+            battle_event.payload_json = dumps_json(effective_payload)
         estimate_observation_results = self._process_estimate_observations(
             damage_event=damage_event,
             payload=payload,
@@ -267,7 +299,7 @@ class DamageEventService:
         if payload.damage_display_type == DamageDisplayType.VISUAL_TOTAL_DAMAGE:
             return payload.final_total_damage_value
         if payload.damage_display_type == DamageDisplayType.COMBO_REPEATED_DAMAGE:
-            return None
+            return DamageEventService._computed_combo_total(payload)
         return payload.damage_value
 
     @staticmethod

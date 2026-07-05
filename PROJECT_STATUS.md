@@ -1,6 +1,6 @@
 # 当前项目状态
 
-更新日期：2026-06-12
+更新日期：2026-07-04
 
 ## 总体阶段
 
@@ -32,6 +32,10 @@
 - 旧敌方候选生成、候选摘要/详情/分页代码和 `/candidates/*` 已从当前代码中删除；主流程只维护实时面板估计。
 - 已实现 Observation API：支持伤害值、扣血百分比、技能出现、速度先后手等观测写入实时估计 evidence 和属性约束。
 - 已实现普通攻击最小伤害计算、P0 状态伤害计算、星陨伤害计算、伤害观测匹配、`RuleResolver` 雏形、`ModifierResolver` 与 `ResponseResolver` 最小闭环。
+- 2026-07-04 已补齐动态层数读取的第一批复杂分支：`不可接触` 可按攻击方中毒层数追加减伤，`以毒攻毒` 可按对方中毒层数动态施加魔攻增加层数；传动机制和技能槽位置条件仍暂不接入。
+- 2026-07-04 landed the second batch of 10 executable unfinished skill branches: `偷袭`, `倾泻`, `假寐`, `伺机而动`, `冰封`, `冰冻光线`, `冰捆缚`, `冰晶坠`, `冰雹`, `水环`; covered resource changes from effect layers, one-use skill modifier consumption, failed defense-response conditions, and all-skill energy-cost modifiers.
+- 2026-07-04 已补齐固定连击 P0 闭环：`hit_rule_json.hit_count` 可自动进入伤害公式和工作台理论伤害预览；手动录入的 `hit_count` 优先于静态规则；连击按单段伤害向下取整后乘段数，伤害事件会用单段×次数写入总伤害、资源扣血和实时估计上下文。
+- 设置页已新增 structured 技能规则同步检查入口：可列出 seed 中已完备但数据库未同步的技能分支，并由用户选择 dry-run 或确认写库；后端普通启动仍不会自动写入技能规则。
 - 星陨已按独立公式接入 `DamageCalculator`：触发条件看非幻系攻击技能，伤害按幻系计算克制/抵抗，攻防属性跟随触发技能类别。
 - Observation API 的伤害观测上下文已允许通过 payload 指定 `formula_type = status | starfall`；非普通攻击最小公式会先记录 unknown，后续纳入状态/天气新反推规则。
 - 阶段 A 已完成：`EffectDefinitionOut` 已扩展完整审阅字段，effect importer 已新增 `--status` 只读状态查询，前端类型和接口文档已同步。
@@ -76,6 +80,7 @@
 - 本地数据库已有真实 rocom 静态数据，当前活跃 rocom 精灵/技能已刷新到 `rocom_bwiki_20260609` 版本；数据库中活跃精灵 469 个、技能 497 个（含核心默认技能 1 个）、精灵可学习技能 22387 条、属性克制规则 113 条。线上详情页缺六维的 4 个精灵保留旧版本有效数据和旧 BWIKI 技能关系，避免空页面覆盖面板反推基础数据。
 - 30 种性格已拆为正式核心规则，后端启动时会幂等自检查并写入/修正。
 - P0 状态定义已可通过 `backend/app/seed/effect_definitions_p0.json` 和 effect importer 写入；当前工作库已导入 11 条 P0 状态定义，其中新增 `effect_physical_attack_up_100` 支撑力量增效。技能人工审阅、机制补齐和确认印记/蓄力时序机制额外补入 57 条属性/速度/技能层数/印记/行动修正状态，当前 active `effect_definition` 共 68 条。
+- 技能定义已新增 `raw_description` 原文中文描述字段，rocom 导入会写入 cleaned 的技能图鉴原文；规则库和战斗工作台技能卡优先展示该字段，`manual_review.notes` 仅作为人工审阅备注保留。
 - 技能人工审阅已完成 cleaned 全量 496 条；当前工作树只保留正式导入总文件 `backend/app/seed/manual_skill_effect_definitions_all_20260612.json` 和 `backend/app/seed/manual_skill_rule_reviews_all_20260612.json`。早期分批 JSON 归档已在整合后移除以缩减仓库体积，历史批次过程和结构缺口记录在 `docs/03_系统设计/技能规则人工审阅记录_v0.1.md`。
 
 ## 当前未完成内容

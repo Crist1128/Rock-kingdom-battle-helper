@@ -15,7 +15,7 @@ import type {
 export interface EstimatePanelSelection {
   elfId: string;
   stats: StatBlock | null;
-  source: "default_config" | "base_talent" | "unknown";
+  source: "default_config" | "expanded_config" | "base_talent" | "unknown";
   matchedCount: number;
   natureName?: string | null;
 }
@@ -44,10 +44,12 @@ export function EstimatePanel({
   battleId,
   elfId,
   onEstimateChange,
+  onDefaultConfigRefreshingChange,
 }: {
   battleId?: string | null;
   elfId?: string | null;
   onEstimateChange?: (selection: EstimatePanelSelection) => void;
+  onDefaultConfigRefreshingChange?: (refreshing: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const [defaultNatureId, setDefaultNatureId] = useState("");
@@ -68,16 +70,26 @@ export function EstimatePanel({
   const natures = useQuery({ queryKey: ["natures", "estimate-panel"], queryFn: () => api.natures.list({ limit: 100 }) });
   const natureMap = useMemo(() => new Map((natures.data ?? []).map((nature) => [nature.nature_id, nature.nature_name])), [natures.data]);
   const updateDefaultConfigMutation = useMutation({
+    onMutate: () => {
+      onDefaultConfigRefreshingChange?.(true);
+    },
     mutationFn: () =>
       api.estimates.updateDefaultConfig(battleId!, elfId!, {
         preset: "custom",
         nature_id: defaultNatureId,
         individual_talent_distribution: defaultTalents,
       }),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       queryClient.setQueryData(["enemy-estimate", battleId, elfId], result);
       setDefaultFormTouched(false);
+      await queryClient.invalidateQueries({
+        queryKey: ["battle-state", battleId],
+        refetchType: "active",
+      });
       queryClient.invalidateQueries({ queryKey: ["enemy-estimate", battleId, elfId] });
+    },
+    onSettled: () => {
+      onDefaultConfigRefreshingChange?.(false);
     },
   });
 
@@ -305,8 +317,13 @@ export function EstimatePanel({
               disabled={!canSaveDefaultConfig || !defaultNatureAllowed}
               onClick={() => updateDefaultConfigMutation.mutate()}
             >
-              {updateDefaultConfigMutation.isPending ? "保存中..." : "保存默认配置"}
+              {updateDefaultConfigMutation.isPending ? "保存并刷新理论伤害中..." : "保存默认配置"}
             </Button>
+            {updateDefaultConfigMutation.isPending ? (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-sky-700">
+                正在用新的默认配置重算工作台理论伤害，刷新完成前会隐藏旧伤害数值。
+              </div>
+            ) : null}
             {updateDefaultConfigMutation.error ? (
               <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
                 保存失败：{String(updateDefaultConfigMutation.error.message ?? "unknown error")}

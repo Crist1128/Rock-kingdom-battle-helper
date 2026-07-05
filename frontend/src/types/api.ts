@@ -74,6 +74,7 @@ export interface SkillDefinitionOut {
   skill_id: string;
   skill_name: string;
   skill_icon?: string | null;
+  raw_description?: string | null;
   element_type: string;
   skill_category: string;
   base_power?: number | null;
@@ -402,6 +403,11 @@ export interface BattleSkillSlotDict {
   effective_energy_cost?: number | null;
   priority_modifier?: number | null;
   attacker_element_types?: string[];
+  raw_description?: string | null;
+  skill_description?: string | null;
+  damage_rule_json?: string | null;
+  hit_rule_json?: string | null;
+  effect_operations_json?: string | null;
   power_preview?: {
     status?: string;
     base_power?: number | null;
@@ -436,7 +442,9 @@ export interface SkillDamageTargetPreview {
   defender_max_hp?: number | null;
   single_damage?: number | null;
   hit_count?: number | null;
+  hit_count_source?: string | null;
   total_damage?: number | null;
+  hit_rule?: Record<string, unknown> | null;
   multipliers?: Record<string, unknown>;
 }
 
@@ -948,6 +956,40 @@ export interface RocomLocalImportRequest {
   refresh_static?: boolean;
   /** Local import mode: incremental or full. */
   update_mode?: "incremental" | "full";
+}
+
+export interface StaticSkillRuleSyncItem {
+  skill_id: string;
+  skill_name: string;
+  review_status: string;
+  review_notes?: string | null;
+  changed_fields: string[];
+  has_damage_rule: boolean;
+  has_hit_rule: boolean;
+  has_effect_operations: boolean;
+}
+
+export interface StaticSkillRuleSyncRequest {
+  /** 是否实际提交数据库事务；false 为 dry-run。 */
+  commit?: boolean;
+  /** 只同步指定技能；留空表示同步全部待同步 structured 技能。 */
+  skill_ids?: string[] | null;
+}
+
+export interface StaticSkillRuleSyncResponse {
+  source: string;
+  total_rows: number;
+  status_counts: Record<string, number>;
+  structured_total: number;
+  up_to_date_count: number;
+  pending_count: number;
+  pending_items: StaticSkillRuleSyncItem[];
+  pending_items_truncated: boolean;
+  missing_skills: Array<Record<string, unknown>>;
+  errors: string[];
+  applied_skill_ids: string[];
+  applied_count: number;
+  transaction: string;
 }
 
 export interface RocomDataUpdateAccepted {

@@ -192,6 +192,49 @@ def test_rule_resolver_fills_skill_stab_and_single_type_multiplier(db_session: S
     assert result.explanation["rule_resolution_enabled"] is True
 
 
+def test_rule_resolver_uses_skill_fixed_hit_count(db_session: Session) -> None:
+    """固定连击技能应从 hit_rule_json 自动带入连击数。"""
+    skill = db_session.get(SkillDefinition, "fire_skill")
+    assert skill is not None
+    skill.hit_rule_json = dumps_json(
+        {
+            "damage_display_type": "combo_repeated_damage",
+            "runtime_record_strategy": "per_hit_damage",
+            "hit_count": 3,
+        }
+    )
+
+    context = RuleResolver(db_session).resolve_damage_context(
+        _context("grass_elf"),
+        {"resolve_rules": True},
+    )
+
+    assert context.hit_count == 3
+    assert context.damage_display_type == "combo_repeated_damage"
+    assert context.rule_resolution_details["hit_rule"]["source"] == "skill_hit_rule"
+    result = DamageCalculator().calculate(context)
+    assert result.explanation["single_damage"] == 225
+    assert result.explanation["hit_count"] == 3
+    assert result.explanation["hit_count_source"] == "skill_hit_rule"
+    assert result.damage_value == 675
+
+
+def test_rule_resolver_manual_hit_count_overrides_skill_rule(db_session: Session) -> None:
+    """用户手动观测到的连击数应优先于静态技能库。"""
+    skill = db_session.get(SkillDefinition, "fire_skill")
+    assert skill is not None
+    skill.hit_rule_json = dumps_json({"hit_count": 3})
+
+    context = RuleResolver(db_session).resolve_damage_context(
+        _context("grass_elf"),
+        {"resolve_rules": True, "hit_count": 2},
+    )
+
+    assert context.hit_count == 2
+    assert context.rule_resolution_details["hit_rule"]["source"] == "manual_payload"
+    assert context.rule_resolution_details["hit_rule"]["skill_hit_count"] == 3
+
+
 def test_rule_resolver_combines_dual_type_by_project_rule(db_session: Session) -> None:
     """双属性一克制一抵抗时，项目规则要求合并为 1，而不是简单相乘。"""
     context = RuleResolver(db_session).resolve_damage_context(

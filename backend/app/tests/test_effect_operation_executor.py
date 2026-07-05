@@ -447,6 +447,235 @@ def test_dynamic_apply_effect_uses_existing_layers(
     assert payload["effect_operation_results"][0]["layers_after"] == 4
 
 
+def test_dynamic_apply_effect_reads_opponent_effect_layers(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """以毒攻毒可读取敌方中毒层数，并按倍率转成己方魔攻增益层数。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_poison_power", layers=1)
+        session.add_all([_poison_definition(), _magic_attack_up_definition()])
+        session.flush()
+        skill = session.get(SkillDefinition, "skill_poison_power")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "dynamic_apply_effect",
+                    "effect_id": "effect_magic_attack_up_layered",
+                    "target": "self",
+                    "layers_from": "opponent_existing_effect_layers",
+                    "source_effect_id": "effect_poison",
+                    "layers_multiplier": 3,
+                    "timing": "on_skill_use",
+                }
+            ]
+        )
+        session.add(
+            BattleEffectInstance(
+                instance_id="enemy_poison",
+                battle_id="battle_ops",
+                effect_id="effect_poison",
+                category="abnormal",
+                owner_scope="elf",
+                owner_side="enemy",
+                owner_elf_id="elf_enemy",
+                layers=2,
+                is_active=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.SKILL_USE.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_poison_power",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    result = payload["effect_operation_results"][0]
+    assert result["status"] == "executed"
+    assert result["layers_after"] == 6
+    with session_factory() as session:
+        instance = session.scalars(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == "battle_ops",
+                BattleEffectInstance.effect_id == "effect_magic_attack_up_layered",
+                BattleEffectInstance.owner_side == "self",
+                BattleEffectInstance.owner_elf_id == "elf_self",
+                BattleEffectInstance.is_active.is_(True),
+            )
+        ).first()
+        assert instance is not None
+        assert instance.layers == 6
+
+
+def test_resource_change_from_effect_layers_gains_energy(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """冰封这类分支可按敌方当前异常层数回复能量。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_freeze_energy", layers=1)
+        session.get(BattleElfState, "state_self").energy = 1
+        session.add(
+            EffectDefinition(
+                effect_id="effect_freeze",
+                effect_name="冻结",
+                category="abnormal",
+                polarity="negative",
+                display_group="abnormal",
+                display_priority=1,
+                owner_scope="elf",
+                target_scope="single_elf",
+                attach_target_type="elf",
+                stack_rule="add_layers",
+            )
+        )
+        session.flush()
+        skill = session.get(SkillDefinition, "skill_freeze_energy")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "resource_change_from_effect_layers",
+                    "source_effect_id": "effect_freeze",
+                    "source_target": "enemy_side",
+                    "resource_type": "energy",
+                    "change_type": "gain",
+                    "value_per_layer": 1,
+                    "target": "actor_side",
+                }
+            ]
+        )
+        session.add(
+            BattleEffectInstance(
+                instance_id="enemy_freeze",
+                battle_id="battle_ops",
+                effect_id="effect_freeze",
+                category="abnormal",
+                owner_scope="elf",
+                owner_side="enemy",
+                owner_elf_id="elf_enemy",
+                layers=3,
+                is_active=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.SKILL_USE.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_freeze_energy",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    result = payload["effect_operation_results"][0]
+    assert result["operation"] == "resource_change_from_effect_layers"
+    assert result["source_layers"] == 3
+    assert result["value"] == 3
+    with session_factory() as session:
+        state = session.get(BattleElfState, "state_self")
+        assert state is not None
+        assert state.energy == 4
+        resource_event = session.scalar(
+            select(ResourceChangeEvent).where(
+                ResourceChangeEvent.battle_id == "battle_ops",
+                ResourceChangeEvent.resource_type == "energy",
+            )
+        )
+        assert resource_event is not None
+        assert resource_event.value == 3
+
+
+def test_clear_effects_supports_failed_response_condition(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """倾泻可用 response_defense_success=false 触发防御应对失败分支。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_clear_marks", layers=1)
+        skill = session.get(SkillDefinition, "skill_clear_marks")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "clear_effects",
+                    "target": "field",
+                    "categories": ["mark"],
+                    "condition": "response_defense_failed",
+                }
+            ]
+        )
+        session.add(
+            BattleEffectInstance(
+                instance_id="self_mark",
+                battle_id="battle_ops",
+                effect_id="effect_starfall_mark",
+                category="mark",
+                owner_scope="side",
+                owner_side="self",
+                layers=1,
+                is_active=True,
+            )
+        )
+        session.add(
+            BattleEffectInstance(
+                instance_id="enemy_mark",
+                battle_id="battle_ops",
+                effect_id="effect_starfall_mark",
+                category="mark",
+                owner_scope="side",
+                owner_side="enemy",
+                layers=2,
+                is_active=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.SKILL_USE.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_clear_marks",
+            "payload_json": dumps_json(
+                {"condition_flags": {"response_defense_success": False}}
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    result = payload["effect_operation_results"][0]
+    assert result["operation"] == "clear_effects"
+    assert result["status"] == "executed"
+    assert len(result["removed_effects"]) == 2
+    with session_factory() as session:
+        assert session.get(BattleEffectInstance, "self_mark").is_active is False
+        assert session.get(BattleEffectInstance, "enemy_mark").is_active is False
+
+
 def test_change_weather_replaces_existing_weather(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
@@ -1136,6 +1365,64 @@ def _physical_attack_up_definition() -> EffectDefinition:
                     {
                         "modifier_type": "stat_stage",
                         "stat": "physical_attack",
+                        "value_type": "percent_add",
+                        "value_per_layer": 0.1,
+                    }
+                ],
+            }
+        ),
+    )
+
+
+def _poison_definition() -> EffectDefinition:
+    """构造中毒状态定义。"""
+    return EffectDefinition(
+        effect_id="effect_poison",
+        effect_name="中毒",
+        category="abnormal",
+        polarity="negative",
+        display_group="abnormal",
+        display_priority=110,
+        owner_scope="elf",
+        target_scope="single_elf",
+        attach_target_type="elf",
+        is_visible_icon=True,
+        is_recognizable_by_icon=False,
+        default_layers=1,
+        max_layers=None,
+        stack_rule="add_layers",
+        duration_type="until_removed",
+        clear_on_switch=True,
+    )
+
+
+def _magic_attack_up_definition() -> EffectDefinition:
+    """构造以毒攻毒使用的魔攻层数状态。"""
+    return EffectDefinition(
+        effect_id="effect_magic_attack_up_layered",
+        effect_name="魔攻增加",
+        category="stat_modifier",
+        polarity="positive",
+        display_group="stat_modifier_layered",
+        display_priority=300,
+        owner_scope="elf",
+        target_scope="single",
+        attach_target_type="elf",
+        is_visible_icon=True,
+        is_recognizable_by_icon=True,
+        default_layers=1,
+        max_layers=None,
+        stack_rule="add_layers",
+        duration_type="until_switch_or_cleanse",
+        clear_on_switch=True,
+        clear_by_stat_clear=True,
+        stat_modifier_json=dumps_json(
+            {
+                "modifier_type": "stat_stage",
+                "modifiers": [
+                    {
+                        "modifier_type": "stat_stage",
+                        "stat": "magic_attack",
                         "value_type": "percent_add",
                         "value_per_layer": 0.1,
                     }

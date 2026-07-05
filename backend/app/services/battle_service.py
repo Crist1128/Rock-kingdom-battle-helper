@@ -710,6 +710,11 @@ class BattleService:
                 slot["static_base_power"] = skill.base_power
                 slot["base_energy_cost"] = skill.base_energy_cost
                 slot["priority_modifier"] = skill.priority_modifier
+                slot["damage_rule_json"] = skill.damage_rule_json
+                slot["hit_rule_json"] = skill.hit_rule_json
+                slot["effect_operations_json"] = skill.effect_operations_json
+                slot["raw_description"] = skill.raw_description
+                slot["skill_description"] = self._skill_original_description(skill)
                 slot["effective_energy_cost"] = (
                     slot.get("current_energy_cost")
                     if slot.get("current_energy_cost") is not None
@@ -766,6 +771,41 @@ class BattleService:
                 str(item.get("skill_id") or ""),
             ),
         )
+
+    @staticmethod
+    def _skill_original_description(skill: SkillDefinition) -> str | None:
+        """提取技能原始描述，优先使用爬虫/清洗阶段保留的 raw_description。"""
+        if skill.raw_description and skill.raw_description.strip():
+            return skill.raw_description.strip()
+        rule_jsons = (
+            skill.damage_rule_json,
+            skill.effect_operations_json,
+            skill.hit_rule_json,
+        )
+        for rule_json in rule_jsons:
+            description = BattleService._raw_description_from_json(rule_json)
+            if description:
+                return description
+        return None
+
+    @staticmethod
+    def _raw_description_from_json(raw_json: str | None) -> str | None:
+        value = loads_json(raw_json, None)
+        if isinstance(value, dict):
+            raw_description = value.get("raw_description")
+            if isinstance(raw_description, str) and raw_description.strip():
+                return raw_description.strip()
+        if isinstance(value, list):
+            descriptions: list[str] = []
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                raw_description = item.get("raw_description")
+                if isinstance(raw_description, str) and raw_description.strip():
+                    descriptions.append(raw_description.strip())
+            if descriptions:
+                return "；".join(dict.fromkeys(descriptions))
+        return None
 
     def _battle_speed_preview(
         self,
@@ -1256,7 +1296,9 @@ class BattleService:
             "defender_max_hp": defender_panel.hp,
             "single_damage": explanation.get("single_damage"),
             "hit_count": explanation.get("hit_count"),
+            "hit_count_source": explanation.get("hit_count_source"),
             "total_damage": explanation.get("total_damage"),
+            "hit_rule": rule_details.get("hit_rule") if isinstance(rule_details, dict) else None,
             "multipliers": {
                 "display_power": explanation.get("display_power"),
                 "stab": self._rule_detail_value(rule_details, "stab_multiplier"),
@@ -1409,6 +1451,9 @@ class BattleService:
                 continue
             if definition.category == "weather":
                 continue
+            remaining_uses = item.get("remaining_uses")
+            if isinstance(remaining_uses, int | float) and int(remaining_uses) <= 0:
+                continue
             if not self._skill_modifier_snapshot_item_applies(context, item, slot_id):
                 continue
             rule = loads_json(definition.skill_modifier_json, {})
@@ -1455,8 +1500,10 @@ class BattleService:
             items.append(
                 {
                     "effect_id": definition.effect_id,
+                    "effect_instance_id": item.get("instance_id"),
                     "effect_name": definition.effect_name,
                     "modifier_type": rule.get("modifier_type"),
+                    "remaining_uses": remaining_uses,
                     "layers": str(layers),
                     "multiplier": str(rule_multiplier or Decimal("1")),
                     "power_add": str(item_power_add),
@@ -2250,6 +2297,13 @@ class BattleService:
         )
         if consume_result:
             summary["energy_consumption"] = consume_result
+        consumed_modifiers = self.consume_skill_modifier_effect_uses(
+            event,
+            energy_modifier["items"],
+            reason="skill_use_cost_modifier_consumed",
+        )
+        if consumed_modifiers:
+            summary["consumed_skill_modifier_effects"] = consumed_modifiers
         if slot is not None:
             hook_results = self._apply_executable_skill_runtime_hooks(event, skill, slot)
             if hook_results:
@@ -2258,6 +2312,94 @@ class BattleService:
             summary["charge"] = charge_state
             self._apply_charge_state_resolution(event, skill, charge_state)
         return summary
+
+    def consume_skill_modifier_effect_uses(
+        self,
+        event: BattleEvent,
+        modifier_items: list[dict],
+        *,
+        reason: str,
+    ) -> list[dict]:
+        """消耗本次实际参与结算的一次性技能修正状态。"""
+        results: list[dict] = []
+        consumed_instance_ids: set[str] = set()
+        for item in modifier_items:
+            if not isinstance(item, dict):
+                continue
+            remaining_uses = item.get("remaining_uses")
+            if remaining_uses is None:
+                continue
+            try:
+                remaining_uses_int = int(remaining_uses)
+            except (TypeError, ValueError):
+                continue
+            if remaining_uses_int <= 0:
+                continue
+            instance_id = item.get("effect_instance_id")
+            if not isinstance(instance_id, str) or not instance_id:
+                continue
+            if instance_id in consumed_instance_ids:
+                continue
+            instance = self.db.get(BattleEffectInstance, instance_id)
+            if (
+                instance is None
+                or instance.battle_id != event.battle_id
+                or not instance.is_active
+            ):
+                continue
+            definition = self.db.get(EffectDefinition, instance.effect_id)
+            if definition is None or definition.deleted_at is not None:
+                continue
+
+            layers_before = instance.layers
+            uses_before = instance.remaining_uses
+            next_uses = max(int(instance.remaining_uses or remaining_uses_int) - 1, 0)
+            instance.remaining_uses = next_uses
+            instance.last_updated_turn = event.turn_number
+            if next_uses <= 0:
+                instance.is_active = False
+                instance.layers = 0
+            self.db.add(
+                EffectChangeEvent(
+                    event_id=f"effect_change_{uuid4().hex}",
+                    battle_id=event.battle_id,
+                    battle_event_id=event.event_id,
+                    turn_number=event.turn_number,
+                    change_type="consume_use" if next_uses > 0 else "clear",
+                    effect_instance_id=instance.instance_id,
+                    effect_id=definition.effect_id,
+                    effect_name=definition.effect_name,
+                    category=definition.category,
+                    target_side=instance.owner_side,
+                    target_elf_id=instance.owner_elf_id,
+                    target_skill_slot_id=instance.owner_skill_slot_id,
+                    owner_scope=instance.owner_scope,
+                    layers_before=layers_before,
+                    layers_after=instance.layers,
+                    duration_before=uses_before,
+                    duration_after=next_uses,
+                    source_skill_id=event.skill_id,
+                    source_elf_id=event.actor_elf_id,
+                    condition_branch=None,
+                    reason=reason,
+                    source=EventSource.SYSTEM_CALCULATED.value,
+                    recognition_confidence=1.0,
+                    manual_override=False,
+                )
+            )
+            consumed_instance_ids.add(instance_id)
+            results.append(
+                {
+                    "status": "consumed",
+                    "effect_id": definition.effect_id,
+                    "effect_instance_id": instance.instance_id,
+                    "remaining_uses_before": uses_before,
+                    "remaining_uses_after": next_uses,
+                    "layers_before": layers_before,
+                    "layers_after": instance.layers,
+                }
+            )
+        return results
 
     def _apply_skill_use_mark_triggers(
         self,

@@ -84,6 +84,7 @@ class SkillDefinitionOut(ORMBase):
     Attributes:
         skill_id: 技能唯一标识
         skill_name: 技能显示名称
+        raw_description: 技能图鉴原始中文效果描述
         element_type: 技能系别类型
         skill_category: 技能类别
         base_power: 基础威力（None 表示无威力值）
@@ -95,6 +96,7 @@ class SkillDefinitionOut(ORMBase):
     """
     skill_id: str
     skill_name: str
+    raw_description: str | None = None
     element_type: str
     skill_category: str
     base_power: int | None = None

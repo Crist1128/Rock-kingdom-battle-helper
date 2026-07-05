@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.calculation.formula_context import DamageFormulaContext
+from app.calculation.hit_rule_resolver import HitRuleResolver
 from app.calculation.modifier_resolver import ModifierResolver
 from app.calculation.response_resolver import ResponseResolver
 from app.models.battle import BattleSkillSlot
@@ -35,6 +36,7 @@ class RuleResolver:
 
     def __init__(self, db: Session | None = None) -> None:
         self.db = db
+        self.hit_rule_resolver = HitRuleResolver(db)
         self.modifier_resolver = ModifierResolver(db)
         self.response_resolver = ResponseResolver()
 
@@ -56,6 +58,7 @@ class RuleResolver:
         self._fill_skill_definition(context, details)
         self._fill_runtime_skill_slot(context, details)
         self._fill_element_types(context, payload, details)
+        details.update(self.hit_rule_resolver.resolve_hit_rule(context, payload))
         self._load_attack_skill_response_rule(context, payload, details)
         self._record_condition_flags(payload, details)
         details.update(self.response_resolver.resolve_response_modifiers(context, payload))
