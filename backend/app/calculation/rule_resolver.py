@@ -24,6 +24,7 @@ from app.calculation.formula_context import DamageFormulaContext
 from app.calculation.hit_rule_resolver import HitRuleResolver
 from app.calculation.modifier_resolver import ModifierResolver
 from app.calculation.response_resolver import ResponseResolver
+from app.core.element_aliases import canonical_element_type, element_type_matches
 from app.models.battle import BattleSkillSlot
 from app.models.static import ElfDefinition, SkillDefinition, TypeEffectivenessRule
 from app.utils.json import loads_json
@@ -264,7 +265,10 @@ class RuleResolver:
 
         context.stab_multiplier = (
             self.DEFAULT_STAB_MULTIPLIER
-            if context.skill_element_type in context.attacker_element_types
+            if any(
+                element_type_matches(context.skill_element_type, attacker_type)
+                for attacker_type in context.attacker_element_types
+            )
             else Decimal("1")
         )
         details["stab_multiplier"] = {
@@ -357,14 +361,29 @@ class RuleResolver:
         """读取单属性克制倍率；缺失规则按数学文档视为 1。"""
         if self.db is None:
             return Decimal("1")
+        attack_candidates = self._element_type_lookup_candidates(attack_type)
+        defense_candidates = self._element_type_lookup_candidates(defense_type)
         stmt = select(TypeEffectivenessRule.multiplier).where(
-            TypeEffectivenessRule.attack_element_type == attack_type,
-            TypeEffectivenessRule.defense_element_type == defense_type,
+            TypeEffectivenessRule.attack_element_type.in_(attack_candidates),
+            TypeEffectivenessRule.defense_element_type.in_(defense_candidates),
         )
         value = self.db.scalar(stmt)
         if value is None:
             return Decimal("1")
         return self._to_decimal(value)
+
+
+    @staticmethod
+    def _element_type_lookup_candidates(value: str) -> list[str]:
+        """返回属性克制表查询候选值，兼容 rocom 英文值与旧 seed/测试中的中文值。"""
+        candidates: list[str] = []
+        canonical = canonical_element_type(value)
+        if canonical:
+            candidates.append(canonical)
+        raw = str(value).strip()
+        if raw and raw not in candidates:
+            candidates.append(raw)
+        return candidates
 
     def _load_elf_element_types(self, elf_id: str) -> list[str]:
         """从精灵定义读取系别。"""

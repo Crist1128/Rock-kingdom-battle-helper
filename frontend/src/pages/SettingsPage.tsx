@@ -52,6 +52,7 @@ export function SettingsPage() {
   const [lastCheckResult, setLastCheckResult] = useState<RocomCheckResponse | null>(null);
   const [lastAcceptedJob, setLastAcceptedJob] = useState<RocomDataUpdateAccepted | null>(null);
   const [staticRuleCheckLimit, setStaticRuleCheckLimit] = useState("100");
+  const [staticRuleSearch, setStaticRuleSearch] = useState("");
   const [lastStaticRuleResult, setLastStaticRuleResult] =
     useState<StaticSkillRuleSyncResponse | null>(null);
   const [selectedStaticRuleSkillIds, setSelectedStaticRuleSkillIds] = useState<string[]>([]);
@@ -167,7 +168,7 @@ export function SettingsPage() {
   const staticRuleCheckMutation = useMutation({
     mutationFn: () =>
       api.adminDataUpdates.checkStaticSkillRules(
-        { limit: toNumber(staticRuleCheckLimit, 100) },
+        { limit: toNumber(staticRuleCheckLimit, 100), q: emptyToNull(staticRuleSearch) },
         adminToken || undefined,
       ),
     onSuccess: (result) => {
@@ -182,6 +183,7 @@ export function SettingsPage() {
         {
           commit: payload.commit,
           skill_ids: payload.skillIds,
+          q: payload.skillIds ? null : emptyToNull(staticRuleSearch),
         },
         adminToken || undefined,
       ),
@@ -427,6 +429,14 @@ export function SettingsPage() {
                   onChange={(event) => setStaticRuleCheckLimit(event.target.value.replace(/[^0-9]/g, ""))}
                 />
               </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium">技能名 / ID 筛选</span>
+                <Input
+                  value={staticRuleSearch}
+                  placeholder="例如：三连破、花炮"
+                  onChange={(event) => setStaticRuleSearch(event.target.value)}
+                />
+              </label>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -472,13 +482,14 @@ export function SettingsPage() {
               <Button
                 variant="secondary"
                 onClick={() => {
-                  if (window.confirm("确认写入所有待同步 structured 技能规则？建议先查看列表。")) {
+                  const scopeText = staticRuleSearch.trim() ? `当前筛选“${staticRuleSearch.trim()}”下的` : "所有";
+                  if (window.confirm(`确认写入${scopeText}待同步 structured 技能规则？建议先查看列表。`)) {
                     staticRuleSyncMutation.mutate({ commit: true, skillIds: null });
                   }
                 }}
                 disabled={staticRuleSyncMutation.isPending || !lastStaticRuleResult?.pending_count}
               >
-                写入全部待同步
+                {staticRuleSearch.trim() ? "写入当前筛选待同步" : "写入全部待同步"}
               </Button>
             </div>
             {staticRuleCheckError ? <ErrorBox text={staticRuleCheckError} /> : null}
@@ -780,6 +791,7 @@ function StaticSkillRuleSyncPanel({
       </div>
       <div className="mt-3 text-xs text-muted-foreground">
         来源：{result.source} · transaction: {result.transaction}
+        {result.query ? ` · 筛选：${result.query}` : ""}
       </div>
       {result.errors.length ? <ErrorBox text={result.errors.join("\n")} /> : null}
       {result.applied_skill_ids.length ? (
@@ -817,7 +829,9 @@ function StaticSkillRuleSyncPanel({
             ))}
           </div>
           {result.pending_items_truncated ? (
-            <div className="text-xs text-muted-foreground">待同步列表已截断，可提高列表上限查看更多。</div>
+            <div className="text-xs text-muted-foreground">
+              待同步列表已截断，可提高列表上限或输入技能名/ID 精确筛选。
+            </div>
           ) : null}
         </div>
       ) : (

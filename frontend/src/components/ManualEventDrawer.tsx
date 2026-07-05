@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -10,13 +10,15 @@ import { useAppStore } from "@/store/useAppStore";
 import { buildEffectLayerSummary } from "@/lib/effectLayerSummary";
 import { buildDamageObservationPayloadV1 } from "@/lib/observationPayload";
 import { sideName } from "@/lib/utils";
-import type { BattleElfStateDict, BattleEventOut, DamageDisplayType, DamageEventCreateResult, EffectDefinitionOut, ObservationCreate, PanelStatsInput, Side, SkillDefinitionOut } from "@/types/api";
+import type { BattleEffectInstanceDict, BattleElfStateDict, BattleEventOut, BattleStateOut, DamageDisplayType, DamageEventCreateResult, EffectDefinitionOut, ObservationCreate, PanelStatsInput, Side, SkillDefinitionOut } from "@/types/api";
 
 interface PlannedActionPrefill {
   kind?: string;
   skillId?: string | null;
   switchElfId?: string | null;
 }
+
+type BattleFormState = Pick<BattleStateOut, "battle" | "elves"> & Partial<Pick<BattleStateOut, "active_effects" | "skill_slots">>;
 
 export function ManualEventDrawer({
   battleId,
@@ -26,7 +28,7 @@ export function ManualEventDrawer({
   plannedActionBySide,
 }: {
   battleId?: string | null;
-  state?: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } };
+  state?: BattleFormState;
   onSkillEventResult?: (event: BattleEventOut) => void;
   onDamageEventResult?: (result: DamageEventCreateResult) => void;
   plannedActionBySide?: Partial<Record<Side, PlannedActionPrefill>>;
@@ -92,7 +94,7 @@ function SkillUseForm({
   onDone,
 }: {
   battleId: string;
-  state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } };
+  state: BattleFormState;
   defaultSide?: Side | null;
   plannedAction?: PlannedActionPrefill;
   onStatusDamageDone?: (result: DamageEventCreateResult) => void;
@@ -123,6 +125,9 @@ function SkillUseForm({
   const [statusDamageTolerance, setStatusDamageTolerance] = useState(0);
   const [statusDamageSectionOpen, setStatusDamageSectionOpen] = useState(plannedAction?.kind === "status_skill");
   const [autoPrefilledKey, setAutoPrefilledKey] = useState<string | null>(null);
+  const [skillHitCount, setSkillHitCount] = useState(1);
+  const [hitCountManuallyEdited, setHitCountManuallyEdited] = useState(false);
+  const [hitCountPrefilledSkillId, setHitCountPrefilledSkillId] = useState<string | null>(null);
   const actorElfId = actorSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
   const targetElfId = targetSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
   const statusDamageDefenderElfId = statusDamageDefenderSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
@@ -130,16 +135,56 @@ function SkillUseForm({
   const statusDamageSourceElfId = statusDamageSourceSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
   const statusDamageDefenderElf = state.elves.find((elf) => elf.side === statusDamageDefenderSide && elf.elf_id === statusDamageDefenderElfId);
   const statusLayerSummary = buildEffectLayerSummary(selectedStatusEffect ?? undefined, statusDamageLayers);
+  const conditionFlags = buildConditionFlags({
+    response_attack_success: optionalBool(responseAttackSuccess),
+    response_defense_success: optionalBool(responseDefenseSuccess),
+    response_status_success: optionalBool(responseStatusSuccess),
+    actor_moves_before_target: actorMovesBeforeTarget || undefined,
+    actor_moves_after_target: actorMovesAfterTarget || undefined,
+    target_switched_this_turn: targetSwitchedThisTurn || undefined,
+  });
   const selectedSkillQuery = useQuery({
     queryKey: ["skill", skillId],
     queryFn: () => api.skills.get(skillId!),
     enabled: Boolean(skillId),
     retry: false,
   });
-  const inferredStatusPrefill = useMemo(
-    () => buildStatusEffectPrefill(selectedSkillQuery.data, actorSide, targetSide),
-    [actorSide, selectedSkillQuery.data, targetSide],
+  const activeEffectIds = useMemo(
+    () => Array.from(new Set((state.active_effects ?? [])
+      .filter((effect) => effect.is_active !== false && Boolean(effect.effect_id))
+      .map((effect) => effect.effect_id))),
+    [state.active_effects],
   );
+  const activeEffectDefinitionQueries = useQueries({
+    queries: activeEffectIds.map((effectId) => ({
+      queryKey: ["effect", effectId],
+      queryFn: () => api.effects.get(effectId),
+      retry: false,
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+  const activeEffectDefinitions = new Map<string, EffectDefinitionOut>();
+  activeEffectDefinitionQueries.forEach((query, index) => {
+    if (query.data) activeEffectDefinitions.set(activeEffectIds[index], query.data);
+  });
+  const inferredStatusPrefill = useMemo(
+    () => buildStatusEffectPrefill(selectedSkillQuery.data, actorSide, targetSide, skillHitCount),
+    [actorSide, selectedSkillQuery.data, skillHitCount, targetSide],
+  );
+  const comboPrefill = useMemo(
+    () => buildComboDamagePrefill(selectedSkillQuery.data),
+    [selectedSkillQuery.data],
+  );
+  const effectiveComboPrefill = buildEffectiveComboPrefill({
+    basePrefill: comboPrefill,
+    skill: selectedSkillQuery.data,
+    activeEffects: state.active_effects ?? [],
+    effectDefinitions: activeEffectDefinitions,
+    skillSlots: state.skill_slots ?? [],
+    actorSide,
+    actorElfId,
+    conditionFlags,
+  });
   const selectedStatusEffectQuery = useQuery({
     queryKey: ["effect", statusEffectId],
     queryFn: () => api.effects.get(statusEffectId!),
@@ -156,7 +201,18 @@ function SkillUseForm({
   useEffect(() => {
     if (!skillId) {
       setAutoPrefilledKey(null);
+      setHitCountPrefilledSkillId(null);
       return;
+    }
+    if (
+      hitCountPrefilledSkillId !== effectiveComboPrefill.prefillKey
+      && selectedSkillQuery.data?.skill_id === skillId
+      && comboPrefill.isCombo
+    ) {
+      if (effectiveComboPrefill.hitCount !== null && !hitCountManuallyEdited) {
+        setSkillHitCount(effectiveComboPrefill.hitCount);
+      }
+      setHitCountPrefilledSkillId(effectiveComboPrefill.prefillKey);
     }
     if (!inferredStatusPrefill) {
       if (autoPrefilledKey) {
@@ -168,7 +224,7 @@ function SkillUseForm({
       }
       return;
     }
-    const nextPrefillKey = `${skillId}:${actorSide}:${targetSide}`;
+    const nextPrefillKey = `${skillId}:${actorSide}:${targetSide}:${inferredStatusPrefill.effectId}:${inferredStatusPrefill.layers}`;
     if (autoPrefilledKey === nextPrefillKey) return;
     setStatusEffectId(inferredStatusPrefill.effectId);
     setSelectedStatusEffect(null);
@@ -177,7 +233,20 @@ function SkillUseForm({
     setStatusDamageSectionOpen(true);
     setRecordStatusDamage(false);
     setAutoPrefilledKey(nextPrefillKey);
-  }, [actorSide, autoPrefilledKey, inferredStatusPrefill, skillId, targetSide]);
+  }, [
+    actorSide,
+    autoPrefilledKey,
+    comboPrefill.hitCount,
+    comboPrefill.isCombo,
+    effectiveComboPrefill.hitCount,
+    effectiveComboPrefill.prefillKey,
+    hitCountManuallyEdited,
+    hitCountPrefilledSkillId,
+    inferredStatusPrefill,
+    selectedSkillQuery.data?.skill_id,
+    skillId,
+    targetSide,
+  ]);
 
   useEffect(() => {
     if (!inferredStatusPrefill) setStatusDamageDefenderSide(targetSide);
@@ -202,14 +271,6 @@ function SkillUseForm({
     );
   };
 
-  const conditionFlags = buildConditionFlags({
-    response_attack_success: optionalBool(responseAttackSuccess),
-    response_defense_success: optionalBool(responseDefenseSuccess),
-    response_status_success: optionalBool(responseStatusSuccess),
-    actor_moves_before_target: actorMovesBeforeTarget || undefined,
-    actor_moves_after_target: actorMovesAfterTarget || undefined,
-    target_switched_this_turn: targetSwitchedThisTurn || undefined,
-  });
   const mutation = useMutation({
     mutationFn: async () => {
       const skillEvent = await api.battles.createSkillEvent(battleId, {
@@ -221,6 +282,10 @@ function SkillUseForm({
         skill_id: skillId!,
         skill_confirmed: Boolean(skillId),
         condition_flags: Object.keys(conditionFlags).length > 0 ? conditionFlags : undefined,
+        hit_count: comboPrefill.isCombo || skillHitCount > 1 ? skillHitCount : undefined,
+        combo_count_source: comboPrefill.isCombo || skillHitCount > 1
+          ? (hitCountManuallyEdited ? "manual_input" : effectiveComboPrefill.source)
+          : undefined,
         notes,
       });
       const statusDamageResult = recordStatusDamage && statusEffectId && statusDamageValue > 0
@@ -258,8 +323,17 @@ function SkillUseForm({
       <SkillSearchSelect
         label="使用技能"
         value={skillId}
-        onChange={(id) => {
+        onChange={(id, item) => {
           setSkillId(id);
+          setHitCountManuallyEdited(false);
+          setHitCountPrefilledSkillId(null);
+          const prefill = buildComboDamagePrefill(item);
+          if (prefill.isCombo && prefill.hitCount !== null) {
+            setSkillHitCount(prefill.hitCount);
+            setHitCountPrefilledSkillId(id);
+          } else if (!prefill.isCombo) {
+            setSkillHitCount(1);
+          }
           setAutoPrefilledKey(null);
           setStatusEffectId(null);
           setSelectedStatusEffect(null);
@@ -269,6 +343,24 @@ function SkillUseForm({
         elfId={actorElfId}
         resultsMode="focus"
       />
+      {comboPrefill.isCombo ? (
+        <div className="rounded-2xl border bg-slate-50 p-3 text-sm">
+          <NumberField
+            label="连击次数"
+            value={skillHitCount}
+            onChange={(value) => {
+              setSkillHitCount(Math.max(1, value || 1));
+              setHitCountManuallyEdited(true);
+            }}
+          />
+          <div className="mt-2 text-xs text-muted-foreground">
+            当前状态技能会把这个连击次数写入事件；后端按技能规则计算状态层数时优先使用这里的手动值。
+            {effectiveComboPrefill.modifierDelta !== 0
+              ? ` 已按场上连击数状态自动修正 ${effectiveComboPrefill.modifierDelta > 0 ? "+" : ""}${effectiveComboPrefill.modifierDelta}。`
+              : ""}
+          </div>
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ResponseResultSelect label="应对攻击" value={responseAttackSuccess} onChange={setResponseAttackSuccess} />
         <ResponseResultSelect label="应对防御" value={responseDefenseSuccess} onChange={setResponseDefenseSuccess} />
@@ -400,6 +492,7 @@ function buildStatusEffectPrefill(
   skill: SkillDefinitionOut | undefined,
   actorSide: Side,
   targetSide: Side,
+  currentHitCount: number,
 ): StatusEffectPrefill | null {
   const operations = parseEffectOperations(skill?.effect_operations_json);
   for (const operation of operations) {
@@ -407,12 +500,24 @@ function buildStatusEffectPrefill(
     if (!["apply_effect", "add_layers", "dynamic_apply_effect"].includes(opType ?? "")) continue;
     const effectId = asString(operation.effect_id);
     if (!effectId) continue;
-    const layers = firstPositiveInteger(
+    const staticLayers = firstPositiveInteger(
       operation.layers,
       operation.add_layers,
       operation.layer_delta,
       operation.default_layers,
     );
+    const layersPerHit = firstPositiveInteger(
+      operation.layers_per_hit,
+      operation.layers_per_combo,
+      operation.layers_multiplier,
+      operation.layers_per_source_layer,
+    );
+    const dynamicLayers = operation.layers_from === "current_hit_count"
+      || operation.layers_from === "skill_hit_count"
+      || operation.layers_from === "effective_hit_count"
+      ? Math.max(1, currentHitCount || 1) * (layersPerHit ?? 1)
+      : null;
+    const layers = staticLayers ?? dynamicLayers;
     if (layers === null) continue;
     return {
       effectId,
@@ -459,8 +564,256 @@ function firstPositiveInteger(...values: unknown[]): number | null {
   return null;
 }
 
+function integerValue(value: unknown): number | null {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? Math.trunc(numeric) : null;
+}
+
+function numberValue(value: unknown): number | null {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+interface ComboDamagePrefill {
+  isCombo: boolean;
+  hitCount: number | null;
+}
+
+interface EffectiveComboPrefill {
+  isCombo: boolean;
+  hitCount: number | null;
+  modifierDelta: number;
+  modifierMultiplier: number;
+  source: "skill_rule_prefill" | "auto_effect_prefill";
+  prefillKey: string | null;
+}
+
+function buildComboDamagePrefill(skill: SkillDefinitionOut | null | undefined): ComboDamagePrefill {
+  const hitRule = parseJsonRecord(skill?.hit_rule_json);
+  const ruleHitCount = firstPositiveInteger(hitRule?.hit_count);
+  const ruleDisplayType = asString(hitRule?.damage_display_type);
+  const conditionalRule = parseRecordValue(hitRule?.conditional_hit_rule);
+  const conditionalHitCount = firstPositiveInteger(conditionalRule?.hit_count);
+  const descriptionHitCount = inferHitCountFromText(skill?.raw_description);
+  const hitCount = [ruleHitCount, conditionalHitCount, descriptionHitCount].find(
+    (value): value is number => typeof value === "number" && value > 1,
+  ) ?? null;
+  return {
+    isCombo: ruleDisplayType === "combo_repeated_damage" || hitCount !== null,
+    hitCount,
+  };
+}
+
+function buildEffectiveComboPrefill({
+  basePrefill,
+  skill,
+  activeEffects,
+  effectDefinitions,
+  skillSlots,
+  actorSide,
+  actorElfId,
+  conditionFlags,
+}: {
+  basePrefill: ComboDamagePrefill;
+  skill: SkillDefinitionOut | null | undefined;
+  activeEffects: BattleEffectInstanceDict[];
+  effectDefinitions: Map<string, EffectDefinitionOut>;
+  skillSlots: NonNullable<BattleFormState["skill_slots"]>;
+  actorSide: Side;
+  actorElfId?: string | null;
+  conditionFlags: Record<string, boolean>;
+}): EffectiveComboPrefill {
+  if (!basePrefill.isCombo) {
+    return {
+      isCombo: false,
+      hitCount: null,
+      modifierDelta: 0,
+      modifierMultiplier: 1,
+      source: "skill_rule_prefill",
+      prefillKey: skill?.skill_id ? `${skill.skill_id}:not_combo` : null,
+    };
+  }
+  const baseHitCount = Math.max(1, basePrefill.hitCount ?? 1);
+  const slotId = skillSlots.find(
+    (slot) =>
+      slot.side === actorSide
+      && slot.elf_id === actorElfId
+      && slot.skill_id === skill?.skill_id,
+  )?.slot_id ?? "";
+  const modifier = resolveHitCountModifierFromEffects({
+    activeEffects,
+    effectDefinitions,
+    skill,
+    actorSide,
+    actorElfId,
+    slotId,
+    conditionFlags,
+  });
+  const hitCount = Math.max(
+    1,
+    Math.trunc((baseHitCount + modifier.delta) * modifier.multiplier),
+  );
+  return {
+    isCombo: true,
+    hitCount,
+    modifierDelta: modifier.delta,
+    modifierMultiplier: modifier.multiplier,
+    source:
+      modifier.delta !== 0 || modifier.multiplier !== 1
+        ? "auto_effect_prefill"
+        : "skill_rule_prefill",
+    prefillKey: [
+      skill?.skill_id ?? "",
+      actorSide,
+      actorElfId ?? "",
+      baseHitCount,
+      modifier.signature,
+      hitCount,
+    ].join(":"),
+  };
+}
+
+function resolveHitCountModifierFromEffects({
+  activeEffects,
+  effectDefinitions,
+  skill,
+  actorSide,
+  actorElfId,
+  slotId,
+  conditionFlags,
+}: {
+  activeEffects: BattleEffectInstanceDict[];
+  effectDefinitions: Map<string, EffectDefinitionOut>;
+  skill: SkillDefinitionOut | null | undefined;
+  actorSide: Side;
+  actorElfId?: string | null;
+  slotId: string;
+  conditionFlags: Record<string, boolean>;
+}): { delta: number; multiplier: number; signature: string } {
+  let delta = 0;
+  let multiplier = 1;
+  const signatureParts: string[] = [];
+  for (const effect of activeEffects) {
+    if (!effectAppliesToActorSkill(effect, actorSide, actorElfId, slotId)) continue;
+    if (typeof effect.remaining_uses === "number" && effect.remaining_uses <= 0) continue;
+    const definition = effectDefinitions.get(effect.effect_id);
+    const rule = parseJsonRecord(definition?.skill_modifier_json);
+    if (!rule || !skillModifierRuleMatches(rule, skill, conditionFlags)) continue;
+    const layers = typeof effect.layers === "number" && Number.isFinite(effect.layers) ? effect.layers : 1;
+    let itemDelta = integerValue(rule.hit_count_delta) ?? 0;
+    const perLayer = numberValue(rule.hit_count_delta_per_layer);
+    if (perLayer !== null) itemDelta += Math.trunc(perLayer * layers);
+    let itemMultiplier = numberValue(rule.hit_count_multiplier) ?? 1;
+    const multiplierAddPerLayer = numberValue(rule.hit_count_multiplier_add_per_layer);
+    if (multiplierAddPerLayer !== null) itemMultiplier *= 1 + multiplierAddPerLayer * layers;
+    itemMultiplier = Math.max(0, itemMultiplier);
+    if (itemDelta === 0 && itemMultiplier === 1) continue;
+    delta += itemDelta;
+    multiplier *= itemMultiplier;
+    signatureParts.push(
+      `${effect.instance_id}:${effect.effect_id}:${layers}:${itemDelta}:${itemMultiplier}`,
+    );
+  }
+  return { delta, multiplier, signature: signatureParts.join("|") || "no_modifier" };
+}
+
+function effectAppliesToActorSkill(
+  effect: BattleEffectInstanceDict,
+  actorSide: Side,
+  actorElfId: string | null | undefined,
+  slotId: string,
+): boolean {
+  if (effect.owner_scope === "field") return true;
+  if (effect.owner_scope === "side") return effect.owner_side === actorSide;
+  if (effect.owner_scope === "elf") {
+    return effect.owner_side === actorSide && (!actorElfId || effect.owner_elf_id === actorElfId);
+  }
+  if (effect.owner_scope === "skill_slot") {
+    return Boolean(slotId) && effect.owner_skill_slot_id === slotId;
+  }
+  return false;
+}
+
+function skillModifierRuleMatches(
+  rule: Record<string, unknown>,
+  skill: SkillDefinitionOut | null | undefined,
+  conditionFlags: Record<string, boolean>,
+): boolean {
+  const elementType = rule.element_type;
+  if (elementType !== undefined && String(elementType) !== skill?.element_type) return false;
+  const requiredConditionFlag = asString(rule.required_condition_flag);
+  if (requiredConditionFlag && conditionFlags[requiredConditionFlag] !== true) return false;
+  if (rule.requires_burst === true && conditionFlags.burst_triggered !== true && conditionFlags.burst_active !== true) {
+    return false;
+  }
+  const skillCategory = rule.skill_category;
+  if (skillCategory === undefined || skillCategory === null) return true;
+  const actualCategory = skill?.skill_category;
+  if (Array.isArray(skillCategory)) {
+    return skillCategory.map(String).includes(String(actualCategory));
+  }
+  const expected = String(skillCategory);
+  if (expected === "attack" || expected === "physical_or_magic") {
+    return actualCategory === "physical" || actualCategory === "magic";
+  }
+  return expected === actualCategory;
+}
+
+function parseJsonRecord(rawJson?: string | null): Record<string, unknown> | null {
+  if (!rawJson) return null;
+  try {
+    return parseRecordValue(JSON.parse(rawJson) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+function parseRecordValue(value: unknown): Record<string, unknown> | null {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function inferHitCountFromText(text?: string | null): number | null {
+  if (!text) return null;
+  const normalized = text.replace(/[\uFF10-\uFF19]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) - 0xfee0),
+  );
+  const hitUnit = "[\\u6B21\\u6BB5\\u4E0B]";
+  const rangeMatch = normalized.match(
+    new RegExp(`(\\d+)\\s*(?:[-~\\uFF5E\\u81F3\\u5230])\\s*(\\d+)\\s*${hitUnit}`),
+  );
+  if (rangeMatch) {
+    const lower = Number(rangeMatch[1]);
+    const upper = Number(rangeMatch[2]);
+    if (Number.isFinite(lower) && Number.isFinite(upper) && Math.max(lower, upper) > 1) {
+      return Math.min(lower, upper);
+    }
+  }
+  const hitWords = [
+    "\\u8FDE\\u51FB",
+    "\\u8FDE\\u7EED",
+    "\\u653B\\u51FB",
+    "\\u9020\\u6210",
+    "\\u91CD\\u590D",
+    "\\u6BCF\\u56DE\\u5408",
+    "\\u6BCF\\u6B21",
+  ].join("|");
+  const damageWords = ["\\u4F24\\u5BB3", "\\u653B\\u51FB", "\\u8FDE\\u51FB"].join("|");
+  const patterns = [
+    new RegExp(`(?:${hitWords})\\D{0,8}(\\d+)\\s*${hitUnit}`),
+    new RegExp(`(\\d+)\\s*${hitUnit}\\D{0,8}(?:${damageWords})`),
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    const hitCount = match ? Number(match[1]) : Number.NaN;
+    if (Number.isFinite(hitCount) && hitCount > 1) return Math.floor(hitCount);
+  }
+  return null;
 }
 
 function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { battleId: string; state: { elves: BattleElfStateDict[]; battle: { turn_number: number; self_active_elf_id?: string | null; enemy_active_elf_id?: string | null } }; defaultSide?: Side | null; plannedAction?: PlannedActionPrefill; onDone: (result: DamageEventCreateResult) => void }) {
@@ -486,6 +839,8 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
   const [syncObservation, setSyncObservation] = useState(true);
   const [resolveRules, setResolveRules] = useState(true);
   const [damageTolerance, setDamageTolerance] = useState(0);
+  const [comboPrefilledSkillId, setComboPrefilledSkillId] = useState<string | null>(null);
+  const [hitCountManuallyEdited, setHitCountManuallyEdited] = useState(false);
 
   const attackerElfId = attackerSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
   const defenderElfId = defenderSide === "self" ? state.battle.self_active_elf_id : state.battle.enemy_active_elf_id;
@@ -493,6 +848,12 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
   const defenderElf = state.elves.find((elf) => elf.side === defenderSide && elf.elf_id === defenderElfId);
   const attackerPanelStats = toPanelStats(attackerElf?.panel_stats_json);
   const defenderPanelStats = toPanelStats(defenderElf?.panel_stats_json);
+  const selectedDamageSkillQuery = useQuery({
+    queryKey: ["skill", skillId],
+    queryFn: () => api.skills.get(skillId!),
+    enabled: Boolean(skillId),
+    retry: false,
+  });
   useEffect(() => {
     if (defenderSide === "self") {
       setHpBefore("");
@@ -502,6 +863,20 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
     setHpBefore(normalizeHpPercent(defenderElf?.current_hp_percent) ?? 100);
     setHpAfter("");
   }, [defenderSide, defenderElfId, defenderElf?.current_hp_percent]);
+  useEffect(() => {
+    if (!skillId) {
+      setComboPrefilledSkillId(null);
+      return;
+    }
+    if (comboPrefilledSkillId === skillId) return;
+    if (!selectedDamageSkillQuery.data || selectedDamageSkillQuery.data.skill_id !== skillId) return;
+    const prefill = buildComboDamagePrefill(selectedDamageSkillQuery.data);
+    if (prefill.isCombo) {
+      setDamageDisplayType("combo_repeated_damage");
+      if (prefill.hitCount !== null && !hitCountManuallyEdited) setHitCount(prefill.hitCount);
+    }
+    setComboPrefilledSkillId(skillId);
+  }, [comboPrefilledSkillId, hitCountManuallyEdited, selectedDamageSkillQuery.data, skillId]);
   const observedTotalDamage = damageDisplayType === "combo_repeated_damage" ? perHitDamage * hitCount : damageValue;
   const conditionFlags = buildConditionFlags({
     actor_moves_before_target: actorMovesBeforeTarget || undefined,
@@ -548,7 +923,6 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
       condition_flags: Object.keys(conditionFlags).length > 0 ? conditionFlags : undefined,
       damage_display_type: damageDisplayType,
       damage_value: damageDisplayType === "single_damage" ? damageValue : undefined,
-      final_total_damage_value: damageDisplayType === "visual_total_damage" ? damageValue : undefined,
       per_hit_damage_value: damageDisplayType === "combo_repeated_damage" ? perHitDamage : undefined,
       hit_count: damageDisplayType === "combo_repeated_damage" ? hitCount : undefined,
       hp_percent_before: defenderSide === "enemy" && hpBefore !== "" ? Number(hpBefore) : undefined,
@@ -567,7 +941,16 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
       <SkillSearchSelect
         label="技能"
         value={skillId}
-        onChange={(id) => setSkillId(id)}
+        onChange={(id, item) => {
+          setSkillId(id);
+          setHitCountManuallyEdited(false);
+          const prefill = buildComboDamagePrefill(item);
+          if (prefill.isCombo) {
+            setDamageDisplayType("combo_repeated_damage");
+            if (prefill.hitCount !== null) setHitCount(prefill.hitCount);
+          }
+          setComboPrefilledSkillId(id);
+        }}
         resultsMode="focus"
       />
       <details className="rounded-2xl border bg-slate-50 p-3 text-sm">
@@ -633,13 +1016,12 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
         <label className="text-sm font-medium">伤害显示类型</label>
         <Select value={damageDisplayType} onChange={(e) => setDamageDisplayType(e.target.value as DamageDisplayType)}>
           <option value="single_damage">单次伤害</option>
-          <option value="visual_total_damage">动画多段最终总伤害</option>
           <option value="combo_repeated_damage">连击伤害</option>
         </Select>
       </div>
       {damageDisplayType !== "combo_repeated_damage" ? <NumberField label="伤害值" value={damageValue} onChange={setDamageValue} /> : null}
       {damageDisplayType === "combo_repeated_damage" ? (
-        <div className="grid grid-cols-2 gap-3"><NumberField label="单段伤害" value={perHitDamage} onChange={setPerHitDamage} /><NumberField label="连击次数" value={hitCount} onChange={setHitCount} /></div>
+        <div className="grid grid-cols-2 gap-3"><NumberField label="单段伤害" value={perHitDamage} onChange={setPerHitDamage} /><NumberField label="连击次数" value={hitCount} onChange={(value) => { setHitCount(value); setHitCountManuallyEdited(true); }} /></div>
       ) : null}
       {defenderSide === "self" ? (
         <div className="rounded-xl border bg-slate-50 p-3 text-xs text-slate-600">

@@ -30,7 +30,7 @@ def test_ensure_database_schema_current_creates_empty_sqlite_db(tmp_path) -> Non
 
     assert "nature_definition" in tables
     assert "skill_definition" in tables
-    assert version == "0007_battle_runtime_form"
+    assert version == "0008_skill_raw_description"
 
 
 def test_ensure_database_schema_current_rejects_unversioned_non_empty_db(tmp_path) -> None:

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.calculation.damage_calculator import DamageCalculator
 from app.calculation.formula_context import DamageFormulaContext, PanelStats
+from app.calculation.hit_rule_resolver import HitRuleResolver
 from app.calculation.modifier_resolver import ModifierResolver
 from app.calculation.rule_resolver import RuleResolver
 from app.calculation.stat_calculator import (
@@ -27,6 +28,7 @@ from app.core.default_skills import (
     DEFAULT_INITIAL_ENERGY,
     append_default_common_skill_ids,
 )
+from app.core.element_aliases import element_type_matches
 from app.core.enums import BattleEventType, BattlePhase, EventSource, Side, StatKey
 from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.effect import BattleEffectInstance
@@ -154,6 +156,10 @@ class BattleService:
             battle=battle,
             turn_number=ended_turn_number,
         )
+        end_turn_skill_runtime_results = self._apply_end_turn_skill_runtime_hooks(
+            battle=battle,
+            turn_number=ended_turn_number,
+        )
         settlement_status = self._settlement_status(settlement_events)
         event = BattleEvent(
             event_id=f"event_{uuid4().hex}",
@@ -168,6 +174,7 @@ class BattleService:
                     "next_turn_number": next_turn_number,
                     "settlement_status": settlement_status,
                     "settlement_events": settlement_events,
+                    "end_turn_skill_runtime_results": end_turn_skill_runtime_results,
                 }
             ),
             notes=payload.notes,
@@ -1266,8 +1273,14 @@ class BattleService:
         resolved_context.flat_power_bonus = (
             Decimal(str(resolved_context.flat_power_bonus)) + skill_modifier["flat_power_bonus"]
         )
+        base_hit_count = int(resolved_context.hit_count or 1) + int(
+            skill_modifier["hit_count_delta"]
+        )
         resolved_context.hit_count = max(
-            int(resolved_context.hit_count or 1) + int(skill_modifier["hit_count_delta"]),
+            int(
+                Decimal(str(base_hit_count))
+                * Decimal(str(skill_modifier.get("hit_count_multiplier") or "1"))
+            ),
             1,
         )
         if skill_modifier["items"]:
@@ -1347,7 +1360,12 @@ class BattleService:
             snapshot_payload=snapshot_payload,
         )
         context.stab_multiplier = (
-            Decimal("1.25") if skill.element_type in attacker_element_types else Decimal("1")
+            Decimal("1.25")
+            if any(
+                element_type_matches(skill.element_type, item)
+                for item in attacker_element_types
+            )
+            else Decimal("1")
         )
         details = ModifierResolver(self.db).resolve_formula_modifiers(context, {})
         skill_modifier = self._skill_power_modifier_from_effects(
@@ -1441,6 +1459,7 @@ class BattleService:
         multiplier = Decimal("1")
         flat_power_bonus = Decimal("0")
         hit_count_delta = 0
+        hit_count_multiplier = Decimal("1")
         energy_cost_delta = 0
         items: list[dict[str, Any]] = []
         for item in snapshot_payload:
@@ -1478,6 +1497,18 @@ class BattleService:
                 )
             hit_count_delta += item_hit_count_delta
 
+            item_hit_count_multiplier = Decimal("1")
+            if rule.get("hit_count_multiplier") is not None:
+                item_hit_count_multiplier *= Decimal(str(rule["hit_count_multiplier"]))
+            if rule.get("hit_count_multiplier_add_per_layer") is not None:
+                item_hit_count_multiplier *= (
+                    Decimal("1")
+                    + Decimal(str(rule["hit_count_multiplier_add_per_layer"])) * layers
+                )
+            if item_hit_count_multiplier < 0:
+                item_hit_count_multiplier = Decimal("0")
+            hit_count_multiplier *= item_hit_count_multiplier
+
             item_energy_cost_delta = 0
             if rule.get("energy_cost_delta") is not None:
                 item_energy_cost_delta += int(rule["energy_cost_delta"])
@@ -1492,6 +1523,7 @@ class BattleService:
                 rule_multiplier is None
                 and item_power_add == 0
                 and item_hit_count_delta == 0
+                and item_hit_count_multiplier == 1
                 and item_energy_cost_delta == 0
             ):
                 continue
@@ -1508,6 +1540,7 @@ class BattleService:
                     "multiplier": str(rule_multiplier or Decimal("1")),
                     "power_add": str(item_power_add),
                     "hit_count_delta": item_hit_count_delta,
+                    "hit_count_multiplier": str(item_hit_count_multiplier),
                     "energy_cost_delta": item_energy_cost_delta,
                     "requires_burst": rule.get("requires_burst") is True,
                 }
@@ -1516,6 +1549,7 @@ class BattleService:
             "multiplier": multiplier,
             "flat_power_bonus": flat_power_bonus,
             "hit_count_delta": hit_count_delta,
+            "hit_count_multiplier": hit_count_multiplier,
             "energy_cost_delta": energy_cost_delta,
             "items": items,
         }
@@ -1566,7 +1600,10 @@ class BattleService:
         rule: dict[str, Any],
     ) -> bool:
         element_type = rule.get("element_type")
-        if element_type is not None and str(element_type) != context.skill_element_type:
+        if element_type is not None and not element_type_matches(
+            element_type,
+            context.skill_element_type,
+        ):
             return False
         required_condition_flag = rule.get("required_condition_flag")
         if required_condition_flag is not None:
@@ -2088,6 +2125,9 @@ class BattleService:
                     }
                 )
             else:
+                if skill_runtime_result:
+                    event_payload["skill_runtime"] = skill_runtime_result
+                    event.payload_json = dumps_json(event_payload)
                 effect_operation_results = EffectOperationExecutor(self.db).execute_for_skill_event(
                     event
                 )
@@ -2150,6 +2190,16 @@ class BattleService:
         if condition_flags:
             event_payload["condition_flags"] = condition_flags
         return event_payload
+
+    def _switched_sides_this_turn(self, *, battle_id: str, turn_number: int) -> set[str]:
+        stmt = select(BattleEvent.actor_side).where(
+            BattleEvent.battle_id == battle_id,
+            BattleEvent.turn_number == turn_number,
+            BattleEvent.event_type == BattleEventType.SWITCH_ELF.value,
+            BattleEvent.actor_side.is_not(None),
+            BattleEvent.is_voided.is_(False),
+        )
+        return {side for side in self.db.scalars(stmt).all() if side}
 
     def _is_burst_eligible(self, event: BattleEvent) -> bool:
         """判断当前技能是否处于登场首回合的迸发窗口。"""
@@ -2267,9 +2317,33 @@ class BattleService:
             else static_energy_cost
         )
         energy_modifier = self._skill_effect_modifiers_for_event(event, skill, slot)
+        dynamic_energy_modifier = self._skill_dynamic_energy_cost_modifier(event, skill)
+        hit_rule_result = self._resolve_skill_hit_count_for_event(event)
+        combined_energy_cost_delta = (
+            int(energy_modifier["energy_cost_delta"])
+            + int(dynamic_energy_modifier["energy_cost_delta"])
+        )
+        combined_modifier_items = [
+            *energy_modifier["items"],
+            *dynamic_energy_modifier["items"],
+        ]
+        hit_count_modifier_delta = 0
+        hit_count_modifier_multiplier = Decimal("1")
+        if hit_rule_result["source"] not in {"manual_payload", "auto_effect_prefill"}:
+            hit_count_modifier_delta = int(energy_modifier.get("hit_count_delta") or 0)
+            hit_count_modifier_multiplier = Decimal(
+                str(energy_modifier.get("hit_count_multiplier") or "1")
+            )
+        effective_hit_count = max(
+            int(
+                (Decimal(str(int(hit_rule_result["hit_count"]) + hit_count_modifier_delta)))
+                * hit_count_modifier_multiplier
+            ),
+            1,
+        )
         charge_state = self._resolve_charge_state_for_skill_event(event, skill)
         effective_energy_cost = max(
-            int(base_runtime_energy_cost + energy_modifier["energy_cost_delta"]),
+            int(base_runtime_energy_cost + combined_energy_cost_delta),
             0,
         )
         if charge_state["phase"] in {
@@ -2286,10 +2360,16 @@ class BattleService:
             "static_energy_cost": static_energy_cost,
             "base_runtime_energy_cost": base_runtime_energy_cost,
             "effective_energy_cost": effective_energy_cost,
-            "energy_cost_modifier": energy_modifier["items"],
-            "skill_modifier": energy_modifier["items"],
+            "energy_cost_modifier": combined_modifier_items,
+            "skill_modifier": combined_modifier_items,
             "current_power": slot.current_power if slot is not None else None,
             "cooldown_remaining": slot.cooldown_remaining if slot is not None else None,
+            "base_hit_count": hit_rule_result["hit_count"],
+            "effective_hit_count": effective_hit_count,
+            "hit_count_source": hit_rule_result["source"],
+            "hit_count_modifier_delta": hit_count_modifier_delta,
+            "hit_count_modifier_multiplier": str(hit_count_modifier_multiplier),
+            "hit_rule": hit_rule_result.get("hit_rule"),
         }
         consume_result = self._consume_runtime_skill_energy_cost(
             event,
@@ -2305,13 +2385,51 @@ class BattleService:
         if consumed_modifiers:
             summary["consumed_skill_modifier_effects"] = consumed_modifiers
         if slot is not None:
+            response_listener_results = self._apply_response_success_runtime_listeners(event)
+            if response_listener_results:
+                summary["response_success_listener_results"] = response_listener_results
             hook_results = self._apply_executable_skill_runtime_hooks(event, skill, slot)
             if hook_results:
                 summary["hook_results"] = hook_results
+            listener_results = self._apply_other_skill_use_runtime_listeners(event, skill)
+            if listener_results:
+                summary["other_skill_use_listener_results"] = listener_results
         if charge_state["phase"] != "not_required":
             summary["charge"] = charge_state
             self._apply_charge_state_resolution(event, skill, charge_state)
         return summary
+
+    def _resolve_skill_hit_count_for_event(self, event: BattleEvent) -> dict[str, Any]:
+        """解析技能使用事件的当前连击数，供状态技能按连击数施加效果。"""
+        payload = loads_json(event.payload_json, {})
+        if not isinstance(payload, dict):
+            payload = {}
+        context = DamageFormulaContext(
+            battle_id=event.battle_id,
+            attacker_side=str(event.actor_side or ""),
+            attacker_elf_id=str(event.actor_elf_id or ""),
+            defender_side=str(
+                event.target_side
+                or EffectOperationExecutor._opposite_side(event.actor_side)
+                or ""
+            ),
+            defender_elf_id=str(event.target_elf_id or ""),
+            skill_id=event.skill_id,
+            formula_type="attack",
+            snapshot_payload=self._active_effect_snapshot_payload(event.battle_id),
+        )
+        details = HitRuleResolver(self.db).resolve_hit_rule(context, payload)
+        hit_rule = details.get("hit_rule") if isinstance(details, dict) else None
+        source = (
+            hit_rule.get("source")
+            if isinstance(hit_rule, dict) and isinstance(hit_rule.get("source"), str)
+            else "context_default"
+        )
+        return {
+            "hit_count": max(int(context.hit_count or 1), 1),
+            "source": source,
+            "hit_rule": hit_rule,
+        }
 
     def consume_skill_modifier_effect_uses(
         self,
@@ -2401,6 +2519,165 @@ class BattleService:
             )
         return results
 
+    def _skill_dynamic_energy_cost_modifier(
+        self,
+        event: BattleEvent,
+        skill: SkillDefinition,
+    ) -> dict[str, Any]:
+        """解析技能自身按目标状态层数变化的能耗分支。"""
+        rule = loads_json(skill.damage_rule_json, {})
+        if not isinstance(rule, dict):
+            return {"energy_cost_delta": 0, "items": []}
+        cost_rule = rule.get("dynamic_energy_cost_rule")
+        if not isinstance(cost_rule, dict):
+            return {"energy_cost_delta": 0, "items": []}
+
+        if cost_rule.get("missing_hp_percent_step") is not None:
+            return self._dynamic_energy_cost_from_missing_hp(event, skill, cost_rule)
+
+        effect_ids = self._dynamic_cost_effect_ids(cost_rule)
+        categories = self._dynamic_cost_categories(cost_rule)
+        if not effect_ids and not categories:
+            return {"energy_cost_delta": 0, "items": []}
+        target_side = self._dynamic_cost_target_side(event, cost_rule)
+        if target_side is None:
+            return {"energy_cost_delta": 0, "items": []}
+        battle = self.db.get(Battle, event.battle_id)
+        if battle is None or battle.deleted_at is not None:
+            return {"energy_cost_delta": 0, "items": []}
+        target_elf_id = (
+            battle.self_active_elf_id
+            if target_side == Side.SELF.value
+            else battle.enemy_active_elf_id
+        )
+
+        stmt = select(BattleEffectInstance).where(
+            BattleEffectInstance.battle_id == event.battle_id,
+            BattleEffectInstance.owner_side == target_side,
+            BattleEffectInstance.is_active.is_(True),
+        )
+        if effect_ids:
+            stmt = stmt.where(BattleEffectInstance.effect_id.in_(effect_ids))
+        if categories:
+            stmt = stmt.where(BattleEffectInstance.category.in_(categories))
+        instances = self.db.scalars(stmt).all()
+        total_layers = 0
+        matched: list[dict[str, Any]] = []
+        for instance in instances:
+            if instance.owner_scope == "elf" and target_elf_id:
+                if instance.owner_elf_id != target_elf_id:
+                    continue
+            layers = max(int(instance.layers or 0), 0)
+            if layers <= 0:
+                continue
+            total_layers += layers
+            matched.append(
+                {
+                    "effect_id": instance.effect_id,
+                    "effect_instance_id": instance.instance_id,
+                    "owner_scope": instance.owner_scope,
+                    "owner_side": instance.owner_side,
+                    "owner_elf_id": instance.owner_elf_id,
+                    "layers": layers,
+                }
+            )
+        if total_layers <= 0:
+            return {"energy_cost_delta": 0, "items": []}
+
+        delta_per_layer = int(cost_rule.get("energy_cost_delta_per_layer") or 0)
+        delta = total_layers * delta_per_layer
+        return {
+            "energy_cost_delta": delta,
+            "items": [
+                {
+                    "modifier_type": "dynamic_energy_cost_from_effect_layers",
+                    "source": "skill_definition.damage_rule_json",
+                    "skill_id": skill.skill_id,
+                    "source_effect_ids": sorted(effect_ids),
+                    "source_categories": sorted(categories),
+                    "source_target": cost_rule.get("source_target"),
+                    "layers": total_layers,
+                    "energy_cost_delta": delta,
+                    "matched_instances": matched,
+                }
+            ],
+        }
+
+    def _dynamic_energy_cost_from_missing_hp(
+        self,
+        event: BattleEvent,
+        skill: SkillDefinition,
+        cost_rule: dict[str, Any],
+    ) -> dict[str, Any]:
+        """按自身已损生命百分比动态修正本技能能耗。"""
+        if event.actor_side is None or event.actor_elf_id is None:
+            return {"energy_cost_delta": 0, "items": []}
+        state = self.db.scalars(
+            select(BattleElfState).where(
+                BattleElfState.battle_id == event.battle_id,
+                BattleElfState.side == event.actor_side,
+                BattleElfState.elf_id == event.actor_elf_id,
+            )
+        ).first()
+        if state is None or state.current_hp_percent is None:
+            return {"energy_cost_delta": 0, "items": []}
+        step = Decimal(str(cost_rule.get("missing_hp_percent_step") or 0))
+        if step <= 0:
+            return {"energy_cost_delta": 0, "items": []}
+        missing = max(Decimal("100") - Decimal(str(state.current_hp_percent)), Decimal("0"))
+        steps = int(missing // step)
+        delta_per_step = int(cost_rule.get("energy_cost_delta_per_step") or 0)
+        delta = steps * delta_per_step
+        return {
+            "energy_cost_delta": delta,
+            "items": [
+                {
+                    "modifier_type": "dynamic_energy_cost_from_missing_hp_percent",
+                    "source": "skill_definition.damage_rule_json",
+                    "skill_id": skill.skill_id,
+                    "hp_percent": str(state.current_hp_percent),
+                    "missing_hp_percent": str(missing),
+                    "step": str(step),
+                    "steps": steps,
+                    "energy_cost_delta": delta,
+                }
+            ],
+        }
+
+    @staticmethod
+    def _dynamic_cost_effect_ids(cost_rule: dict[str, Any]) -> set[str]:
+        source_effect_ids = cost_rule.get("source_effect_ids")
+        if isinstance(source_effect_ids, str):
+            return {source_effect_ids}
+        if isinstance(source_effect_ids, list):
+            return {str(item) for item in source_effect_ids if item is not None}
+        effect_id = cost_rule.get("source_effect_id")
+        return {str(effect_id)} if effect_id else set()
+
+    @staticmethod
+    def _dynamic_cost_categories(cost_rule: dict[str, Any]) -> set[str]:
+        source_categories = cost_rule.get("source_categories")
+        if isinstance(source_categories, str):
+            return {source_categories}
+        if isinstance(source_categories, list):
+            return {str(item) for item in source_categories if item is not None}
+        category = cost_rule.get("source_category")
+        return {str(category)} if category else set()
+
+    @staticmethod
+    def _dynamic_cost_target_side(
+        event: BattleEvent,
+        cost_rule: dict[str, Any],
+    ) -> str | None:
+        source_target = str(cost_rule.get("source_target") or "enemy_side")
+        if source_target in {"enemy_side", "opponent_side", "defender_side", "target_side"}:
+            return event.target_side or EffectOperationExecutor._opposite_side(event.actor_side)
+        if source_target in {"actor_side", "self_side", "attacker_side"}:
+            return event.actor_side
+        if source_target in {Side.SELF.value, Side.ENEMY.value}:
+            return source_target
+        return None
+
     def _apply_skill_use_mark_triggers(
         self,
         event: BattleEvent,
@@ -2465,6 +2742,112 @@ class BattleService:
                         ],
                     )
                 )
+        return results
+
+    def _apply_end_turn_skill_runtime_hooks(
+        self,
+        *,
+        battle: Battle,
+        turn_number: int,
+    ) -> list[dict]:
+        """执行“在场回合末”技能槽持久钩子。"""
+        active_pairs = [
+            (Side.SELF.value, battle.self_active_elf_id),
+            (Side.ENEMY.value, battle.enemy_active_elf_id),
+        ]
+        results: list[dict] = []
+        for side, elf_id in active_pairs:
+            if not elf_id:
+                continue
+            slots = self.db.scalars(
+                select(BattleSkillSlot).where(
+                    BattleSkillSlot.battle_id == battle.battle_id,
+                    BattleSkillSlot.side == side,
+                    BattleSkillSlot.elf_id == elf_id,
+                )
+            ).all()
+            for slot in slots:
+                skill = self.db.get(SkillDefinition, slot.skill_id)
+                if skill is None or skill.deleted_at is not None:
+                    continue
+                rule = loads_json(skill.damage_rule_json, {})
+                manual_review = rule.get("manual_review") if isinstance(rule, dict) else None
+                hooks = (
+                    manual_review.get("future_hooks")
+                    if isinstance(manual_review, dict)
+                    else None
+                )
+                if not isinstance(hooks, list):
+                    continue
+                for hook in hooks:
+                    if (
+                        not isinstance(hook, dict)
+                        or hook.get("status") != "executable"
+                        or hook.get("trigger") != "end_turn_in_field"
+                    ):
+                        continue
+                    if (
+                        hook.get("hook_type") == "persistent_skill_cost_modifier"
+                        and hook.get("target") == "source_skill"
+                    ):
+                        before = (
+                            slot.current_energy_cost
+                            if slot.current_energy_cost is not None
+                            else skill.base_energy_cost
+                        )
+                        delta = int(hook.get("cost_delta") or 0)
+                        slot.current_energy_cost = max(int(before or 0) + delta, 0)
+                        results.append(
+                            {
+                                "status": "executed",
+                                "hook_type": hook.get("hook_type"),
+                                "trigger": "end_turn_in_field",
+                                "turn_number": turn_number,
+                                "side": side,
+                                "elf_id": elf_id,
+                                "skill_id": skill.skill_id,
+                                "slot_id": slot.slot_id,
+                                "field": "current_energy_cost",
+                                "before": before,
+                                "after": slot.current_energy_cost,
+                                "cost_delta": delta,
+                            }
+                        )
+                    elif (
+                        hook.get("hook_type") == "persistent_skill_power_modifier"
+                        and hook.get("target") == "source_skill"
+                    ):
+                        before = (
+                            slot.current_power
+                            if slot.current_power is not None
+                            else skill.base_power
+                        )
+                        delta = int(hook.get("power_add") or 0)
+                        multiplier = hook.get("power_multiplier")
+                        if multiplier is not None:
+                            slot.current_power = max(
+                                int(Decimal(str(before or 0)) * Decimal(str(multiplier))),
+                                0,
+                            )
+                        else:
+                            slot.current_power = max(int(before or 0) + delta, 0)
+                        results.append(
+                            {
+                                "status": "executed",
+                                "hook_type": hook.get("hook_type"),
+                                "trigger": "end_turn_in_field",
+                                "turn_number": turn_number,
+                                "side": side,
+                                "elf_id": elf_id,
+                                "skill_id": skill.skill_id,
+                                "slot_id": slot.slot_id,
+                                "field": "current_power",
+                                "before": before,
+                                "after": slot.current_power,
+                                "power_add": delta,
+                                "power_multiplier": multiplier,
+                            }
+                        )
         return results
 
     def ensure_observed_skill_slot(self, event: BattleEvent) -> dict | None:
@@ -2640,6 +3023,8 @@ class BattleService:
             if not isinstance(hook, dict):
                 continue
             hook_type = hook.get("hook_type")
+            if hook_type == "response_success_skill_cost_listener":
+                continue
             hook_is_confirmed_executable = hook_type in {
                 "next_skill_charge_requirement_override",
             }
@@ -2678,12 +3063,56 @@ class BattleService:
                     }
                 )
             elif (
+                hook_type == "persistent_skill_hit_count_modifier"
+                and hook.get("target") == "source_skill"
+            ):
+                delta = int(hook.get("hit_count_delta") or hook.get("hit_count_bonus") or 0)
+                if delta == 0:
+                    results.append(
+                        {"status": "skipped", "hook_type": hook_type, "reason": "zero_delta"}
+                    )
+                    continue
+                effect_id = (
+                    "effect_skill_slot_hit_count_up_persistent"
+                    if delta > 0
+                    else "effect_skill_slot_hit_count_down_persistent"
+                )
+                operation_results = EffectOperationExecutor(self.db).execute_operations_for_event(
+                    event,
+                    [
+                        {
+                            "op_type": "apply_effect",
+                            "effect_id": effect_id,
+                            "target": "source_skill",
+                            "layers": abs(delta),
+                            "condition": "always",
+                            "timing": "on_skill_use",
+                        }
+                    ],
+                )
+                results.append(
+                    {
+                        "status": "executed",
+                        "hook_type": hook_type,
+                        "effect_id": effect_id,
+                        "hit_count_delta": delta,
+                        "operation_results": operation_results,
+                    }
+                )
+            elif (
                 hook_type == "persistent_skill_power_modifier"
                 and hook.get("target") == "source_skill"
             ):
                 before = slot.current_power if slot.current_power is not None else skill.base_power
                 delta = int(hook.get("power_add") or 0)
-                slot.current_power = max(int(before or 0) + delta, 0)
+                multiplier = hook.get("power_multiplier")
+                if multiplier is not None:
+                    slot.current_power = max(
+                        int(Decimal(str(before or 0)) * Decimal(str(multiplier))),
+                        0,
+                    )
+                else:
+                    slot.current_power = max(int(before or 0) + delta, 0)
                 results.append(
                     {
                         "status": "executed",
@@ -2691,6 +3120,26 @@ class BattleService:
                         "field": "current_power",
                         "before": before,
                         "after": slot.current_power,
+                        "power_multiplier": multiplier,
+                    }
+                )
+            elif (
+                hook_type == "reset_skill_cost_modifier"
+                and hook.get("target") == "source_skill"
+            ):
+                before = (
+                    slot.current_energy_cost
+                    if slot.current_energy_cost is not None
+                    else skill.base_energy_cost
+                )
+                slot.current_energy_cost = max(int(skill.base_energy_cost or 0), 0)
+                results.append(
+                    {
+                        "status": "executed",
+                        "hook_type": hook_type,
+                        "field": "current_energy_cost",
+                        "before": before,
+                        "after": slot.current_energy_cost,
                     }
                 )
             elif hook_type == "next_skill_charge_requirement_override":
@@ -2730,6 +3179,290 @@ class BattleService:
                 )
         return results
 
+    def _apply_response_success_runtime_listeners(self, event: BattleEvent) -> list[dict]:
+        """处理“本精灵应对成功后，指定技能槽费用变化”的监听。"""
+        if event.actor_side is None or event.actor_elf_id is None:
+            return []
+        payload = loads_json(event.payload_json, {})
+        condition_flags = payload.get("condition_flags") if isinstance(payload, dict) else None
+        if not isinstance(condition_flags, dict):
+            condition_flags = {}
+        if not any(
+            condition_flags.get(key) is True
+            for key in (
+                "response_attack_success",
+                "response_defense_success",
+                "response_status_success",
+            )
+        ):
+            return []
+        slots = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == event.battle_id,
+                BattleSkillSlot.side == event.actor_side,
+                BattleSkillSlot.elf_id == event.actor_elf_id,
+            )
+        ).all()
+        results: list[dict] = []
+        for slot in slots:
+            skill = self.db.get(SkillDefinition, slot.skill_id)
+            if skill is None or skill.deleted_at is not None:
+                continue
+            rule = loads_json(skill.damage_rule_json, {})
+            manual_review = rule.get("manual_review") if isinstance(rule, dict) else None
+            hooks = manual_review.get("future_hooks") if isinstance(manual_review, dict) else None
+            if not isinstance(hooks, list):
+                continue
+            for hook in hooks:
+                if not isinstance(hook, dict) or hook.get("status") != "executable":
+                    continue
+                if hook.get("hook_type") != "response_success_skill_cost_listener":
+                    continue
+                if not self._skill_runtime_hook_triggered(hook, condition_flags):
+                    continue
+                before = (
+                    slot.current_energy_cost
+                    if slot.current_energy_cost is not None
+                    else skill.base_energy_cost
+                )
+                delta = int(hook.get("cost_delta") or 0)
+                slot.current_energy_cost = max(int(before or 0) + delta, 0)
+                results.append(
+                    {
+                        "status": "executed",
+                        "hook_type": hook.get("hook_type"),
+                        "trigger": hook.get("trigger"),
+                        "listener_skill_id": skill.skill_id,
+                        "slot_id": slot.slot_id,
+                        "field": "current_energy_cost",
+                        "before": before,
+                        "after": slot.current_energy_cost,
+                        "cost_delta": delta,
+                    }
+                )
+        return results
+
+    def _apply_other_skill_use_runtime_listeners(
+        self,
+        event: BattleEvent,
+        used_skill: SkillDefinition,
+    ) -> list[dict]:
+        """处理“使用其他指定系别技能后，本技能槽获得永久修正”的监听。"""
+        if event.actor_side is None or event.actor_elf_id is None:
+            return []
+        slots = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == event.battle_id,
+                BattleSkillSlot.side == event.actor_side,
+                BattleSkillSlot.elf_id == event.actor_elf_id,
+                BattleSkillSlot.skill_id != used_skill.skill_id,
+            )
+        ).all()
+        results: list[dict] = []
+        for slot in slots:
+            listener_skill = self.db.get(SkillDefinition, slot.skill_id)
+            if listener_skill is None or listener_skill.deleted_at is not None:
+                continue
+            rule = loads_json(listener_skill.damage_rule_json, {})
+            manual_review = rule.get("manual_review") if isinstance(rule, dict) else None
+            hooks = manual_review.get("future_hooks") if isinstance(manual_review, dict) else None
+            if not isinstance(hooks, list):
+                continue
+            for hook in hooks:
+                if not isinstance(hook, dict):
+                    continue
+                if hook.get("status") != "executable":
+                    continue
+                if hook.get("trigger") != "other_element_skill_use":
+                    continue
+                if hook.get("element_type") is not None and not element_type_matches(
+                    hook["element_type"],
+                    used_skill.element_type,
+                ):
+                    continue
+                if hook.get("hook_type") == "persistent_skill_power_modifier":
+                    before = (
+                        slot.current_power
+                        if slot.current_power is not None
+                        else listener_skill.base_power
+                    )
+                    multiplier = hook.get("power_multiplier")
+                    power_add = int(hook.get("power_add") or 0)
+                    if multiplier is not None:
+                        multiplier_decimal = Decimal(str(multiplier))
+                        slot.current_power = max(
+                            int(Decimal(str(before or 0)) * multiplier_decimal),
+                            0,
+                        )
+                    else:
+                        multiplier_decimal = Decimal("1")
+                        slot.current_power = max(int(before or 0) + power_add, 0)
+                    results.append(
+                        {
+                            "status": "executed",
+                            "hook_type": hook.get("hook_type"),
+                            "trigger": "other_element_skill_use",
+                            "used_skill_id": used_skill.skill_id,
+                            "listener_skill_id": listener_skill.skill_id,
+                            "slot_id": slot.slot_id,
+                            "field": "current_power",
+                            "before": before,
+                            "after": slot.current_power,
+                            "power_multiplier": str(multiplier),
+                            "power_add": power_add,
+                        }
+                    )
+        return results
+
+    def apply_damage_taken_runtime_listeners(
+        self,
+        *,
+        battle_event: BattleEvent,
+        defender_side: str | None,
+        defender_elf_id: str | None,
+        damage_value: int | None,
+    ) -> list[dict]:
+        """处理“本精灵受伤后，本技能槽获得永久修正”的监听。"""
+        if (
+            defender_side is None
+            or defender_elf_id is None
+            or not damage_value
+            or damage_value <= 0
+        ):
+            return []
+        payload = loads_json(battle_event.payload_json, {})
+        if not isinstance(payload, dict):
+            payload = {}
+        condition_flags = payload.get("condition_flags") if isinstance(payload, dict) else None
+        if not isinstance(condition_flags, dict):
+            condition_flags = {}
+        for key in (
+            "response_attack_success",
+            "response_defense_success",
+            "response_status_success",
+        ):
+            if payload.get(key) is True:
+                condition_flags[key] = True
+            elif payload.get(key) is False:
+                condition_flags.setdefault(key, False)
+        damage_hit_count = max(int(payload.get("hit_count") or 1), 1)
+        slots = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == battle_event.battle_id,
+                BattleSkillSlot.side == defender_side,
+                BattleSkillSlot.elf_id == defender_elf_id,
+            )
+        ).all()
+        results: list[dict] = []
+        for slot in slots:
+            skill = self.db.get(SkillDefinition, slot.skill_id)
+            if skill is None or skill.deleted_at is not None:
+                continue
+            rule = loads_json(skill.damage_rule_json, {})
+            manual_review = rule.get("manual_review") if isinstance(rule, dict) else None
+            hooks = manual_review.get("future_hooks") if isinstance(manual_review, dict) else None
+            if not isinstance(hooks, list):
+                continue
+            for hook in hooks:
+                if not isinstance(hook, dict) or hook.get("status") != "executable":
+                    continue
+                trigger = hook.get("trigger")
+                if trigger == "damage_taken_resisted":
+                    if condition_flags.get("damage_resisted") is not True:
+                        continue
+                elif trigger != "damage_taken":
+                    continue
+                if not self._skill_runtime_hook_triggered(hook, condition_flags):
+                    continue
+                if (
+                    hook.get("requires_defense_skill_used") is True
+                    and payload.get("defense_skill_id") != skill.skill_id
+                ):
+                    continue
+                if hook.get("hook_type") == "persistent_skill_cost_modifier":
+                    before = slot.current_energy_cost if slot.current_energy_cost is not None else (
+                        skill.base_energy_cost
+                    )
+                    delta = int(hook.get("cost_delta") or 0)
+                    slot.current_energy_cost = max(int(before or 0) + delta, 0)
+                    results.append(
+                        {
+                            "status": "executed",
+                            "hook_type": hook.get("hook_type"),
+                            "trigger": "damage_taken",
+                            "listener_skill_id": skill.skill_id,
+                            "slot_id": slot.slot_id,
+                            "field": "current_energy_cost",
+                            "before": before,
+                            "after": slot.current_energy_cost,
+                            "cost_delta": delta,
+                        }
+                    )
+                elif hook.get("hook_type") == "persistent_skill_power_modifier":
+                    before = (
+                        slot.current_power
+                        if slot.current_power is not None
+                        else skill.base_power
+                    )
+                    per_hit = hook.get("per_damage_hit") is True
+                    delta = int(hook.get("power_add") or 0)
+                    total_delta = delta * damage_hit_count if per_hit else delta
+                    slot.current_power = max(int(before or 0) + total_delta, 0)
+                    results.append(
+                        {
+                            "status": "executed",
+                            "hook_type": hook.get("hook_type"),
+                            "trigger": trigger,
+                            "listener_skill_id": skill.skill_id,
+                            "slot_id": slot.slot_id,
+                            "field": "current_power",
+                            "before": before,
+                            "after": slot.current_power,
+                            "power_add": total_delta,
+                            "damage_hit_count": damage_hit_count,
+                        }
+                    )
+                elif hook.get("hook_type") == "apply_effect":
+                    layers = int(hook.get("layers") or 0)
+                    layers += damage_hit_count * int(hook.get("layers_per_damage_hit") or 0)
+                    if layers <= 0:
+                        results.append(
+                            {
+                                "status": "skipped",
+                                "hook_type": hook.get("hook_type"),
+                                "reason": "zero_layers",
+                                "listener_skill_id": skill.skill_id,
+                            }
+                        )
+                        continue
+                    operation_results = EffectOperationExecutor(
+                        self.db
+                    ).execute_operations_for_event(
+                        battle_event,
+                        [
+                            {
+                                "op_type": "apply_effect",
+                                "effect_id": hook.get("effect_id"),
+                                "target": hook.get("target") or "target_side",
+                                "layers": layers,
+                                "condition": "always",
+                                "timing": "after_damage",
+                            }
+                        ],
+                    )
+                    results.append(
+                        {
+                            "status": "executed",
+                            "hook_type": hook.get("hook_type"),
+                            "trigger": "damage_taken",
+                            "listener_skill_id": skill.skill_id,
+                            "damage_hit_count": damage_hit_count,
+                            "layers": layers,
+                            "operation_results": operation_results,
+                        }
+                    )
+        return results
+
     @staticmethod
     def _skill_runtime_hook_triggered(hook: dict, condition_flags: dict) -> bool:
         trigger = hook.get("trigger") or hook.get("condition") or "after_skill_use"
@@ -2740,6 +3473,15 @@ class BattleService:
             or trigger in {"burst_active", "burst_triggered"}
         ):
             return condition_flags.get(trigger) is True
+        if trigger == "any_response_success":
+            return any(
+                condition_flags.get(key) is True
+                for key in (
+                    "response_attack_success",
+                    "response_defense_success",
+                    "response_status_success",
+                )
+            )
         return False
 
     @staticmethod

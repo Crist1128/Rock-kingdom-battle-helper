@@ -11,12 +11,14 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.calculation.formula_context import DamageFormulaContext
+from app.calculation.hit_rule_resolver import HitRuleResolver
 from app.core.enums import EventSource, OwnerScope, Side
 from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.effect import BattleEffectInstance
 from app.models.event import BattleEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import EffectDefinition, SkillDefinition
-from app.utils.json import loads_json
+from app.utils.json import dumps_json, loads_json
 
 
 class EffectOperationExecutor:
@@ -32,10 +34,14 @@ class EffectOperationExecutor:
         "resource_change",
         "resource_change_from_effect_layers",
         "heal_from_damage_dealt",
+        "convert_effect",
+        "trigger_status_damage_now",
         "multiply_layers",
         "multiply_layers_by_polarity",
         "clear_effect_layers",
         "conditional_branch",
+        "modify_skill_slots",
+        "interrupt_action",
     }
     ALWAYS_CONDITIONS = {None, "", "always", "normal", "on_skill_use"}
 
@@ -68,7 +74,33 @@ class EffectOperationExecutor:
                 }
             ]
 
-        return self.execute_operations_for_event(battle_event, operations)
+        return self.execute_operations_for_event(
+            battle_event,
+            [
+                item
+                for item in operations
+                if isinstance(item, dict) and item.get("timing") != "after_damage"
+            ],
+        )
+
+    def execute_for_damage_event(self, battle_event: BattleEvent) -> list[dict]:
+        """执行明确标记为 after_damage 的技能后置效果。"""
+        if battle_event.skill_id is None:
+            return []
+        skill = self.db.get(SkillDefinition, battle_event.skill_id)
+        if skill is None or skill.deleted_at is not None:
+            return []
+        operations = loads_json(skill.effect_operations_json, [])
+        if not isinstance(operations, list):
+            return []
+        return self.execute_operations_for_event(
+            battle_event,
+            [
+                item
+                for item in operations
+                if isinstance(item, dict) and item.get("timing") == "after_damage"
+            ],
+        )
 
     def execute_operations_for_event(
         self,
@@ -106,7 +138,7 @@ class EffectOperationExecutor:
             return self._skipped(operation, operation_index, "unsupported_operation")
 
         timing = operation.get("timing")
-        if timing not in (None, "", "on_skill_use", "after_damage_or_skill_use"):
+        if timing not in (None, "", "on_skill_use", "after_damage_or_skill_use", "after_damage"):
             return self._skipped(operation, operation_index, "unsupported_timing")
 
         condition = operation.get("condition")
@@ -123,6 +155,10 @@ class EffectOperationExecutor:
 
         if operation_type == "conditional_branch":
             return self._execute_conditional_branch(battle_event, operation, operation_index)
+        if operation_type == "modify_skill_slots":
+            return self._execute_modify_skill_slots(battle_event, operation, operation_index)
+        if operation_type == "interrupt_action":
+            return self._execute_interrupt_action(battle_event, operation, operation_index)
         if operation_type == "resource_change":
             return self._execute_resource_change(battle_event, operation, operation_index)
         if operation_type == "resource_change_from_effect_layers":
@@ -133,6 +169,14 @@ class EffectOperationExecutor:
             )
         if operation_type == "heal_from_damage_dealt":
             return self._execute_heal_from_damage_dealt(battle_event, operation, operation_index)
+        if operation_type == "convert_effect":
+            return self._execute_convert_effect(battle_event, operation, operation_index)
+        if operation_type == "trigger_status_damage_now":
+            return self._execute_trigger_status_damage_now(
+                battle_event,
+                operation,
+                operation_index,
+            )
         if operation_type == "clear_effects":
             return self._execute_clear_effects(battle_event, operation, operation_index)
         if operation_type == "clear_effect_layers":
@@ -188,7 +232,7 @@ class EffectOperationExecutor:
                 condition,
             )
 
-        layers_result = self._resolve_layers(operation, definition, target)
+        layers_result = self._resolve_layers(battle_event, operation, definition, target)
         if layers_result["status"] != "resolved":
             return {
                 "status": "unknown" if layers_result["status"] == "unknown" else "skipped",
@@ -261,6 +305,7 @@ class EffectOperationExecutor:
             "layers_before": layers_before,
             "layers_after": instance.layers,
             "layer_bonus_sources": layer_bonus_sources,
+            "layers_resolution": self._layers_resolution_detail(layers_result),
         }
 
     def _positive_stat_layer_bonus_sources(
@@ -348,6 +393,105 @@ class EffectOperationExecutor:
             "child_results": child_results,
         }
 
+    def _execute_interrupt_action(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """记录“打断被应对技能”的结构化结果。
+
+        当前系统仍以手动事件流为准，不会删除用户已经录入的后续事件；这里把打断
+        写回 payload，供前端和后续重放逻辑识别该技能分支已经触发。
+        """
+        payload = loads_json(battle_event.payload_json, {})
+        if not isinstance(payload, dict):
+            payload = {}
+        interrupted = payload.get("interrupted_actions")
+        if not isinstance(interrupted, list):
+            interrupted = []
+        item = {
+            "source_skill_id": battle_event.skill_id,
+            "target": operation.get("target") or "responded_skill",
+            "reason": operation.get("reason") or "skill_interrupt_action",
+        }
+        interrupted.append(item)
+        payload["interrupted_actions"] = interrupted
+        battle_event.payload_json = dumps_json(payload)
+        return {
+            "status": "executed",
+            "operation_index": operation_index,
+            "operation": "interrupt_action",
+            **item,
+        }
+
+    def _execute_modify_skill_slots(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """批量调整运行时技能槽字段，目前用于防御技能冷却修正。"""
+        target_side = self._resolve_target_side(battle_event, operation.get("target"))
+        if target_side is None:
+            return self._skipped(operation, operation_index, "target_side_missing")
+        battle = self.db.get(Battle, battle_event.battle_id)
+        if battle is None or battle.deleted_at is not None:
+            return self._skipped(operation, operation_index, "battle_missing")
+        target_elf_id = self._resolve_target_elf_id(battle, battle_event, target_side)
+        if target_elf_id is None:
+            return self._skipped(operation, operation_index, "target_elf_id_missing")
+        slots = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == battle_event.battle_id,
+                BattleSkillSlot.side == target_side,
+                BattleSkillSlot.elf_id == target_elf_id,
+            )
+        ).all()
+        skill_category = operation.get("skill_category")
+        slot_kind = operation.get("slot_kind")
+        cooldown_delta = int(operation.get("cooldown_delta") or 0)
+        changed: list[dict] = []
+        for slot in slots:
+            skill = self.db.get(SkillDefinition, slot.skill_id)
+            if skill is None or skill.deleted_at is not None:
+                continue
+            if skill_category is not None and skill.skill_category != str(skill_category):
+                continue
+            if slot_kind == "defense" and not self._skill_has_defense_rule(skill):
+                continue
+            before_cooldown = slot.cooldown_remaining or 0
+            if cooldown_delta:
+                slot.cooldown_remaining = max(before_cooldown + cooldown_delta, 0)
+            changed.append(
+                {
+                    "slot_id": slot.slot_id,
+                    "skill_id": slot.skill_id,
+                    "skill_name": skill.skill_name,
+                    "cooldown_before": before_cooldown,
+                    "cooldown_after": slot.cooldown_remaining,
+                }
+            )
+        return {
+            "status": "executed" if changed else "skipped",
+            "reason": None if changed else "no_matching_skill_slots",
+            "operation_index": operation_index,
+            "operation": "modify_skill_slots",
+            "target_side": target_side,
+            "target_elf_id": target_elf_id,
+            "changed": changed,
+        }
+
+    @staticmethod
+    def _skill_has_defense_rule(skill: SkillDefinition) -> bool:
+        rule = loads_json(skill.damage_rule_json, {})
+        if not isinstance(rule, dict):
+            return False
+        return any(
+            rule.get(key) is not None
+            for key in ("damage_reduction", "reduction", "damage_multiplier", "multiplier")
+        )
+
     def _execute_change_weather(
         self,
         battle_event: BattleEvent,
@@ -371,7 +515,7 @@ class EffectOperationExecutor:
         target = self._resolve_target(battle_event, "field", definition)
         if target["status"] != "resolved":
             return self._skipped(operation, operation_index, target["reason"])
-        layers_result = self._resolve_layers(operation, definition, target)
+        layers_result = self._resolve_layers(battle_event, operation, definition, target)
         if layers_result["status"] != "resolved":
             return {
                 "status": "unknown",
@@ -767,6 +911,176 @@ class EffectOperationExecutor:
         result["rounding"] = "floor"
         return result
 
+    def _execute_convert_effect(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """把目标身上的一种状态转换为另一种状态，层数默认继承。"""
+        from_effect_id = operation.get("from_effect_id") or operation.get("source_effect_id")
+        to_effect_id = operation.get("to_effect_id") or operation.get("effect_id")
+        if not isinstance(from_effect_id, str) or not from_effect_id:
+            return self._skipped(operation, operation_index, "from_effect_id_missing")
+        if not isinstance(to_effect_id, str) or not to_effect_id:
+            return self._skipped(operation, operation_index, "to_effect_id_missing")
+        from_definition = self.db.get(EffectDefinition, from_effect_id)
+        to_definition = self.db.get(EffectDefinition, to_effect_id)
+        if from_definition is None or from_definition.deleted_at is not None:
+            return self._skipped(operation, operation_index, "from_effect_definition_missing")
+        if to_definition is None or to_definition.deleted_at is not None:
+            return self._skipped(operation, operation_index, "to_effect_definition_missing")
+
+        target = self._resolve_target(
+            battle_event,
+            operation.get("target"),
+            from_definition,
+        )
+        if target["status"] != "resolved":
+            return self._skipped(operation, operation_index, target["reason"])
+        existing = self._find_existing_instance(
+            battle_id=battle_event.battle_id,
+            definition=from_definition,
+            owner_side=target.get("owner_side"),
+            owner_elf_id=target.get("owner_elf_id"),
+            owner_skill_slot_id=target.get("owner_skill_slot_id"),
+            field_id=target.get("field_id"),
+        )
+        if existing is None or not existing.is_active or existing.layers <= 0:
+            return self._skipped(operation, operation_index, "source_effect_instance_missing")
+
+        layers_before = existing.layers
+        existing.is_active = False
+        existing.layers = 0
+        existing.last_updated_turn = battle_event.turn_number
+        self._create_effect_change_event(
+            battle_event=battle_event,
+            definition=from_definition,
+            instance=existing,
+            change_type="convert",
+            layers_before=layers_before,
+            condition_branch=str(operation.get("condition") or "") or None,
+            reason="skill_convert_effect_source",
+        )
+
+        apply_operation = dict(operation)
+        apply_operation.update(
+            {
+                "op_type": "apply_effect",
+                "effect_id": to_effect_id,
+                "layers": layers_before,
+                "target": operation.get("target"),
+                "condition": "always",
+            }
+        )
+        target_to = self._resolve_target(battle_event, operation.get("target"), to_definition)
+        if target_to["status"] != "resolved":
+            return self._skipped(operation, operation_index, target_to["reason"])
+        instance = self._find_existing_instance(
+            battle_id=battle_event.battle_id,
+            definition=to_definition,
+            owner_side=target_to.get("owner_side"),
+            owner_elf_id=target_to.get("owner_elf_id"),
+            owner_skill_slot_id=target_to.get("owner_skill_slot_id"),
+            field_id=target_to.get("field_id"),
+        )
+        layers_to_apply = layers_before
+        if to_definition.max_layers is not None:
+            layers_to_apply = min(layers_to_apply, to_definition.max_layers)
+        if instance is None:
+            instance = self._create_instance(
+                battle_event=battle_event,
+                definition=to_definition,
+                target=target_to,
+                layers=layers_to_apply,
+                operation=apply_operation,
+            )
+            target_layers_before = None
+            change_type = "apply"
+        else:
+            target_layers_before = instance.layers
+            self._update_existing_instance(
+                instance=instance,
+                definition=to_definition,
+                layers=layers_to_apply,
+                turn_number=battle_event.turn_number,
+                operation=apply_operation,
+            )
+            instance.is_active = True
+            change_type = "stack"
+        self._create_effect_change_event(
+            battle_event=battle_event,
+            definition=to_definition,
+            instance=instance,
+            change_type=change_type,
+            layers_before=target_layers_before,
+            condition_branch=str(operation.get("condition") or "") or None,
+            reason="skill_convert_effect_target",
+        )
+        return {
+            "status": "executed",
+            "operation_index": operation_index,
+            "operation": "convert_effect",
+            "from_effect_id": from_effect_id,
+            "to_effect_id": to_effect_id,
+            "converted_layers": layers_before,
+            "source_effect_instance_id": existing.instance_id,
+            "target_effect_instance_id": instance.instance_id,
+        }
+
+    def _execute_trigger_status_damage_now(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """立即结算目标身上指定状态的一次状态伤害。"""
+        effect_id = operation.get("effect_id") or operation.get("source_effect_id")
+        if not isinstance(effect_id, str) or not effect_id:
+            return self._skipped(operation, operation_index, "effect_id_missing")
+        definition = self.db.get(EffectDefinition, effect_id)
+        if definition is None or definition.deleted_at is not None:
+            return self._skipped(operation, operation_index, "effect_definition_missing")
+        target = self._resolve_target(battle_event, operation.get("target"), definition)
+        if target["status"] != "resolved":
+            return self._skipped(operation, operation_index, target["reason"])
+        instance = self._find_existing_instance(
+            battle_id=battle_event.battle_id,
+            definition=definition,
+            owner_side=target.get("owner_side"),
+            owner_elf_id=target.get("owner_elf_id"),
+            owner_skill_slot_id=target.get("owner_skill_slot_id"),
+            field_id=target.get("field_id"),
+        )
+        if instance is None or not instance.is_active or instance.layers <= 0:
+            return self._skipped(operation, operation_index, "effect_instance_missing")
+        battle = self.db.get(Battle, battle_event.battle_id)
+        if battle is None or battle.deleted_at is not None:
+            return self._skipped(operation, operation_index, "battle_missing")
+        resource_rule = loads_json(definition.resource_modifier_json, {})
+        if not isinstance(resource_rule, dict) or not resource_rule:
+            return self._skipped(operation, operation_index, "resource_rule_missing")
+
+        from app.services.turn_settlement_service import TurnSettlementService
+
+        result = TurnSettlementService(self.db)._settle_status_damage(
+            battle=battle,
+            turn_number=battle_event.turn_number,
+            instance=instance,
+            definition=definition,
+            resource_rule=resource_rule,
+            settlement_phase=str(operation.get("settlement_phase") or "skill_triggered"),
+        )
+        settled = result.get("status") in {"settled", "settled_percent"}
+        return {
+            "status": "executed" if settled else "skipped",
+            "reason": None if settled else result.get("reason"),
+            "operation_index": operation_index,
+            "operation": "trigger_status_damage_now",
+            "effect_id": effect_id,
+            "settlement_result": result,
+        }
+
     def _execute_resource_change(
         self,
         battle_event: BattleEvent,
@@ -780,7 +1094,7 @@ class EffectOperationExecutor:
         resource_type = str(operation.get("resource_type") or "hp")
         change_type = str(operation.get("change_type") or "manual_set")
         value_type = str(operation.get("value_type") or "value")
-        raw_value = operation.get("value")
+        raw_value = self._resolve_resource_change_value(battle_event, operation)
         if not isinstance(raw_value, int | float):
             return self._skipped(operation, operation_index, "resource_value_missing")
 
@@ -976,6 +1290,13 @@ class EffectOperationExecutor:
         payload = loads_json(battle_event.payload_json, {})
         if not isinstance(payload, dict) or not isinstance(condition, str):
             return "unknown"
+        if condition.startswith("not_"):
+            positive = self._condition_result(battle_event, condition.removeprefix("not_"))
+            if positive == "matched":
+                return "condition_not_met"
+            if positive == "condition_not_met":
+                return "matched"
+            return positive
         manual_flags = payload.get("manual_flags")
         condition_flags = payload.get("condition_flags")
         values = [
@@ -986,6 +1307,29 @@ class EffectOperationExecutor:
         if True in values:
             return "matched"
         if False in values:
+            return "condition_not_met"
+        if condition in {
+            "self_switched_this_turn",
+            "enemy_switched_this_turn",
+            "target_switched_this_turn",
+            "defender_switched_this_turn",
+            "actor_switched_this_turn",
+        }:
+            return (
+                "matched"
+                if self._switch_condition_matches(battle_event, condition)
+                else "condition_not_met"
+            )
+        if condition == "target_defeated":
+            return "matched" if self._target_is_defeated(battle_event) else "condition_not_met"
+        if condition == "any_response_success":
+            for key in (
+                "response_attack_success",
+                "response_defense_success",
+                "response_status_success",
+            ):
+                if self._condition_result(battle_event, key) == "matched":
+                    return "matched"
             return "condition_not_met"
         if condition.endswith("_failed"):
             success_condition = f"{condition[:-7]}_success"
@@ -1003,6 +1347,79 @@ class EffectOperationExecutor:
             if True in success_values:
                 return "condition_not_met"
         return "unknown"
+
+    def _resolve_resource_change_value(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+    ) -> object:
+        """解析资源变化数值，支持从被应对技能能耗读取。"""
+        value_from = operation.get("value_from")
+        if value_from not in {"responded_skill_energy_cost", "target_skill_energy_cost"}:
+            return operation.get("value")
+        skill_id = self._responded_skill_id(battle_event)
+        if not skill_id:
+            return None
+        skill = self.db.get(SkillDefinition, skill_id)
+        if skill is None or skill.deleted_at is not None:
+            return None
+        return max(int(skill.base_energy_cost or 0), 0)
+
+    @staticmethod
+    def _responded_skill_id(battle_event: BattleEvent) -> str | None:
+        payload = loads_json(battle_event.payload_json, {})
+        if not isinstance(payload, dict):
+            return None
+        for key in ("responded_skill_id", "target_skill_id", "interrupted_skill_id"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                return value
+        responded_skill = payload.get("responded_skill")
+        if isinstance(responded_skill, dict):
+            value = responded_skill.get("skill_id")
+            if isinstance(value, str) and value:
+                return value
+        return None
+
+    def _target_is_defeated(self, battle_event: BattleEvent) -> bool:
+        target_state = self._resolve_resource_target(
+            battle_event,
+            battle_event.target_side or "target_side",
+        )
+        if target_state is not None:
+            return target_state.is_defeated is True
+        payload = loads_json(battle_event.payload_json, {})
+        if isinstance(payload, dict):
+            if payload.get("target_defeated") is True:
+                return True
+            hp_after = payload.get("hp_percent_after")
+            if isinstance(hp_after, int | float) and hp_after <= 0:
+                return True
+        return False
+
+    def _switch_condition_matches(self, battle_event: BattleEvent, condition: str) -> bool:
+        switched_sides = {
+            side
+            for side in self.db.scalars(
+                select(BattleEvent.actor_side).where(
+                    BattleEvent.battle_id == battle_event.battle_id,
+                    BattleEvent.turn_number == battle_event.turn_number,
+                    BattleEvent.event_type == "switch_elf",
+                    BattleEvent.actor_side.is_not(None),
+                    BattleEvent.is_voided.is_(False),
+                )
+            ).all()
+            if side
+        }
+        if condition == "self_switched_this_turn":
+            return Side.SELF.value in switched_sides
+        if condition == "enemy_switched_this_turn":
+            return Side.ENEMY.value in switched_sides
+        if condition in {"target_switched_this_turn", "defender_switched_this_turn"}:
+            return battle_event.target_side in switched_sides
+        if condition == "actor_switched_this_turn":
+            return battle_event.actor_side in switched_sides
+        return False
 
     def _resolve_target(
         self,
@@ -1054,6 +1471,18 @@ class EffectOperationExecutor:
             owner_skill_slot_id = None
             if target in {"source_skill", "self_skill"} and battle_event.skill_id:
                 owner_skill_slot_id = self._source_skill_slot_id(battle_event)
+            elif target in {
+                "enemy_current_turn_used_skill",
+                "opponent_current_turn_used_skill",
+                "target_current_turn_used_skill",
+            }:
+                target_side_for_slot = self._resolve_target_side(battle_event, "enemy_side")
+                if target == "target_current_turn_used_skill":
+                    target_side_for_slot = self._resolve_target_side(battle_event, "target_side")
+                owner_skill_slot_id = self._current_turn_used_skill_slot_id(
+                    battle_event,
+                    target_side_for_slot,
+                )
             if owner_skill_slot_id is None:
                 return {"status": "failed", "reason": "owner_skill_slot_id_missing"}
             return {
@@ -1118,6 +1547,40 @@ class EffectOperationExecutor:
         ).first()
         return slot.slot_id if slot is not None else None
 
+    def _current_turn_used_skill_slot_id(
+        self,
+        battle_event: BattleEvent,
+        target_side: str | None,
+    ) -> str | None:
+        """读取目标阵营本回合已经使用过的最后一个技能槽 ID。"""
+        if target_side is None:
+            return None
+        used_event = self.db.scalars(
+            select(BattleEvent)
+            .where(
+                BattleEvent.battle_id == battle_event.battle_id,
+                BattleEvent.turn_number == battle_event.turn_number,
+                BattleEvent.actor_side == target_side,
+                BattleEvent.skill_id.is_not(None),
+                BattleEvent.is_voided.is_(False),
+            )
+            .order_by(
+                BattleEvent.action_order.desc().nullslast(),
+                BattleEvent.created_at.desc(),
+            )
+        ).first()
+        if used_event is None or used_event.skill_id is None or used_event.actor_elf_id is None:
+            return None
+        slot = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == battle_event.battle_id,
+                BattleSkillSlot.side == target_side,
+                BattleSkillSlot.elf_id == used_event.actor_elf_id,
+                BattleSkillSlot.skill_id == used_event.skill_id,
+            )
+        ).first()
+        return slot.slot_id if slot is not None else None
+
     @staticmethod
     def _opposite_side(side: str | None) -> str | None:
         """返回对方阵营。"""
@@ -1129,11 +1592,28 @@ class EffectOperationExecutor:
 
     def _resolve_layers(
         self,
+        battle_event: BattleEvent,
         operation: dict,
         definition: EffectDefinition,
         target: dict,
     ) -> dict:
         """解析施加层数，并按状态定义 max_layers 截断。"""
+        if operation.get("layers_from") in {
+            "current_hit_count",
+            "skill_hit_count",
+            "effective_hit_count",
+        }:
+            return self._resolve_layers_from_current_hit_count(
+                battle_event,
+                operation,
+                definition,
+            )
+        if operation.get("layers_from") in {"damage_hit_count", "current_damage_hit_count"}:
+            return self._resolve_layers_from_damage_hit_count(
+                battle_event,
+                operation,
+                definition,
+            )
         if "layers_from" in operation:
             return self._resolve_dynamic_layers(operation, definition, target)
         operation_type = (
@@ -1205,6 +1685,171 @@ class EffectOperationExecutor:
         if definition.max_layers is not None:
             layers = min(layers, definition.max_layers)
         return {"status": "resolved", "layers": layers}
+
+    def _resolve_layers_from_current_hit_count(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        definition: EffectDefinition,
+    ) -> dict:
+        """按当前连击数计算状态层数，例如每段获得 30%/60% 属性增益。"""
+        hit_count_detail = self._resolve_current_hit_count(battle_event)
+        if hit_count_detail["status"] != "resolved":
+            return {
+                "status": "unknown",
+                "reason": hit_count_detail["reason"],
+            }
+        hit_count = int(hit_count_detail["hit_count"])
+        layers_per_hit = self._positive_int(
+            operation.get("layers_per_hit")
+            or operation.get("layers_per_combo")
+            or operation.get("layers_multiplier")
+            or operation.get("layers_per_source_layer")
+            or 1
+        )
+        base_layers = self._non_negative_int(operation.get("base_layers")) or 0
+        layers = base_layers + hit_count * layers_per_hit
+        if definition.max_layers is not None:
+            layers = min(layers, definition.max_layers)
+        return {
+            "status": "resolved",
+            "layers": max(layers, 0),
+            "layers_from": operation.get("layers_from"),
+            "hit_count": hit_count,
+            "hit_count_source": hit_count_detail.get("source"),
+            "layers_per_hit": layers_per_hit,
+            "base_layers": base_layers,
+        }
+
+    def _resolve_layers_from_damage_hit_count(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        definition: EffectDefinition,
+    ) -> dict:
+        """按伤害事件的连击段数解析层数。"""
+        payload = loads_json(battle_event.payload_json, {})
+        if not isinstance(payload, dict):
+            return {"status": "unknown", "reason": "payload_missing"}
+        hit_count = self._positive_int(payload.get("hit_count"))
+        if hit_count is None:
+            damage_display_type = payload.get("damage_display_type")
+            hit_count = 1 if damage_display_type in {None, "single_damage"} else None
+        if hit_count is None:
+            return {"status": "unknown", "reason": "damage_hit_count_missing"}
+        layers_per_hit = self._positive_int(
+            operation.get("layers_per_hit")
+            or operation.get("layers_per_combo")
+            or operation.get("layers_multiplier")
+            or operation.get("layers_per_source_layer")
+        ) or 1
+        base_layers = self._non_negative_int(operation.get("base_layers")) or 0
+        layers = base_layers + hit_count * layers_per_hit
+        if definition.max_layers is not None:
+            layers = min(layers, definition.max_layers)
+        return {
+            "status": "resolved",
+            "layers": max(layers, 0),
+            "layers_from": operation.get("layers_from"),
+            "hit_count": hit_count,
+            "layers_per_hit": layers_per_hit,
+            "base_layers": base_layers,
+        }
+
+    def _resolve_current_hit_count(self, battle_event: BattleEvent) -> dict:
+        """读取技能事件 payload 中的最终连击数，缺失时回退到技能 hit_rule_json。"""
+        payload = loads_json(battle_event.payload_json, {})
+        if not isinstance(payload, dict):
+            payload = {}
+        skill_runtime = payload.get("skill_runtime")
+        if isinstance(skill_runtime, dict):
+            runtime_hit_count = self._positive_int(skill_runtime.get("effective_hit_count"))
+            if runtime_hit_count is not None:
+                return {
+                    "status": "resolved",
+                    "hit_count": runtime_hit_count,
+                    "source": "skill_runtime",
+                }
+        manual_hit_count = self._positive_int(payload.get("hit_count"))
+        if manual_hit_count is not None:
+            return {
+                "status": "resolved",
+                "hit_count": manual_hit_count,
+                "source": "manual_payload",
+            }
+        context = DamageFormulaContext(
+            battle_id=battle_event.battle_id,
+            attacker_side=str(battle_event.actor_side or ""),
+            attacker_elf_id=str(battle_event.actor_elf_id or ""),
+            defender_side=str(
+                battle_event.target_side
+                or self._opposite_side(battle_event.actor_side)
+                or ""
+            ),
+            defender_elf_id=str(battle_event.target_elf_id or ""),
+            skill_id=battle_event.skill_id,
+            formula_type="attack",
+            snapshot_payload=self._active_effect_snapshot_payload(battle_event.battle_id),
+        )
+        details = HitRuleResolver(self.db).resolve_hit_rule(context, payload)
+        hit_rule = details.get("hit_rule") if isinstance(details, dict) else None
+        source = (
+            hit_rule.get("source")
+            if isinstance(hit_rule, dict) and isinstance(hit_rule.get("source"), str)
+            else "context_default"
+        )
+        return {
+            "status": "resolved",
+            "hit_count": max(int(context.hit_count or 1), 1),
+            "source": source,
+        }
+
+    def _active_effect_snapshot_payload(self, battle_id: str) -> list[dict]:
+        """把当前 active 状态转成 HitRuleResolver 可读取的轻量快照。"""
+        return [
+            {
+                "instance_id": item.instance_id,
+                "effect_id": item.effect_id,
+                "category": item.category,
+                "owner_scope": item.owner_scope,
+                "owner_side": item.owner_side,
+                "owner_elf_id": item.owner_elf_id,
+                "owner_skill_slot_id": item.owner_skill_slot_id,
+                "field_id": item.field_id,
+                "layers": item.layers,
+            }
+            for item in self.db.scalars(
+                select(BattleEffectInstance).where(
+                    BattleEffectInstance.battle_id == battle_id,
+                    BattleEffectInstance.is_active.is_(True),
+                )
+            ).all()
+        ]
+
+    @staticmethod
+    def _layers_resolution_detail(layers_result: dict) -> dict | None:
+        detail = {
+            key: value
+            for key, value in layers_result.items()
+            if key not in {"status", "layers"}
+        }
+        return detail or None
+
+    @staticmethod
+    def _positive_int(value: object) -> int | None:
+        try:
+            parsed = int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed > 0 else None
+
+    @staticmethod
+    def _non_negative_int(value: object) -> int | None:
+        try:
+            parsed = int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
 
     def _resolve_dynamic_layers_source_target(
         self,

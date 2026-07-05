@@ -22,6 +22,7 @@ from app.models.event import BattleEvent, DamageEvent, ResourceChangeEvent
 from app.models.static import EffectDefinition, SkillDefinition
 from app.schemas.event import DamageEventCreate, DamageEventCreateResult
 from app.services.battle_service import BattleService
+from app.services.effect_operation_executor import EffectOperationExecutor
 from app.services.estimate_service import EstimateService
 from app.services.snapshot_service import SnapshotService
 from app.services.turn_settlement_service import TurnSettlementService
@@ -68,6 +69,10 @@ class DamageEventService:
             status_rule
         )
         effective_payload["formula_type"] = formula_type
+        effective_payload["turn_number"] = turn_number
+        if total_damage is not None:
+            effective_payload["damage_dealt"] = total_damage
+            effective_payload["computed_total_damage_value"] = total_damage
         if payload.effect_id:
             effective_payload["effect_id"] = payload.effect_id
         if effect_layers is not None:
@@ -224,10 +229,27 @@ class DamageEventService:
             context.flat_power_bonus = (
                 Decimal(str(context.flat_power_bonus)) + skill_modifier["flat_power_bonus"]
             )
-            context.hit_count = max(
-                int(context.hit_count or 1) + int(skill_modifier["hit_count_delta"]),
-                1,
+            hit_rule_detail = context.rule_resolution_details.get("hit_rule", {})
+            hit_rule_source = (
+                hit_rule_detail.get("source")
+                if isinstance(hit_rule_detail, dict)
+                else None
             )
+            if hit_rule_source not in {"manual_payload", "auto_effect_prefill"}:
+                context.hit_count = max(
+                    int(
+                        Decimal(
+                            str(
+                                int(context.hit_count or 1)
+                                + int(skill_modifier["hit_count_delta"])
+                            )
+                        )
+                        * Decimal(
+                            str(skill_modifier.get("hit_count_multiplier") or "1")
+                        )
+                    ),
+                    1,
+                )
             if skill_modifier["items"]:
                 context.rule_resolution_details["skill_modifier"] = skill_modifier["items"]
         damage_event.formula_context_json = dumps_json(context)
@@ -240,6 +262,18 @@ class DamageEventService:
         )
         if consumed_skill_modifiers:
             effective_payload["consumed_skill_modifier_effects"] = consumed_skill_modifiers
+            battle_event.payload_json = dumps_json(effective_payload)
+        damage_skill_runtime_result = self._process_damage_skill_runtime_if_needed(
+            battle_service,
+            battle_event,
+        )
+        if damage_skill_runtime_result:
+            if (
+                isinstance(observed_skill_slot, dict)
+                and observed_skill_slot.get("slot_created") is True
+            ):
+                damage_skill_runtime_result["slot_created"] = True
+            effective_payload["skill_runtime"] = damage_skill_runtime_result
             battle_event.payload_json = dumps_json(effective_payload)
         estimate_observation_results = self._process_estimate_observations(
             damage_event=damage_event,
@@ -269,6 +303,25 @@ class DamageEventService:
             hp_percent_delta=hp_percent_delta,
         )
         self._update_defender_hp_state(battle, payload, total_damage)
+        damage_taken_runtime_listener_results = battle_service.apply_damage_taken_runtime_listeners(
+            battle_event=battle_event,
+            defender_side=payload.defender_side,
+            defender_elf_id=payload.defender_elf_id,
+            damage_value=total_damage,
+        )
+        if damage_taken_runtime_listener_results:
+            effective_payload["damage_taken_runtime_listener_results"] = (
+                damage_taken_runtime_listener_results
+            )
+            battle_event.payload_json = dumps_json(effective_payload)
+        post_damage_operation_results = EffectOperationExecutor(self.db).execute_for_damage_event(
+            battle_event
+        )
+        if post_damage_operation_results:
+            effective_payload["post_damage_effect_operation_results"] = (
+                post_damage_operation_results
+            )
+            battle_event.payload_json = dumps_json(effective_payload)
         post_settlement_events = TurnSettlementService(self.db).settle_post_attack(
             battle=battle,
             turn_number=turn_number,
@@ -290,6 +343,48 @@ class DamageEventService:
             inference_result=inference_result,
             post_settlement_events=post_settlement_events,
         )
+
+    def _process_damage_skill_runtime_if_needed(
+        self,
+        battle_service: BattleService,
+        battle_event: BattleEvent,
+    ) -> dict | None:
+        """
+        伤害事件也代表一次攻击技能使用。
+
+        公式计算必须基于事件发生瞬间的快照，因此这里放在本次伤害结算之后再处理
+        技能槽扣能、使用后威力/能耗钩子、以及“使用其他同系技能”监听，确保只影响
+        后续面板预览，不污染本次伤害计算。
+        """
+        if battle_event.skill_id is None or not battle_event.skill_confirmed:
+            return None
+        if self._same_turn_skill_use_event_exists(battle_event):
+            return None
+        result = battle_service._process_skill_runtime(battle_event)
+        if isinstance(result, dict):
+            result.setdefault("record_source", "damage_event")
+        return result
+
+    def _same_turn_skill_use_event_exists(self, battle_event: BattleEvent) -> bool:
+        """若同回合已记录对应 skill_use，则避免伤害事件重复触发技能运行时钩子。"""
+        if (
+            battle_event.skill_id is None
+            or battle_event.actor_side is None
+            or battle_event.actor_elf_id is None
+        ):
+            return False
+        existing = self.db.scalars(
+            select(BattleEvent).where(
+                BattleEvent.battle_id == battle_event.battle_id,
+                BattleEvent.turn_number == battle_event.turn_number,
+                BattleEvent.event_type == BattleEventType.SKILL_USE.value,
+                BattleEvent.actor_side == battle_event.actor_side,
+                BattleEvent.actor_elf_id == battle_event.actor_elf_id,
+                BattleEvent.skill_id == battle_event.skill_id,
+                BattleEvent.is_voided.is_(False),
+            )
+        ).first()
+        return existing is not None
 
     @staticmethod
     def _resolve_total_damage(payload: DamageEventCreate) -> int | None:

@@ -92,6 +92,15 @@ class SkillUseEventCreate(BaseModel):
     target_elf_id: str | None = Field(default=None, description="目标方精灵 ID")
     skill_id: str = Field(..., description="使用的技能 ID")
     skill_confirmed: bool = Field(default=True, description="技能是否已确认")
+    hit_count: int | None = Field(
+        default=None,
+        ge=1,
+        description="本次状态/辅助类技能的实际连击次数；手动填写优先于技能库规则",
+    )
+    combo_count_source: str | None = Field(
+        default="manual_input",
+        description="连击次数来源",
+    )
     condition_flags: dict[str, bool] | None = Field(
         default=None,
         description="技能结构化操作的条件旗标，例如 response_defense_success",

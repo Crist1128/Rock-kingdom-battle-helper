@@ -800,6 +800,8 @@ export interface SkillUseEventCreate {
   target_elf_id?: string | null;
   skill_id: string;
   skill_confirmed?: boolean;
+  hit_count?: number | null;
+  combo_count_source?: string | null;
   condition_flags?: Record<string, boolean> | null;
   manual_flags?: Record<string, boolean> | null;
   notes?: string | null;
@@ -974,10 +976,13 @@ export interface StaticSkillRuleSyncRequest {
   commit?: boolean;
   /** 只同步指定技能；留空表示同步全部待同步 structured 技能。 */
   skill_ids?: string[] | null;
+  /** 可选技能名/ID 筛选；用于只同步当前筛选范围内的待同步规则。 */
+  q?: string | null;
 }
 
 export interface StaticSkillRuleSyncResponse {
   source: string;
+  query?: string | null;
   total_rows: number;
   status_counts: Record<string, number>;
   structured_total: number;

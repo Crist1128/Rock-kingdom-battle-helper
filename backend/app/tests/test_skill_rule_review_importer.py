@@ -221,6 +221,46 @@ def test_static_rule_sync_checks_and_commits_structured_rules(
     assert loads_json(skill.hit_rule_json, {})["damage_display_type"] == "single_damage"
 
 
+def test_static_rule_sync_can_filter_by_skill_name(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    """同步检查器支持按技能名筛选，避免目标技能被默认列表上限截断。"""
+    db_session.add(_skill("skill_a", skill_name="三连破"))
+    db_session.add(_skill("skill_b", skill_name="花炮"))
+    db_session.commit()
+    reviews_json = tmp_path / "reviews.json"
+    reviews_json.write_text(
+        dumps_json(
+            [
+                {
+                    "skill_id": "skill_a",
+                    "skill_name": "三连破",
+                    "review_status": "structured",
+                    "hit_rule": {"hit_count": 3},
+                },
+                {
+                    "skill_id": "skill_b",
+                    "skill_name": "花炮",
+                    "review_status": "structured",
+                    "hit_rule": {"hit_count": 2},
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    plan = check_structured_skill_rule_sync(
+        db_session,
+        reviews_json=reviews_json,
+        q="花炮",
+    )
+
+    assert plan["query"] == "花炮"
+    assert plan["pending_count"] == 1
+    assert plan["pending_items"][0]["skill_id"] == "skill_b"
+
+
 def _skill(
     skill_id: str,
     *,

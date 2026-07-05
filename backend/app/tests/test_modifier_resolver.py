@@ -15,7 +15,9 @@ from app.models import battle as _battle_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
-from app.models.static import EffectDefinition, SkillDefinition
+from app.models.battle import Battle, BattleElfState
+from app.models.event import BattleEvent
+from app.models.static import EffectDefinition, ElfDefinition, SkillDefinition
 from app.services.battle_service import BattleService
 from app.utils.json import dumps_json
 
@@ -81,6 +83,25 @@ def db_session() -> Iterator[Session]:
                     {
                         "modifier_type": "damage_bonus",
                         "element_type": "水",
+                        "value_type": "percent_add",
+                        "value": 0.75,
+                    }
+                ),
+            ),
+            EffectDefinition(
+                effect_id="weather_sandstorm",
+                effect_name="沙暴",
+                category="weather",
+                polarity="neutral",
+                display_group="weather",
+                display_priority=310,
+                owner_scope="field",
+                target_scope="field",
+                attach_target_type="field",
+                skill_modifier_json=dumps_json(
+                    {
+                        "modifier_type": "damage_bonus",
+                        "element_type": "地",
                         "value_type": "percent_add",
                         "value": 0.75,
                     }
@@ -285,6 +306,27 @@ def test_modifier_resolver_uses_rain_weather_multiplier(db_session: Session) -> 
     assert details["weather_multiplier"]["effect_id"] == "weather_rain"
 
 
+def test_modifier_resolver_matches_weather_element_aliases(db_session: Session) -> None:
+    """天气/状态规则使用中文属性、技能使用英文属性时也应命中。"""
+    context = DamageFormulaContext(
+        battle_id="battle_1",
+        skill_element_type="earth",
+        snapshot_payload=[
+            {
+                "instance_id": "weather_sandstorm_1",
+                "effect_id": "weather_sandstorm",
+                "owner_scope": "field",
+                "layers": 1,
+            }
+        ],
+    )
+
+    details = ModifierResolver(db_session).resolve_formula_modifiers(context, {})
+
+    assert context.weather_multiplier == Decimal("1.75")
+    assert details["weather_multiplier"]["effect_id"] == "weather_sandstorm"
+
+
 def test_modifier_resolver_recognizes_blizzard_without_damage_bonus(
     db_session: Session,
 ) -> None:
@@ -399,6 +441,127 @@ def test_battle_service_reads_skill_modifier_layer_units(db_session: Session) ->
     assert result["flat_power_bonus"] == Decimal("20")
     assert result["hit_count_delta"] == 2
     assert result["energy_cost_delta"] == -2
+
+
+def test_missing_hp_power_rule_can_cap_effective_power_at_zero(db_session: Session) -> None:
+    """Missing-HP negative power rules should honor the configured floor."""
+    db_session.add(
+        ElfDefinition(
+            elf_id="elf_self",
+            elf_name="self",
+            avatar="",
+            element_types_json=dumps_json([]),
+            base_hp_talent=100,
+            base_physical_attack_talent=100,
+            base_physical_defense_talent=100,
+            base_magic_attack_talent=100,
+            base_magic_defense_talent=100,
+            base_speed_talent=100,
+        )
+    )
+    db_session.add(Battle(battle_id="battle_missing_hp", phase="battle", turn_number=1))
+    db_session.flush()
+    db_session.add(
+        BattleElfState(
+            state_id="state_missing_hp_self",
+            battle_id="battle_missing_hp",
+            side="self",
+            elf_id="elf_self",
+            elf_name="self",
+            avatar="",
+            panel_stats_json=dumps_json({}),
+            current_hp_value=250,
+            current_hp_percent=25.0,
+            energy=10,
+            skill_ids_json=dumps_json([]),
+            confirmed_skill_ids_json=dumps_json([]),
+            active_effect_instance_ids_json=dumps_json([]),
+            is_active_elf=True,
+            is_defeated=False,
+            manual_override=True,
+        )
+    )
+    db_session.commit()
+    context = DamageFormulaContext(
+        battle_id="battle_missing_hp",
+        attacker_side="self",
+        attacker_elf_id="elf_self",
+        base_power=40,
+    )
+
+    details = ModifierResolver(db_session).resolve_formula_modifiers(
+        context,
+        {
+            "dynamic_power_rule": {
+                "missing_hp_percent_step": 5,
+                "power_add_per_step": -10,
+                "min_power_after_add": 0,
+            }
+        },
+    )
+
+    assert context.flat_power_bonus == Decimal("-40")
+    item = details["dynamic_power_rules"][0]
+    assert item["capped"] is True
+
+
+def test_target_normal_switch_condition_ignores_return_to_field(db_session: Session) -> None:
+    """Normal switch conditions should ignore return-to-field switch events."""
+    db_session.add(Battle(battle_id="battle_switch", phase="battle", turn_number=3))
+    db_session.add_all(
+        [
+            BattleEvent(
+                event_id="switch_return",
+                battle_id="battle_switch",
+                turn_number=3,
+                event_type="switch_elf",
+                actor_side="enemy",
+                actor_elf_id="elf_enemy",
+                source="manual_input",
+                payload_json=dumps_json({"switch_mode": "return_to_field"}),
+            ),
+            BattleEvent(
+                event_id="switch_normal",
+                battle_id="battle_switch",
+                turn_number=4,
+                event_type="switch_elf",
+                actor_side="enemy",
+                actor_elf_id="elf_enemy",
+                source="manual_input",
+                payload_json=dumps_json({"switch_mode": "normal"}),
+            ),
+        ]
+    )
+    db_session.commit()
+    context = DamageFormulaContext(
+        battle_id="battle_switch",
+        attacker_side="self",
+        defender_side="enemy",
+    )
+
+    ModifierResolver(db_session).resolve_formula_modifiers(
+        context,
+        {
+            "turn_number": 3,
+            "dynamic_power_rule": {
+                "condition": "target_normal_switched_this_turn",
+                "power_add": 100,
+            },
+        },
+    )
+    assert context.flat_power_bonus == Decimal("0")
+
+    ModifierResolver(db_session).resolve_formula_modifiers(
+        context,
+        {
+            "turn_number": 4,
+            "dynamic_power_rule": {
+                "condition": "target_normal_switched_this_turn",
+                "power_add": 100,
+            },
+        },
+    )
+    assert context.flat_power_bonus == Decimal("100")
 
 
 def test_response_resolver_marks_unknown_when_success_flag_missing() -> None:

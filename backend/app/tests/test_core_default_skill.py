@@ -31,6 +31,7 @@ from app.schemas.event import BattleEventCreate, DamageEventCreate
 from app.seed.core_skills import ensure_core_skills
 from app.services.battle_service import BattleService
 from app.services.damage_event_service import DamageEventService
+from app.services.effect_operation_executor import EffectOperationExecutor
 from app.services.turn_settlement_service import TurnSettlementService
 from app.utils.json import dumps_json, loads_json
 
@@ -118,6 +119,543 @@ def test_setup_lineup_initializes_energy_and_common_skill(
 
         self_state = next(state for state in states if state.side == "self")
         assert DEFAULT_COMMON_SKILL_ID in loads_json(self_state.confirmed_skill_ids_json, [])
+
+
+def test_skill_runtime_supports_missing_hp_dynamic_energy_cost(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """Dynamic energy cost can be reduced by the actor's missing HP percent."""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.flush()
+        session.add(
+            SkillDefinition(
+                skill_id="skill_missing_hp_cost",
+                skill_name="missing hp cost",
+                element_type="普通",
+                skill_category="physical",
+                base_power=50,
+                base_energy_cost=8,
+                priority_modifier=0,
+                damage_rule_json=dumps_json(
+                    {
+                        "dynamic_energy_cost_rule": {
+                            "missing_hp_percent_step": 10,
+                            "energy_cost_delta_per_step": -1,
+                        }
+                    }
+                ),
+            )
+        )
+        session.add(
+            Battle(
+                battle_id="battle_missing_hp_cost",
+                phase=BattlePhase.BATTLE.value,
+                turn_number=1,
+                self_active_elf_id="elf_self",
+            )
+        )
+        session.flush()
+        state = _elf_state("battle_missing_hp_cost", "self", "elf_self", energy=20)
+        state.current_hp_value = 300
+        state.current_hp_percent = 60.0
+        session.add(state)
+        event = BattleEvent(
+            event_id="event_missing_hp_cost",
+            battle_id="battle_missing_hp_cost",
+            turn_number=1,
+            event_type=BattleEventType.SKILL_USE.value,
+            actor_side="self",
+            actor_elf_id="elf_self",
+            skill_id="skill_missing_hp_cost",
+            skill_confirmed=True,
+            payload_json=dumps_json({}),
+        )
+        session.add(event)
+        session.commit()
+
+        result = BattleService(session)._process_skill_runtime(event)
+
+        assert result is not None
+        assert result["effective_energy_cost"] == 4
+        session.flush()
+        session.refresh(state)
+        assert state.energy == 16
+
+
+def test_other_element_skill_use_can_add_listener_skill_power(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """Using another skill of the configured element can persistently add listener power."""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.flush()
+        session.add_all(
+            [
+                SkillDefinition(
+                    skill_id="skill_listener",
+                    skill_name="listener",
+                    element_type="light",
+                    skill_category="magic",
+                    base_power=40,
+                    base_energy_cost=0,
+                    priority_modifier=0,
+                    damage_rule_json=dumps_json(
+                        {
+                            "manual_review": {
+                                "future_hooks": [
+                                    {
+                                        "hook_type": "persistent_skill_power_modifier",
+                                        "target": "source_skill",
+                                        "power_add": 60,
+                                        "trigger": "other_element_skill_use",
+                                        "element_type": "草",
+                                        "status": "executable",
+                                    }
+                                ]
+                            }
+                        }
+                    ),
+                ),
+                SkillDefinition(
+                    skill_id="skill_grass_used",
+                    skill_name="grass used",
+                    element_type="grass",
+                    skill_category="magic",
+                    base_power=30,
+                    base_energy_cost=0,
+                    priority_modifier=0,
+                ),
+                Battle(
+                    battle_id="battle_other_element",
+                    phase=BattlePhase.BATTLE.value,
+                    turn_number=1,
+                    self_active_elf_id="elf_self",
+                ),
+                _elf_state("battle_other_element", "self", "elf_self", energy=20),
+            ]
+        )
+        session.flush()
+        session.add_all(
+            [
+                BattleSkillSlot(
+                    slot_id="slot_listener",
+                    battle_id="battle_other_element",
+                    side="self",
+                    elf_id="elf_self",
+                    slot_index=0,
+                    skill_id="skill_listener",
+                    active_effect_instance_ids_json=dumps_json([]),
+                    manual_override=False,
+                ),
+            ]
+        )
+        event = BattleEvent(
+            event_id="event_grass_used",
+            battle_id="battle_other_element",
+            turn_number=1,
+            event_type=BattleEventType.SKILL_USE.value,
+            actor_side="self",
+            actor_elf_id="elf_self",
+            skill_id="skill_grass_used",
+            skill_confirmed=True,
+            payload_json=dumps_json({}),
+        )
+        session.add(event)
+        session.commit()
+
+        result = BattleService(session)._process_skill_runtime(event)
+
+        assert result is not None
+        assert result["other_skill_use_listener_results"][0]["power_add"] == 60
+        slot = session.get(BattleSkillSlot, "slot_listener")
+        assert slot is not None
+        assert slot.current_power == 100
+
+
+def test_response_success_listener_reduces_skill_cost_until_used(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """A response-success listener can reduce its own slot cost and reset after use."""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.flush()
+        session.add_all(
+            [
+                SkillDefinition(
+                    skill_id="skill_qichen",
+                    skill_name="qichen",
+                    element_type="普通",
+                    skill_category="status",
+                    base_power=None,
+                    base_energy_cost=10,
+                    priority_modifier=0,
+                    damage_rule_json=dumps_json(
+                        {
+                            "manual_review": {
+                                "future_hooks": [
+                                    {
+                                        "hook_type": "response_success_skill_cost_listener",
+                                        "target": "source_skill",
+                                        "cost_delta": -3,
+                                        "trigger": "any_response_success",
+                                        "status": "executable",
+                                    },
+                                    {
+                                        "hook_type": "reset_skill_cost_modifier",
+                                        "target": "source_skill",
+                                        "trigger": "after_skill_use",
+                                        "status": "executable",
+                                    },
+                                ]
+                            }
+                        }
+                    ),
+                ),
+                SkillDefinition(
+                    skill_id="skill_response",
+                    skill_name="response",
+                    element_type="普通",
+                    skill_category="status",
+                    base_power=None,
+                    base_energy_cost=0,
+                    priority_modifier=0,
+                ),
+                Battle(
+                    battle_id="battle_response_listener",
+                    phase=BattlePhase.BATTLE.value,
+                    turn_number=1,
+                    self_active_elf_id="elf_self",
+                ),
+                _elf_state("battle_response_listener", "self", "elf_self", energy=30),
+            ]
+        )
+        session.flush()
+        session.add_all(
+            [
+                BattleSkillSlot(
+                    slot_id="slot_qichen",
+                    battle_id="battle_response_listener",
+                    side="self",
+                    elf_id="elf_self",
+                    slot_index=0,
+                    skill_id="skill_qichen",
+                    active_effect_instance_ids_json=dumps_json([]),
+                    manual_override=False,
+                ),
+            ]
+        )
+        response_event = BattleEvent(
+            event_id="event_response_success",
+            battle_id="battle_response_listener",
+            turn_number=1,
+            event_type=BattleEventType.SKILL_USE.value,
+            actor_side="self",
+            actor_elf_id="elf_self",
+            skill_id="skill_response",
+            skill_confirmed=True,
+            payload_json=dumps_json(
+                {"condition_flags": {"response_attack_success": True}}
+            ),
+        )
+        session.add(response_event)
+        session.commit()
+
+        BattleService(session)._process_skill_runtime(response_event)
+        slot = session.get(BattleSkillSlot, "slot_qichen")
+        assert slot is not None
+        assert slot.current_energy_cost == 7
+
+        use_event = BattleEvent(
+            event_id="event_qichen_use",
+            battle_id="battle_response_listener",
+            turn_number=2,
+            event_type=BattleEventType.SKILL_USE.value,
+            actor_side="self",
+            actor_elf_id="elf_self",
+            skill_id="skill_qichen",
+            skill_confirmed=True,
+            payload_json=dumps_json({}),
+        )
+        session.add(use_event)
+        session.flush()
+        result = BattleService(session)._process_skill_runtime(use_event)
+
+        assert result is not None
+        assert result["base_runtime_energy_cost"] == 7
+        assert slot.current_energy_cost == 10
+
+
+def test_effect_operation_can_target_enemy_current_turn_used_skill_slot(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """Effect operations can attach a skill-slot modifier to the opponent's used skill."""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.flush()
+        session.add(
+            EffectDefinition(
+                effect_id="effect_slot_cost_up",
+                effect_name="slot cost up",
+                category="skill_modifier",
+                polarity="negative",
+                display_group="skill_modifier",
+                display_priority=1,
+                owner_scope="skill_slot",
+                target_scope="single_skill_slot",
+                attach_target_type="skill_slot",
+                default_layers=1,
+                max_layers=1,
+                stack_rule="refresh",
+                duration_type="turns",
+                default_duration_turns=3,
+                skill_modifier_json=dumps_json(
+                    {"modifier_type": "skill_energy_cost_delta", "energy_cost_delta": 7}
+                ),
+            )
+        )
+        session.add(
+            Battle(
+                battle_id="battle_control",
+                phase=BattlePhase.BATTLE.value,
+                turn_number=1,
+                self_active_elf_id="elf_self",
+                enemy_active_elf_id="elf_enemy",
+            )
+        )
+        session.flush()
+        session.add_all(
+            [
+                BattleSkillSlot(
+                    slot_id="slot_enemy_used",
+                    battle_id="battle_control",
+                    side="enemy",
+                    elf_id="elf_enemy",
+                    slot_index=0,
+                    skill_id="skill_attack",
+                    active_effect_instance_ids_json=dumps_json([]),
+                    manual_override=False,
+                ),
+                BattleEvent(
+                    event_id="event_enemy_used",
+                    battle_id="battle_control",
+                    turn_number=1,
+                    action_order=1,
+                    event_type=BattleEventType.SKILL_USE.value,
+                    actor_side="enemy",
+                    actor_elf_id="elf_enemy",
+                    skill_id="skill_attack",
+                    skill_confirmed=True,
+                    payload_json=dumps_json({}),
+                ),
+            ]
+        )
+        control_event = BattleEvent(
+            event_id="event_control",
+            battle_id="battle_control",
+            turn_number=1,
+            action_order=2,
+            event_type=BattleEventType.SKILL_USE.value,
+            actor_side="self",
+            actor_elf_id="elf_self",
+            target_side="enemy",
+            target_elf_id="elf_enemy",
+            skill_id="skill_attack",
+            skill_confirmed=True,
+            payload_json=dumps_json({}),
+        )
+        session.add(control_event)
+        session.commit()
+
+        results = EffectOperationExecutor(session).execute_operations_for_event(
+            control_event,
+            [
+                {
+                    "op_type": "apply_effect",
+                    "effect_id": "effect_slot_cost_up",
+                    "target": "enemy_current_turn_used_skill",
+                    "layers": 1,
+                    "condition": "always",
+                }
+            ],
+        )
+
+        assert results[0]["status"] == "executed"
+        instance = session.scalar(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.effect_id == "effect_slot_cost_up"
+            )
+        )
+        assert instance is not None
+        assert instance.owner_scope == "skill_slot"
+        assert instance.owner_skill_slot_id == "slot_enemy_used"
+
+
+def test_damage_event_triggers_after_use_power_modifier(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """录入攻击伤害后，应执行“使用后本技能威力增加”的技能槽钩子。"""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.add(
+            SkillDefinition(
+                skill_id="skill_blow_fire",
+                skill_name="吹火",
+                element_type="火",
+                skill_category="physical",
+                base_power=50,
+                base_energy_cost=1,
+                priority_modifier=0,
+                damage_rule_json=dumps_json(
+                    {
+                        "manual_review": {
+                            "future_hooks": [
+                                {
+                                    "status": "executable",
+                                    "hook_type": "persistent_skill_power_modifier",
+                                    "trigger": "after_skill_use",
+                                    "target": "source_skill",
+                                    "power_add": 20,
+                                }
+                            ]
+                        }
+                    }
+                ),
+            )
+        )
+        session.add(
+            Battle(
+                battle_id="battle_blow_fire",
+                phase=BattlePhase.BATTLE.value,
+                turn_number=1,
+                self_active_elf_id="elf_self",
+                enemy_active_elf_id="elf_enemy",
+            )
+        )
+        session.flush()
+        session.add_all(
+            [
+                _elf_state("battle_blow_fire", "self", "elf_self", energy=10),
+                _elf_state("battle_blow_fire", "enemy", "elf_enemy", energy=10),
+            ]
+        )
+        session.commit()
+
+        DamageEventService(session).create_damage_event(
+            "battle_blow_fire",
+            DamageEventCreate(
+                attacker_side="self",
+                attacker_elf_id="elf_self",
+                defender_side="enemy",
+                defender_elf_id="elf_enemy",
+                skill_id="skill_blow_fire",
+                skill_confirmed=True,
+                damage_display_type=DamageDisplayType.SINGLE_DAMAGE,
+                damage_value=10,
+                sync_observation=False,
+            ),
+        )
+
+        slot = session.scalar(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == "battle_blow_fire",
+                BattleSkillSlot.skill_id == "skill_blow_fire",
+            )
+        )
+        assert slot is not None
+        assert slot.current_power == 70
+
+
+def test_damage_event_triggers_other_fire_skill_power_multiplier(
+    session_factory: sessionmaker[Session],
+) -> None:
+    """录入其他火系攻击伤害后，山火应按当前精灵自己的技能槽永久翻倍。"""
+    with session_factory() as session:
+        _seed_static_rules(session)
+        session.add_all(
+            [
+                SkillDefinition(
+                    skill_id="skill_mountain_fire",
+                    skill_name="山火",
+                    element_type="fire",
+                    skill_category="physical",
+                    base_power=15,
+                    base_energy_cost=3,
+                    priority_modifier=0,
+                    damage_rule_json=dumps_json(
+                        {
+                            "manual_review": {
+                                "future_hooks": [
+                                    {
+                                        "status": "executable",
+                                        "hook_type": "persistent_skill_power_modifier",
+                                        "trigger": "other_element_skill_use",
+                                        "element_type": "火",
+                                        "target": "source_skill",
+                                        "power_multiplier": 2,
+                                    }
+                                ]
+                            }
+                        }
+                    ),
+                ),
+                SkillDefinition(
+                    skill_id="skill_other_fire",
+                    skill_name="其他火系",
+                    element_type="fire",
+                    skill_category="physical",
+                    base_power=30,
+                    base_energy_cost=1,
+                    priority_modifier=0,
+                ),
+            ]
+        )
+        session.add(
+            Battle(
+                battle_id="battle_mountain_fire",
+                phase=BattlePhase.BATTLE.value,
+                turn_number=1,
+                self_active_elf_id="elf_self",
+                enemy_active_elf_id="elf_enemy",
+            )
+        )
+        session.flush()
+        session.add_all(
+            [
+                _elf_state("battle_mountain_fire", "self", "elf_self", energy=10),
+                _elf_state("battle_mountain_fire", "enemy", "elf_enemy", energy=10),
+                BattleSkillSlot(
+                    slot_id="slot_mountain_fire",
+                    battle_id="battle_mountain_fire",
+                    side="self",
+                    elf_id="elf_self",
+                    slot_index=0,
+                    skill_id="skill_mountain_fire",
+                    active_effect_instance_ids_json=dumps_json([]),
+                    manual_override=False,
+                ),
+            ]
+        )
+        session.commit()
+
+        DamageEventService(session).create_damage_event(
+            "battle_mountain_fire",
+            DamageEventCreate(
+                attacker_side="self",
+                attacker_elf_id="elf_self",
+                defender_side="enemy",
+                defender_elf_id="elf_enemy",
+                skill_id="skill_other_fire",
+                skill_confirmed=True,
+                damage_display_type=DamageDisplayType.SINGLE_DAMAGE,
+                damage_value=10,
+                sync_observation=False,
+            ),
+        )
+
+        slot = session.get(BattleSkillSlot, "slot_mountain_fire")
+        assert slot is not None
+        assert slot.current_power == 30
 
 
 def test_battle_state_enriches_carried_skill_slots_with_power_preview(

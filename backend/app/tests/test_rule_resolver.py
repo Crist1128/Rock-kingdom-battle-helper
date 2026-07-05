@@ -19,7 +19,8 @@ from app.models import battle as _battle_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
-from app.models.battle import Battle, BattleSkillSlot
+from app.models.battle import Battle, BattleElfState, BattleSkillSlot
+from app.models.event import BattleEvent
 from app.models.static import ElfDefinition, SkillDefinition, TypeEffectivenessRule
 from app.utils.json import dumps_json
 
@@ -192,6 +193,27 @@ def test_rule_resolver_fills_skill_stab_and_single_type_multiplier(db_session: S
     assert result.explanation["rule_resolution_enabled"] is True
 
 
+def test_rule_resolver_matches_chinese_and_english_element_aliases(
+    db_session: Session,
+) -> None:
+    """中文 seed/payload 与英文 rocom 静态数据混用时，本系和克制倍率仍应命中。"""
+    context = _context("grass_elf")
+    context.skill_id = None
+    context.skill_element_type = "火"
+    context.attacker_element_types = ["fire"]
+    context.defender_element_types = ["草"]
+    context.skill_category = "physical"
+    context.base_power = 50
+
+    resolved = RuleResolver(db_session).resolve_damage_context(
+        context,
+        {"resolve_rules": True},
+    )
+
+    assert resolved.stab_multiplier == Decimal("1.25")
+    assert resolved.type_multiplier == Decimal("2.0")
+
+
 def test_rule_resolver_uses_skill_fixed_hit_count(db_session: Session) -> None:
     """固定连击技能应从 hit_rule_json 自动带入连击数。"""
     skill = db_session.get(SkillDefinition, "fire_skill")
@@ -223,16 +245,28 @@ def test_rule_resolver_manual_hit_count_overrides_skill_rule(db_session: Session
     """用户手动观测到的连击数应优先于静态技能库。"""
     skill = db_session.get(SkillDefinition, "fire_skill")
     assert skill is not None
-    skill.hit_rule_json = dumps_json({"hit_count": 3})
+    skill.hit_rule_json = dumps_json(
+        {
+            "hit_count": 3,
+            "conditional_hit_rule": {
+                "condition": "actor_hp_percent_below_50",
+                "hit_count_bonus": 2,
+            },
+        }
+    )
 
     context = RuleResolver(db_session).resolve_damage_context(
         _context("grass_elf"),
-        {"resolve_rules": True, "hit_count": 2},
+        {"resolve_rules": True, "hit_count": 2, "actor_hp_percent": 49},
     )
 
     assert context.hit_count == 2
     assert context.rule_resolution_details["hit_rule"]["source"] == "manual_payload"
     assert context.rule_resolution_details["hit_rule"]["skill_hit_count"] == 3
+    assert context.rule_resolution_details["hit_rule"]["conditional_hit_rule"] == {
+        "status": "skipped",
+        "reason": "manual_hit_count_override",
+    }
 
 
 def test_rule_resolver_combines_dual_type_by_project_rule(db_session: Session) -> None:
@@ -335,6 +369,164 @@ def test_rule_resolver_uses_runtime_skill_slot_current_power(db_session: Session
 
     assert resolved.base_power == 80
     assert resolved.rule_resolution_details["skill_slot_runtime"]["base_power_overridden"] is True
+
+
+def test_rule_resolver_applies_conditional_hit_count_and_dynamic_layers(
+    db_session: Session,
+) -> None:
+    """Conditional hit rules should support HP flags and snapshot effect layers."""
+    skill = db_session.get(SkillDefinition, "fire_skill")
+    assert skill is not None
+    skill.hit_rule_json = dumps_json(
+        {
+            "damage_display_type": "combo_repeated_damage",
+            "runtime_record_strategy": "per_hit_damage",
+            "hit_count": 3,
+            "conditional_hit_rule": {
+                "condition": "actor_hp_percent_below_50",
+                "hit_count_bonus": 2,
+            },
+        }
+    )
+    resolved = RuleResolver(db_session).resolve_damage_context(
+        _context("grass_elf"),
+        {"resolve_rules": True, "actor_hp_percent": 49},
+    )
+    assert resolved.hit_count == 5
+    assert resolved.rule_resolution_details["hit_rule"]["source"] == "conditional_hit_rule"
+
+    skill.hit_rule_json = dumps_json(
+        {
+            "hit_count": 1,
+            "conditional_hit_rule": {
+                "source_effect_id": "effect_starfall_mark",
+                "source_target": "enemy_side",
+                "hit_count_bonus_per_layer": 1,
+            },
+        }
+    )
+    context = _context("grass_elf")
+    context.attacker_side = "self"
+    context.defender_side = "enemy"
+    context.snapshot_payload = [
+        {
+            "effect_id": "effect_starfall_mark",
+            "owner_scope": "side",
+            "owner_side": "enemy",
+            "layers": 2,
+        }
+    ]
+    resolved = RuleResolver(db_session).resolve_damage_context(
+        context,
+        {"resolve_rules": True},
+    )
+    assert resolved.hit_count == 3
+
+
+def test_rule_resolver_applies_dynamic_power_rules(db_session: Session) -> None:
+    """Dynamic power rules should read condition flags, marks, resources and history."""
+    skill = db_session.get(SkillDefinition, "fire_skill")
+    assert skill is not None
+    skill.damage_rule_json = dumps_json(
+        {
+            "dynamic_power_rules": [
+                {"condition": "actor_moves_before_target", "power_multiplier": 1.5},
+                {
+                    "source_category": "mark",
+                    "source_target": "enemy_side",
+                    "power_add_per_layer": 20,
+                },
+            ]
+        }
+    )
+    context = _context("grass_elf")
+    context.attacker_side = "self"
+    context.defender_side = "enemy"
+    context.snapshot_payload = [
+        {
+            "effect_id": "effect_starfall_mark",
+            "category": "mark",
+            "owner_scope": "side",
+            "owner_side": "enemy",
+            "layers": 2,
+        }
+    ]
+
+    resolved = RuleResolver(db_session).resolve_damage_context(
+        context,
+        {
+            "resolve_rules": True,
+            "condition_flags": {"actor_moves_before_target": True},
+        },
+    )
+
+    assert resolved.power_multiplier == Decimal("1.5")
+    assert resolved.flat_power_bonus == Decimal("40")
+    assert resolved.rule_resolution_details["dynamic_power_rules"][0]["status"] == "resolved"
+
+
+def test_rule_resolver_applies_resource_and_previous_turn_power_rules(
+    db_session: Session,
+) -> None:
+    """Energy-based and previous-turn response rules should be executable."""
+    db_session.add_all(
+        [
+            Battle(battle_id="battle_1", phase="battle", turn_number=2),
+            BattleElfState(
+                state_id="enemy_state_power",
+                battle_id="battle_1",
+                side="enemy",
+                elf_id="grass_elf",
+                elf_name="enemy",
+                avatar="",
+                panel_stats_json=dumps_json({}),
+                current_hp_percent=100,
+                energy=3,
+                is_active_elf=True,
+                is_defeated=False,
+                manual_override=True,
+            ),
+            BattleEvent(
+                event_id="prev_response",
+                battle_id="battle_1",
+                turn_number=1,
+                event_type="skill_use",
+                actor_side="self",
+                actor_elf_id="fire_elf",
+                payload_json=dumps_json({"response_status_success": True}),
+                source="manual_input",
+                manual_override=True,
+            ),
+        ]
+    )
+    skill = db_session.get(SkillDefinition, "fire_skill")
+    assert skill is not None
+    skill.damage_rule_json = dumps_json(
+        {
+            "dynamic_power_rules": [
+                {
+                    "source_resource": "energy",
+                    "source_target": "enemy_side",
+                    "power_multiplier_delta_per_point": -0.1,
+                },
+                {"condition": "previous_turn_response_success", "power_add": 180},
+            ]
+        }
+    )
+    db_session.commit()
+    context = _context("grass_elf")
+    context.attacker_side = "self"
+    context.attacker_elf_id = "fire_elf"
+    context.defender_side = "enemy"
+    context.defender_elf_id = "grass_elf"
+
+    resolved = RuleResolver(db_session).resolve_damage_context(
+        context,
+        {"resolve_rules": True, "turn_number": 2},
+    )
+
+    assert resolved.power_multiplier == Decimal("0.7")
+    assert resolved.flat_power_bonus == Decimal("180")
 
 
 def test_rule_resolver_uses_starfall_element_for_type_multiplier(db_session: Session) -> None:

@@ -374,9 +374,9 @@ export const api = {
       request<RocomDataUpdateJobStatus[]>("/admin/data-updates/rocom/jobs", {
         headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
       }),
-    checkStaticSkillRules: (params: { limit?: number } = {}, adminToken?: string) =>
+    checkStaticSkillRules: (params: { limit?: number; q?: string | null } = {}, adminToken?: string) =>
       request<StaticSkillRuleSyncResponse>(
-        `/admin/data-updates/static-rules/skill-reviews/check${qs({ limit: params.limit ?? 100 })}`,
+        `/admin/data-updates/static-rules/skill-reviews/check${qs({ limit: params.limit ?? 100, q: params.q })}`,
         {
           headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
         },

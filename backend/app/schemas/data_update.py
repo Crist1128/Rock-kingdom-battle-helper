@@ -124,12 +124,17 @@ class StaticSkillRuleSyncRequest(BaseModel):
         default=None,
         description="只同步指定技能；为空表示同步所有待同步 structured 技能",
     )
+    q: str | None = Field(
+        default=None,
+        description="可选技能名/ID 筛选；用于只同步当前筛选范围内的待同步规则",
+    )
 
 
 class StaticSkillRuleSyncResponse(BaseModel):
     """静态技能规则同步检查/执行响应。"""
 
     source: str
+    query: str | None = None
     total_rows: int
     status_counts: dict[str, int] = Field(default_factory=dict)
     structured_total: int

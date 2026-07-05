@@ -183,6 +183,66 @@ def test_strength_amplification_applies_ten_physical_attack_layers(
         assert instance.layers == 10
 
 
+def test_status_skill_effect_layers_can_follow_current_hit_count(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """状态技能可按当前连击数计算最终施加层数。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_projection", layers=4)
+        session.add(_physical_attack_up_definition())
+        skill = _skill(
+            "skill_triple_break",
+            "三连破",
+            operations=[
+                {
+                    "op_type": "apply_effect",
+                    "effect_id": "effect_physical_attack_up_layered",
+                    "target": "actor_side",
+                    "layers_from": "current_hit_count",
+                    "layers_per_hit": 3,
+                    "timing": "on_skill_use",
+                }
+            ],
+        )
+        skill.hit_rule_json = dumps_json(
+            {
+                "damage_display_type": "combo_repeated_damage",
+                "runtime_record_strategy": "per_hit_status_effect",
+                "hit_count": 3,
+            }
+        )
+        session.add(skill)
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_triple_break",
+            "skill_confirmed": True,
+        },
+    )
+
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    assert payload["skill_runtime"]["effective_hit_count"] == 3
+    result = payload["effect_operation_results"][0]
+    assert result["status"] == "executed"
+    assert result["layers_after"] == 9
+    assert result["layers_resolution"] == {
+        "layers_from": "current_hit_count",
+        "hit_count": 3,
+        "hit_count_source": "skill_runtime",
+        "layers_per_hit": 3,
+        "base_layers": 0,
+    }
+
+
 def test_dedicated_skill_event_endpoint_executes_operations(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
@@ -1017,6 +1077,139 @@ def test_heal_from_damage_dealt_rounds_down(
         assert self_state.current_hp_value == 116
 
 
+def test_convert_effect_transfers_layers_to_target_effect(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """convert_effect should remove the source effect and apply target layers."""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_convert", layers=1)
+        session.add(_poison_definition())
+        session.add(_poison_mark_definition())
+        session.flush()
+        skill = session.get(SkillDefinition, "skill_convert")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "convert_effect",
+                    "from_effect_id": "effect_poison",
+                    "to_effect_id": "effect_poison_mark",
+                    "target": "enemy_side",
+                }
+            ]
+        )
+        session.add(
+            BattleEffectInstance(
+                instance_id="poison_enemy",
+                battle_id="battle_ops",
+                effect_id="effect_poison",
+                category="abnormal",
+                owner_scope="elf",
+                owner_side="enemy",
+                owner_elf_id="elf_enemy",
+                layers=3,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.SKILL_USE.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_convert",
+            "skill_confirmed": True,
+        },
+    )
+
+    assert response.status_code == 201
+    with session_factory() as session:
+        poison = session.get(BattleEffectInstance, "poison_enemy")
+        assert poison is not None
+        assert poison.is_active is False
+        mark = session.scalar(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == "battle_ops",
+                BattleEffectInstance.effect_id == "effect_poison_mark",
+            )
+        )
+        assert mark is not None
+        assert mark.layers == 3
+
+
+def test_trigger_status_damage_now_settles_burn_once(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """trigger_status_damage_now should create immediate status damage."""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_burn_now", layers=1)
+        session.add(_burn_definition())
+        session.flush()
+        skill = session.get(SkillDefinition, "skill_burn_now")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "trigger_status_damage_now",
+                    "effect_id": "effect_burn",
+                    "target": "enemy_side",
+                }
+            ]
+        )
+        session.add(
+            BattleEffectInstance(
+                instance_id="burn_enemy",
+                battle_id="battle_ops",
+                effect_id="effect_burn",
+                category="abnormal",
+                owner_scope="elf",
+                owner_side="enemy",
+                owner_elf_id="elf_enemy",
+                layers=2,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/events",
+        json={
+            "turn_number": 1,
+            "event_type": BattleEventType.SKILL_USE.value,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_burn_now",
+            "skill_confirmed": True,
+        },
+    )
+
+    assert response.status_code == 201
+    with session_factory() as session:
+        damage_events = session.scalars(
+            select(BattleEvent).where(
+                BattleEvent.battle_id == "battle_ops",
+                BattleEvent.event_type == BattleEventType.DAMAGE.value,
+            )
+        ).all()
+        assert len(damage_events) == 1
+        enemy = session.get(BattleElfState, "state_enemy")
+        assert enemy is not None
+        assert enemy.current_hp_value == 480
+
+
 def test_switch_lock_records_conflict_without_blocking_switch(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
@@ -1393,6 +1586,61 @@ def _poison_definition() -> EffectDefinition:
         stack_rule="add_layers",
         duration_type="until_removed",
         clear_on_switch=True,
+    )
+
+
+def _poison_mark_definition() -> EffectDefinition:
+    """构造中毒印记状态定义。"""
+    return EffectDefinition(
+        effect_id="effect_poison_mark",
+        effect_name="中毒印记",
+        category="mark",
+        polarity="negative",
+        display_group="mark",
+        display_priority=120,
+        owner_scope="side",
+        target_scope="side",
+        attach_target_type="side",
+        is_visible_icon=True,
+        is_recognizable_by_icon=False,
+        default_layers=1,
+        max_layers=None,
+        stack_rule="add_layers",
+        duration_type="until_removed",
+        clear_on_switch=False,
+    )
+
+
+def _burn_definition() -> EffectDefinition:
+    """构造灼烧状态定义。"""
+    return EffectDefinition(
+        effect_id="effect_burn",
+        effect_name="灼烧",
+        category="abnormal",
+        polarity="negative",
+        display_group="abnormal",
+        display_priority=100,
+        owner_scope="elf",
+        target_scope="single_elf",
+        attach_target_type="elf",
+        is_visible_icon=True,
+        is_recognizable_by_icon=False,
+        default_layers=1,
+        max_layers=None,
+        stack_rule="add_layers",
+        duration_type="until_removed",
+        clear_on_switch=True,
+        formula_hooks_json=dumps_json(["end_turn_status_damage"]),
+        resource_modifier_json=dumps_json(
+            {
+                "settlement_type": "end_turn",
+                "damage_kind": "percent_max_hp",
+                "percent_per_layer": 0.02,
+                "element_type": "火",
+                "uses_type_effectiveness": True,
+            }
+        ),
+        special_rule_id="burn_status_damage",
     )
 
 

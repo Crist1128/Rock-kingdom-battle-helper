@@ -34,10 +34,11 @@ def check_structured_skill_rule_sync(
     *,
     reviews_json: str | Path | None = None,
     limit: int | None = None,
+    q: str | None = None,
 ) -> dict[str, Any]:
     """检查 structured 技能规则 seed 与数据库是否一致，不修改数据库。"""
     rows = _read_rows(reviews_json)
-    return _build_sync_plan(db, rows, limit=limit)
+    return _build_sync_plan(db, rows, limit=limit, q=q)
 
 
 def sync_structured_skill_rules(
@@ -46,15 +47,18 @@ def sync_structured_skill_rules(
     skill_ids: list[str] | None = None,
     commit: bool = False,
     reviews_json: str | Path | None = None,
+    q: str | None = None,
 ) -> dict[str, Any]:
     """把选中的 structured 技能规则写入数据库；默认 dry-run。"""
     rows = _read_rows(reviews_json)
     skill_id_set = {str(item) for item in skill_ids or [] if str(item)}
-    plan = _build_sync_plan(db, rows, skill_ids=skill_id_set or None)
+    plan = _build_sync_plan(db, rows, skill_ids=skill_id_set or None, q=q)
     applied_skill_ids: set[str] = set()
     for row in _iter_structured_rows(rows):
         skill_id = str(row.get("skill_id") or "")
         if skill_id_set and skill_id not in skill_id_set:
+            continue
+        if q is not None and not _row_matches_query(row, q):
             continue
         skill = db.get(SkillDefinition, skill_id) if skill_id else None
         if skill is None or skill.deleted_at is not None:
@@ -88,10 +92,15 @@ def _build_sync_plan(
     *,
     skill_ids: set[str] | None = None,
     limit: int | None = None,
+    q: str | None = None,
 ) -> dict[str, Any]:
     errors = validate_review_rows(rows)
     status_counts: Counter[str] = Counter(str(row.get("review_status")) for row in rows)
-    structured_rows = list(_iter_structured_rows(rows))
+    structured_rows = [
+        row
+        for row in _iter_structured_rows(rows)
+        if q is None or _row_matches_query(row, q)
+    ]
     pending_items: list[dict[str, Any]] = []
     up_to_date_count = 0
     missing_skills: list[dict[str, Any]] = []
@@ -133,6 +142,7 @@ def _build_sync_plan(
     pending_count = _count_pending_items(db, structured_rows, skill_ids) if not errors else 0
     return {
         "source": str(DEFAULT_SKILL_REVIEWS_PATH),
+        "query": _normalize_query(q),
         "total_rows": len(rows),
         "status_counts": dict(sorted(status_counts.items())),
         "structured_total": len(structured_rows),
@@ -170,6 +180,30 @@ def _iter_structured_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for row in rows
         if row.get("review_status") == "structured" and not row.get("structure_gaps")
     ]
+
+
+def _normalize_query(q: str | None) -> str | None:
+    if q is None:
+        return None
+    normalized = q.strip().lower()
+    return normalized or None
+
+
+def _row_matches_query(row: dict[str, Any], q: str | None) -> bool:
+    """按技能 ID 或名称筛选同步检查结果，避免被默认 limit 截断看不到目标技能。"""
+    normalized = _normalize_query(q)
+    if normalized is None:
+        return True
+    searchable_values = [
+        row.get("skill_id"),
+        row.get("skill_name"),
+        row.get("review_notes"),
+    ]
+    return any(
+        normalized in str(value).lower()
+        for value in searchable_values
+        if value is not None
+    )
 
 
 def _desired_rule_payload(skill: SkillDefinition, row: dict[str, Any]) -> dict[str, str | None]:

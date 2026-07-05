@@ -238,6 +238,9 @@ def create_skill_use_event(
     try:
         battle = service.require_battle(battle_id)
         event_payload: dict[str, object] = {}
+        if payload.hit_count is not None:
+            event_payload["hit_count"] = payload.hit_count
+            event_payload["combo_count_source"] = payload.combo_count_source or "manual_input"
         if payload.condition_flags:
             event_payload["condition_flags"] = payload.condition_flags
         if payload.manual_flags:

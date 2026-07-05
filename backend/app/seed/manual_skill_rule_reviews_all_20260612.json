@@ -14,12 +14,26 @@
   {
     "skill_id": "rocom_skill_a3604cfd83",
     "skill_name": "三连破",
-    "review_status": "ambiguous",
-    "review_notes": "描述为“自己获得物攻+30%，3连击”，但技能类别为状态，3连击是否表示多次施加/攻击不清楚；暂不写可执行规则。",
-    "hit_rule": null,
-    "effect_operations": null,
-    "structure_gaps": [
-      "ambiguous_status_multihit_semantics"
+    "review_status": "structured",
+    "review_notes": "确认按当前有效连击次数结算：自己获得物攻+30%，3连击；每次连击折算为物攻+30%（3层）。",
+    "reviewed_at": "2026-07-05",
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "status_effect_per_hit",
+      "source": "manual_review_20260705_combo_status",
+      "hit_count": 3
+    },
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "effect_id": "effect_physical_attack_up_layered",
+        "layers_from": "current_hit_count",
+        "layers_per_hit": 3,
+        "notes": "按 skill_runtime.effective_hit_count 或本次记录的 hit_count 动态计算层数；默认 3 连击即 9 层。"
+      }
     ]
   },
   {
@@ -165,21 +179,25 @@
   {
     "skill_id": "rocom_skill_263accf6b3",
     "skill_name": "乘胜追击",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害和初始1连击已记录；“每次使用后本技能连击数永久+1”需要技能槽持久计数/永久修正，当前结构不能执行。",
+    "review_status": "structured",
+    "review_notes": "造成伤害；每次使用后本技能连击数永久 +1，已接入技能槽持久连击修正。",
     "hit_rule": {
-      "damage_display_type": "single_damage",
-      "runtime_record_strategy": "single_value",
-      "hit_count": 1,
-      "source": "manual_review_20260611",
-      "permanent_bonus_rule": {
-        "bonus_per_use": 1,
-        "status": "not_executable_yet"
-      }
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_same_damage",
+      "source": "manual_review_20260705",
+      "hit_count": 1
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "persistent_skill_slot_hit_count_modifier"
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05",
+    "future_hooks": [
+      {
+        "status": "executable",
+        "hook_type": "persistent_skill_hit_count_modifier",
+        "trigger": "after_skill_use",
+        "target": "source_skill",
+        "hit_count_delta": 1
+      }
     ]
   },
   {
@@ -553,8 +571,8 @@
   {
     "skill_id": "rocom_skill_5196ddfc69",
     "skill_name": "充分燃烧",
-    "review_status": "partial",
-    "review_notes": "敌方灼烧层数翻倍可执行；“触发1次灼烧伤害”需要即时状态伤害操作，暂未实现。",
+    "review_status": "structured",
+    "review_notes": "敌方灼烧层数翻倍，并立即触发1次灼烧伤害，已接入即时状态伤害操作。",
     "clear_damage_rule": true,
     "hit_rule": null,
     "effect_operations": [
@@ -566,10 +584,16 @@
         "condition": "always",
         "timing": "on_skill_use",
         "notes": "使敌方身上的灼烧翻倍。"
+      },
+      {
+        "op_type": "trigger_status_damage_now",
+        "effect_id": "effect_burn",
+        "target": "enemy_side",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "settlement_phase": "skill_triggered",
+        "notes": "立即触发1次敌方灼烧伤害。"
       }
-    ],
-    "structure_gaps": [
-      "trigger_status_damage_now"
     ]
   },
   {
@@ -644,17 +668,26 @@
   {
     "skill_id": "rocom_skill_19efee5cc5",
     "skill_name": "光能聚集",
-    "review_status": "needs_review",
-    "review_notes": "基础魔法伤害已保留；“每次使用其他草系技能后本技能威力永久+60”需要监听其他技能使用和技能槽持久威力修正，暂不写可执行规则。",
+    "review_status": "structured",
+    "review_notes": "每次使用当前精灵的其他草系技能后，本技能战斗内持久威力+60；切换/返场保留技能槽修正。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611"
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "persistent_skill_slot_power_modifier",
-      "listen_other_element_skill_use"
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05",
+    "future_hooks": [
+      {
+        "hook_type": "persistent_skill_power_modifier",
+        "target": "source_skill",
+        "power_add": 60,
+        "trigger": "other_element_skill_use",
+        "element_type": "草",
+        "status": "executable"
+      }
     ]
   },
   {
@@ -777,7 +810,7 @@
     "skill_id": "rocom_skill_78678b4416",
     "skill_name": "冰天雪地",
     "review_status": "partial",
-    "review_notes": "已确认减伤80%；应对攻击成功后“被应对技能能耗+3”需要技能槽费用修正，暂不执行。",
+    "review_notes": "用户确认先不实现该复杂分支；已有减伤规则保留。",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
@@ -802,8 +835,11 @@
       }
     ],
     "structure_gaps": [
-      "responded_skill_cost_modifier"
-    ]
+      "responded_skill_cost_modifier",
+      "deferred_by_user"
+    ],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_caa21aff33",
@@ -952,7 +988,7 @@
     "skill_id": "rocom_skill_01fc58cd11",
     "skill_name": "冰锋横扫",
     "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；威力等于敌方精灵技能总能耗10倍，需要按敌方技能组聚合费用的威力公式。",
+    "review_notes": "用户文档标记暂不实现敌方技能总能耗聚合威力公式；基础伤害保留。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -970,8 +1006,11 @@
       }
     ],
     "structure_gaps": [
-      "skill_cost_sum_power_formula"
-    ]
+      "skill_cost_sum_power_formula",
+      "deferred_by_user"
+    ],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_e146d4cdab",
@@ -1011,8 +1050,8 @@
   {
     "skill_id": "rocom_skill_c27e3e6367",
     "skill_name": "冲撞",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；回合结束本技能能耗永久-1需要技能槽持久费用修正。",
+    "review_status": "structured",
+    "review_notes": "造成伤害；在场回合末本技能能耗永久 -1，已接入回合末在场技能槽钩子。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -1021,16 +1060,15 @@
     "effect_operations": null,
     "future_hooks": [
       {
+        "status": "executable",
         "hook_type": "persistent_skill_cost_modifier",
+        "trigger": "end_turn_in_field",
         "target": "source_skill",
-        "cost_delta": -1,
-        "trigger": "end_turn_after_use",
-        "status": "reserved"
+        "cost_delta": -1
       }
     ],
-    "structure_gaps": [
-      "persistent_skill_slot_cost_modifier"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_c7913690b2",
@@ -1162,28 +1200,33 @@
   {
     "skill_id": "rocom_skill_7cbf736319",
     "skill_name": "力量吞噬",
-    "review_status": "needs_review",
-    "review_notes": "敌方全技能威力-20、自己全技能威力+20需要技能组范围威力修正，暂不执行。",
+    "review_status": "structured",
+    "review_notes": "敌方当前精灵获得技能威力-20，自己当前精灵获得技能威力+20；按现有技能威力层数状态各两层执行。",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "all_skill_power_modifier",
+        "op_type": "apply_effect",
+        "effect_id": "effect_skill_power_down_layered",
         "target": "enemy_side",
-        "power_add": -20,
-        "status": "reserved"
+        "layers": 2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方技能威力-20。"
       },
       {
-        "hook_type": "all_skill_power_modifier",
+        "op_type": "apply_effect",
+        "effect_id": "effect_skill_power_up_layered",
         "target": "actor_side",
-        "power_add": 20,
-        "status": "reserved"
+        "layers": 2,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "自己技能威力+20。"
       }
     ],
-    "structure_gaps": [
-      "all_skill_power_modifier"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_5656feeb59",
@@ -1295,22 +1338,24 @@
   {
     "skill_id": "rocom_skill_2688a451ce",
     "skill_name": "化劲",
-    "review_status": "needs_review",
-    "review_notes": "自己获得全技能威力+40，需要技能组范围威力修正，暂不执行。",
+    "review_status": "structured",
+    "review_notes": "自己当前精灵获得技能威力+40；按现有技能威力增加状态4层执行。",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "all_skill_power_modifier",
+        "op_type": "apply_effect",
+        "effect_id": "effect_skill_power_up_layered",
         "target": "actor_side",
-        "power_add": 40,
-        "status": "reserved"
+        "layers": 4,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "自己技能威力+40。"
       }
     ],
-    "structure_gaps": [
-      "all_skill_power_modifier"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_fdc198bbf0",
@@ -1411,8 +1456,8 @@
   {
     "skill_id": "rocom_skill_64a5cb63a8",
     "skill_name": "反击拳",
-    "review_status": "partial",
-    "review_notes": "基础2连击已记录；若后手攻击改为3连击需要行动顺序条件接入伤害/连击解析。",
+    "review_status": "structured",
+    "review_notes": "默认2连击；后手攻击时改为3连击，已接入条件连击解析。",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
       "runtime_record_strategy": "per_hit_damage",
@@ -1421,13 +1466,10 @@
       "conditional_hit_rule": {
         "condition": "actor_moves_after_target",
         "hit_count": 3,
-        "status": "not_executable_yet"
+        "status": "executable"
       }
     },
-    "effect_operations": null,
-    "structure_gaps": [
-      "action_order_condition_in_hit_rule"
-    ]
+    "effect_operations": null
   },
   {
     "skill_id": "rocom_skill_8f6ac1d4a1",
@@ -1502,22 +1544,25 @@
   {
     "skill_id": "rocom_skill_76479a6e99",
     "skill_name": "叠势",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害和2连击已记录；每成功应对1次本技能连击数永久+2需要技能槽持久连击修正。",
+    "review_status": "structured",
+    "review_notes": "基础 2 连击；每成功应对一次（攻击/防御/状态均包含）本技能连击数永久 +2。",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
-      "runtime_record_strategy": "per_hit_damage",
-      "hit_count": 2,
-      "source": "manual_review_20260611_02",
-      "permanent_bonus_rule": {
-        "trigger": "response_success",
-        "hit_count_bonus": 2,
-        "status": "not_executable_yet"
-      }
+      "runtime_record_strategy": "per_hit_same_damage",
+      "source": "manual_review_20260705",
+      "hit_count": 2
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "persistent_skill_slot_hit_count_modifier"
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05",
+    "future_hooks": [
+      {
+        "status": "executable",
+        "hook_type": "persistent_skill_hit_count_modifier",
+        "trigger": "any_response_success",
+        "target": "source_skill",
+        "hit_count_delta": 2
+      }
     ]
   },
   {
@@ -1601,14 +1646,26 @@
   {
     "skill_id": "rocom_skill_46ba428a5b",
     "skill_name": "吞噬",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；击败敌方后回复6能量需要击杀条件和伤害后资源操作。",
+    "review_status": "structured",
+    "review_notes": "造成物伤；击败敌方后自己回复6能量，已接入伤害后击败条件资源操作。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_02"
     },
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "resource_change",
+        "resource_type": "energy",
+        "change_type": "gain",
+        "value_type": "value",
+        "value": 6,
+        "target": "actor_side",
+        "condition": "target_defeated",
+        "timing": "after_damage",
+        "notes": "击败敌方后自己回复6能量。"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "resource_change_on_defeat",
@@ -1617,9 +1674,6 @@
         "value": 6,
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "post_damage_defeat_condition"
     ]
   },
   {
@@ -1652,7 +1706,7 @@
     "skill_id": "rocom_skill_2f1ac932d6",
     "skill_name": "听桥",
     "review_status": "partial",
-    "review_notes": "已确认减伤60%；应对攻击后反击造成武系物理伤害，威力等于被应对技能，需要反击伤害事件。",
+    "review_notes": "用户确认听桥先不实现反击伤害；已有减伤规则保留。",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
@@ -1678,14 +1732,17 @@
       }
     ],
     "structure_gaps": [
-      "response_counter_damage_operation"
-    ]
+      "response_counter_damage_operation",
+      "deferred_by_user"
+    ],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_df17aa33df",
     "skill_name": "吹火",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；每次使用后本技能威力永久+20需要技能槽持久威力修正。",
+    "review_status": "structured",
+    "review_notes": "造成伤害；每次使用后本技能威力永久 +20。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -1694,16 +1751,15 @@
     "effect_operations": null,
     "future_hooks": [
       {
+        "status": "executable",
         "hook_type": "persistent_skill_power_modifier",
-        "target": "source_skill",
-        "power_add": 20,
         "trigger": "after_skill_use",
-        "status": "reserved"
+        "target": "source_skill",
+        "power_add": 20
       }
     ],
-    "structure_gaps": [
-      "persistent_skill_slot_power_modifier"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_bb09e925b9",
@@ -1860,16 +1916,15 @@
   {
     "skill_id": "rocom_skill_12289c27b5",
     "skill_name": "嗜痛",
-    "review_status": "partial",
-    "review_notes": "已确认减伤80%；应对期间每次受伤获得双攻+40%需要期间监听受伤事件。",
+    "review_status": "structured",
+    "review_notes": "减伤 80%；作为防御应对攻击期间每段受击使自己获得双攻 +40%。",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
       "damage_reduction": 0.8,
       "active": true,
       "response_rule": {
-        "target": "attack",
-        "condition": "response_attack_success"
+        "target": "attack"
       },
       "raw_description": "减伤80%，应对攻击：期间自己每次受到伤害，获得双攻+40%。",
       "source": "manual_review_20260611_02"
@@ -1878,22 +1933,24 @@
     "effect_operations": null,
     "future_hooks": [
       {
-        "hook_type": "damage_taken_listener",
-        "duration": "during_response",
-        "operation": "apply_dual_attack_up_40",
-        "status": "reserved"
+        "status": "executable",
+        "hook_type": "apply_effect",
+        "trigger": "damage_taken",
+        "requires_defense_skill_used": true,
+        "condition": "response_attack_success",
+        "effect_id": "effect_dual_attack_up_layered",
+        "target": "target_side",
+        "layers_per_damage_hit": 4
       }
     ],
-    "structure_gaps": [
-      "during_response_damage_taken_listener",
-      "dual_attack_up_40_effect_definition"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_8f1cc84ca8",
     "skill_name": "嘲弄",
-    "review_status": "partial",
-    "review_notes": "自己获得魔攻+90%可执行；若敌方本回合更换精灵则自己速度+70需要本回合切换监听。",
+    "review_status": "structured",
+    "review_notes": "自己获得魔攻+90%；若敌方本回合更换精灵，自己获得速度+70，已接入切换条件状态操作。",
     "clear_damage_rule": true,
     "hit_rule": null,
     "effect_operations": [
@@ -1906,6 +1963,16 @@
         "timing": "on_skill_use",
         "notes": "自己获得魔攻+90%。",
         "standardized_from_effect_id": "effect_magic_attack_up_90"
+      },
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_speed_up_layered",
+        "target": "actor_side",
+        "layers": 7,
+        "condition": "enemy_switched_this_turn",
+        "timing": "on_skill_use",
+        "notes": "敌方本回合更换精灵时自己获得速度+70。",
+        "standardized_from_effect_id": "effect_speed_up_70"
       }
     ],
     "future_hooks": [
@@ -1916,10 +1983,6 @@
         "operation": "apply_speed_up_70",
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "current_turn_switch_listener",
-      "speed_up_70_effect_definition"
     ]
   },
   {
@@ -1937,8 +2000,8 @@
   {
     "skill_id": "rocom_skill_1a12dec00a",
     "skill_name": "四维降解",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；敌方每1层印记本技能能耗-1需要按目标印记总层数动态费用修正。",
+    "review_status": "structured",
+    "review_notes": "敌方每有 1 层印记，本技能能耗 -1；统计所有 mark 分类层数。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -1954,15 +2017,23 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "dynamic_skill_cost_from_mark_layers"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05",
+    "damage_rule": {
+      "dynamic_energy_cost_rule": {
+        "source_categories": [
+          "mark"
+        ],
+        "source_target": "defender_side",
+        "energy_cost_delta_per_layer": -1
+      }
+    }
   },
   {
     "skill_id": "rocom_skill_ce56ba64f3",
     "skill_name": "回旋踢",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；敌方本回合更换精灵时威力翻倍需要本回合切换监听。",
+    "review_status": "structured",
+    "review_notes": "敌方本回合更换精灵时威力×2，已接入当前回合切换条件威力解析。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -1978,10 +2049,20 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "current_turn_switch_listener",
-      "power_modifier_condition_from_switch"
-    ]
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "source": "manual_complex_branch_20260705",
+      "raw_description": "造成物伤，敌方本回合更换精灵时威力翻倍。",
+      "dynamic_power_rules": [
+        {
+          "condition": "enemy_switched_this_turn",
+          "power_multiplier": 2,
+          "status": "executable"
+        }
+      ]
+    }
   },
   {
     "skill_id": "rocom_skill_c71bd2467a",
@@ -1998,14 +2079,22 @@
   {
     "skill_id": "rocom_skill_1538dc34b5",
     "skill_name": "地刺",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态额外打断被应对技能需要标准打断操作。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功时，额外打断被应对技能；当前记录结构化打断结果。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "interrupt_action",
+        "target": "responded_skill",
+        "condition": "response_status_success",
+        "timing": "after_damage_or_skill_use",
+        "reason": "地刺应对状态成功"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "interrupt_responded_skill",
@@ -2013,10 +2102,8 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "interrupt_operation",
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_e0564bd070",
@@ -2085,14 +2172,25 @@
   {
     "skill_id": "rocom_skill_8a699d734e",
     "skill_name": "坍缩",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；击败敌方后自己获得魔攻+70%需要击败条件后的状态施加。",
+    "review_status": "structured",
+    "review_notes": "造成魔伤；击败敌方后自己获得魔攻+70%，已接入伤害后击败条件状态操作。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_magic_attack_up_layered",
+        "target": "actor_side",
+        "layers": 7,
+        "condition": "target_defeated",
+        "timing": "after_damage",
+        "notes": "击败敌方后自己获得魔攻+70%。",
+        "standardized_from_effect_id": "effect_magic_attack_up_70"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "apply_effect_on_defeat",
@@ -2102,16 +2200,13 @@
         "status": "reserved",
         "standardized_from_effect_id": "effect_magic_attack_up_70"
       }
-    ],
-    "structure_gaps": [
-      "post_damage_defeat_condition"
     ]
   },
   {
     "skill_id": "rocom_skill_30a01d592c",
     "skill_name": "坟场搏击",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；敌方每1能量本次威力-10%需要按目标能量动态威力修正。",
+    "review_status": "structured",
+    "review_notes": "敌方每1能量本次威力-10%，倍率最低按0处理，已接入目标能量动态威力解析。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2127,15 +2222,28 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "dynamic_power_modifier_from_resource"
-    ]
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "source": "manual_complex_branch_20260705",
+      "raw_description": "造成物伤，敌方每1能量本次威力-10%。",
+      "dynamic_power_rules": [
+        {
+          "source_resource": "energy",
+          "source_target": "enemy_side",
+          "power_multiplier_delta_per_point": -0.1,
+          "min_power_multiplier": 0,
+          "status": "executable"
+        }
+      ]
+    }
   },
   {
     "skill_id": "rocom_skill_9c6042b2f5",
     "skill_name": "垂死反击",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；自己每失去5%生命威力+5需要按当前生命百分比动态威力加值。",
+    "review_status": "structured",
+    "review_notes": "自己每失去5%生命本次威力+5，已接入当前生命百分比动态威力解析。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2150,15 +2258,26 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "dynamic_power_add_from_hp_percent"
-    ]
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "source": "manual_complex_branch_20260705",
+      "raw_description": "造成物伤，自己每失去5%生命威力+5。",
+      "dynamic_power_rules": [
+        {
+          "missing_hp_percent_step": 5,
+          "power_add_per_step": 5,
+          "status": "executable"
+        }
+      ]
+    }
   },
   {
     "skill_id": "rocom_skill_a6a267afb4",
     "skill_name": "埋伏",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害和3连击已记录；敌方本回合更换精灵时连击+3需要切换事件条件接入连击解析。",
+    "review_status": "structured",
+    "review_notes": "默认3连击；敌方本回合更换精灵时连击+3，已接入切换条件连击解析。",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
       "runtime_record_strategy": "per_hit_damage",
@@ -2167,14 +2286,10 @@
       "conditional_hit_rule": {
         "condition": "enemy_switched_this_turn",
         "hit_count_bonus": 3,
-        "status": "not_executable_yet"
+        "status": "executable"
       }
     },
-    "effect_operations": null,
-    "structure_gaps": [
-      "current_turn_switch_listener",
-      "conditional_hit_count_modifier"
-    ]
+    "effect_operations": null
   },
   {
     "skill_id": "rocom_skill_3dfd2073bf",
@@ -2199,22 +2314,30 @@
   {
     "skill_id": "rocom_skill_96e4f63e68",
     "skill_name": "壁垒",
-    "review_status": "partial",
-    "review_notes": "确认减伤90%；应对攻击时防御技能冷却-1需要技能冷却修正。",
+    "review_status": "structured",
+    "review_notes": "减伤 90%；应对攻击时所有防御技能冷却 -1。",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
       "damage_reduction": 0.9,
       "active": true,
       "response_rule": {
-        "target": "attack",
-        "condition": "response_attack_success"
+        "target": "attack"
       },
       "raw_description": "减伤90%，应对攻击：防御技能冷却-1。",
       "source": "manual_review_20260611_03"
     },
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "modify_skill_slots",
+        "target": "actor_side",
+        "slot_kind": "defense",
+        "cooldown_delta": -1,
+        "condition": "response_attack_success",
+        "timing": "after_damage_or_skill_use"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "skill_cooldown_modifier",
@@ -2224,9 +2347,8 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "skill_cooldown_rule"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_3f09f6012f",
@@ -2252,8 +2374,8 @@
   {
     "skill_id": "rocom_skill_422d86e913",
     "skill_name": "多维击打",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害和1连击已记录；敌方每1层星陨印记连击+1需要按状态层数动态连击。",
+    "review_status": "structured",
+    "review_notes": "默认1连击；敌方每1层星陨印记连击+1，已接入快照层数动态连击解析。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2263,13 +2385,10 @@
         "source_effect_id": "effect_starfall_mark",
         "source_target": "enemy_side",
         "hit_count_bonus_per_layer": 1,
-        "status": "not_executable_yet"
+        "status": "executable"
       }
     },
-    "effect_operations": null,
-    "structure_gaps": [
-      "dynamic_hit_count_from_effect_layers"
-    ]
+    "effect_operations": null
   },
   {
     "skill_id": "rocom_skill_077fb6f60f",
@@ -2286,8 +2405,8 @@
   {
     "skill_id": "rocom_skill_182c213c2b",
     "skill_name": "天体吸积",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；敌方每1层印记威力+20需要按目标印记总层数动态威力加值。",
+    "review_status": "structured",
+    "review_notes": "敌方每1层印记本次威力+20，已接入按状态类别汇总层数的动态威力解析。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2302,9 +2421,21 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "dynamic_power_add_from_mark_layers"
-    ]
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "source": "manual_complex_branch_20260705",
+      "raw_description": "造成物伤，敌方每1层印记威力+20。",
+      "dynamic_power_rules": [
+        {
+          "source_category": "mark",
+          "source_target": "enemy_side",
+          "power_add_per_layer": 20,
+          "status": "executable"
+        }
+      ]
+    }
   },
   {
     "skill_id": "rocom_skill_237584b96b",
@@ -2353,8 +2484,8 @@
   {
     "skill_id": "rocom_skill_d249f44450",
     "skill_name": "天洪",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；应对状态时本技能能耗永久-6需要技能槽持久费用修正。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功后，本技能槽能耗持久-6，最低0，从下次使用生效。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2367,13 +2498,12 @@
         "target": "source_skill",
         "cost_delta": -6,
         "trigger": "response_status_success",
-        "status": "reserved"
+        "status": "executable"
       }
     ],
-    "structure_gaps": [
-      "persistent_skill_slot_cost_modifier",
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_9950798f9b",
@@ -2425,22 +2555,25 @@
   {
     "skill_id": "rocom_skill_05cece45e9",
     "skill_name": "孢子爆散",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害和1连击已记录；每次使用后本技能连击数永久+2需要技能槽持久连击修正。",
+    "review_status": "structured",
+    "review_notes": "基础 1 段；每次使用后本技能连击数永久 +2，从下次使用开始生效。",
     "hit_rule": {
-      "damage_display_type": "single_damage",
-      "runtime_record_strategy": "single_value",
-      "hit_count": 1,
-      "source": "manual_review_20260611_03",
-      "permanent_bonus_rule": {
-        "trigger": "after_skill_use",
-        "hit_count_bonus": 2,
-        "status": "not_executable_yet"
-      }
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_same_damage",
+      "source": "manual_review_20260705",
+      "hit_count": 1
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "persistent_skill_slot_hit_count_modifier"
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05",
+    "future_hooks": [
+      {
+        "status": "executable",
+        "hook_type": "persistent_skill_hit_count_modifier",
+        "trigger": "after_skill_use",
+        "target": "source_skill",
+        "hit_count_delta": 2
+      }
     ]
   },
   {
@@ -2612,8 +2745,8 @@
   {
     "skill_id": "rocom_skill_ce14bb0282",
     "skill_name": "山火",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；每使用1次其他火系技能本技能威力永久翻倍，需要监听其他火系技能使用和技能槽持久威力倍率。",
+    "review_status": "structured",
+    "review_notes": "当前精灵每使用 1 次自己的其他火系技能，本技能威力永久翻倍。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2622,23 +2755,23 @@
     "effect_operations": null,
     "future_hooks": [
       {
-        "hook_type": "persistent_skill_power_multiplier",
+        "status": "executable",
+        "hook_type": "persistent_skill_power_modifier",
+        "trigger": "other_element_skill_use",
+        "element_type": "火",
         "target": "source_skill",
-        "multiplier_per_trigger": 2,
-        "trigger": "other_fire_skill_use",
-        "status": "reserved"
+        "power_multiplier": 2
       }
     ],
-    "structure_gaps": [
-      "persistent_skill_slot_power_modifier",
-      "listen_other_element_skill_use"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05",
+    "review_source": "manual_complex_branch_batch_20260705_01_fix"
   },
   {
     "skill_id": "rocom_skill_824946a8c3",
     "skill_name": "岩土暴击",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；每被攻击1次本技能能耗永久-1需要受击监听和技能槽持久费用修正。",
+    "review_status": "structured",
+    "review_notes": "当前精灵每受到一次有伤害的攻击，本技能能耗永久 -1。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2647,17 +2780,15 @@
     "effect_operations": null,
     "future_hooks": [
       {
+        "status": "executable",
         "hook_type": "persistent_skill_cost_modifier",
+        "trigger": "damage_taken",
         "target": "source_skill",
-        "cost_delta": -1,
-        "trigger": "actor_takes_attack_damage",
-        "status": "reserved"
+        "cost_delta": -1
       }
     ],
-    "structure_gaps": [
-      "damage_taken_listener",
-      "persistent_skill_slot_cost_modifier"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_d48244ce8c",
@@ -2674,8 +2805,8 @@
   {
     "skill_id": "rocom_skill_1910480a20",
     "skill_name": "崩拳",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态成功时自己获得物攻+100%可执行，但攻击技能 response_rule 尚未自动装载。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功时自己获得物攻 +100%；攻击技能应对分支已可自动读取。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2693,9 +2824,8 @@
         "standardized_from_effect_id": "effect_physical_attack_up_100"
       }
     ],
-    "structure_gaps": [
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_b7a9f69980",
@@ -2824,58 +2954,61 @@
   {
     "skill_id": "rocom_skill_95bb39bc3e",
     "skill_name": "当头棒喝",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；敌方本回合更换精灵时威力+100需要切换事件条件接入威力修正。",
+    "review_status": "structured",
+    "review_notes": "目标本回合发生普通切换时，本次技能威力+100；强制换人/返场不计入。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
     "effect_operations": null,
-    "future_hooks": [
-      {
-        "hook_type": "power_add_on_switch_event",
-        "target": "enemy_side",
-        "duration": "current_turn",
-        "power_add": 100,
-        "status": "reserved"
-      }
-    ],
-    "structure_gaps": [
-      "current_turn_switch_listener",
-      "power_modifier_condition_from_switch"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05",
+    "damage_rule": {
+      "status": "structured",
+      "dynamic_power_rule": {
+        "condition": "target_normal_switched_this_turn",
+        "power_add": 100
+      },
+      "source": "manual_complex_branch_batch_20260705_02"
+    }
   },
   {
     "skill_id": "rocom_skill_88d45e3a39",
     "skill_name": "彗星",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；每失去5%生命威力-10和使用后消耗全部生命都需要动态威力与自损操作。",
+    "review_status": "structured",
+    "review_notes": "每失去5%生命本次威力-10，威力最低0；使用后自己生命归零。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "power_add_from_missing_hp_percent",
-        "percent_step": 5,
-        "power_add_per_step": -10,
-        "status": "reserved"
-      },
-      {
-        "hook_type": "resource_change_after_skill_use",
+        "op_type": "resource_change",
         "resource_type": "hp",
-        "change_type": "set_to_zero",
+        "change_type": "manual_set",
+        "value_type": "value",
+        "value": 0,
         "target": "actor_side",
-        "status": "reserved"
+        "condition": "always",
+        "timing": "after_damage_or_skill_use",
+        "notes": "使用后自己生命归零。"
       }
     ],
-    "structure_gaps": [
-      "dynamic_power_add_from_hp_percent",
-      "self_hp_consume_all"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05",
+    "damage_rule": {
+      "status": "structured",
+      "dynamic_power_rule": {
+        "missing_hp_percent_step": 5,
+        "power_add_per_step": -10,
+        "min_power_after_add": 0
+      },
+      "source": "manual_complex_branch_batch_20260705_02"
+    }
   },
   {
     "skill_id": "rocom_skill_5021c4f0e5",
@@ -2892,25 +3025,25 @@
   {
     "skill_id": "rocom_skill_c06d754a7e",
     "skill_name": "彼岸之手",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；自己每失去10%生命本技能能耗-1需要按生命百分比动态费用修正。",
+    "review_status": "structured",
+    "review_notes": "自身每失去10%生命，本技能本次有效能耗-1，以当前HP百分比向下取整计算。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
     "effect_operations": null,
-    "future_hooks": [
-      {
-        "hook_type": "skill_cost_modifier_from_missing_hp_percent",
-        "percent_step": 10,
-        "cost_delta_per_step": -1,
-        "status": "reserved"
-      }
-    ],
-    "structure_gaps": [
-      "dynamic_skill_cost_from_hp_percent"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05",
+    "damage_rule": {
+      "status": "structured",
+      "dynamic_energy_cost_rule": {
+        "missing_hp_percent_step": 10,
+        "energy_cost_delta_per_step": -1
+      },
+      "source": "manual_complex_branch_batch_20260705_02"
+    }
   },
   {
     "skill_id": "rocom_skill_767e360d96",
@@ -2936,8 +3069,8 @@
   {
     "skill_id": "rocom_skill_b057391a90",
     "skill_name": "微型斥候",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；每受到一次抵抗伤害威力永久+20需要抵抗伤害监听和技能槽持久威力修正。",
+    "review_status": "structured",
+    "review_notes": "每受到一次抵抗伤害，本技能战斗内持久威力+20；多段伤害按命中段数累计。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -2949,15 +3082,14 @@
         "hook_type": "persistent_skill_power_modifier",
         "target": "source_skill",
         "power_add": 20,
-        "trigger": "actor_takes_resisted_damage",
-        "status": "reserved"
+        "trigger": "damage_taken_resisted",
+        "per_damage_hit": true,
+        "status": "executable"
       }
     ],
-    "structure_gaps": [
-      "damage_taken_listener",
-      "resisted_damage_condition",
-      "persistent_skill_slot_power_modifier"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_0cda341c3e",
@@ -2981,8 +3113,8 @@
   {
     "skill_id": "rocom_skill_7d018a5a13",
     "skill_name": "快速移动",
-    "review_status": "partial",
-    "review_notes": "普通分支自己获得速度+80可执行；应对防御改为速度+160需要互斥分支，当前先保留接口避免重复叠加。",
+    "review_status": "structured",
+    "review_notes": "应对防御成功时自己速度+160，否则速度+80；使用互斥条件避免重复叠加。",
     "clear_damage_rule": true,
     "hit_rule": null,
     "effect_operations": [
@@ -2990,30 +3122,24 @@
         "op_type": "apply_effect",
         "effect_id": "effect_speed_up_layered",
         "target": "actor_side",
-        "layers": 8,
-        "condition": "always",
-        "timing": "on_skill_use",
-        "notes": "自己获得速度+80。",
-        "standardized_from_effect_id": "effect_speed_up_80"
-      }
-    ],
-    "future_hooks": [
-      {
-        "hook_type": "exclusive_branch_effect",
-        "condition": "response_defense_success",
-        "replace_effect_id": "effect_speed_up_layered",
-        "effect_id": "effect_speed_up_layered",
-        "status": "reserved",
         "layers": 16,
-        "standardized_from_effect_id": "effect_speed_up_160",
-        "replace_effect_id_layers": 8,
-        "replace_effect_id_standardized_from": "effect_speed_up_80"
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "notes": "应对防御成功：速度+160。"
+      },
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_speed_up_layered",
+        "target": "actor_side",
+        "layers": 8,
+        "condition": "not_response_defense_success",
+        "timing": "on_skill_use",
+        "notes": "未应对防御成功：速度+80。"
       }
     ],
-    "structure_gaps": [
-      "exclusive_conditional_branch",
-      "speed_modifier_not_consumed_by_speed_estimator"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_6441f9a592",
@@ -3186,8 +3312,8 @@
   {
     "skill_id": "rocom_skill_5ffa8d366e",
     "skill_name": "惊吓盒子",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态时敌方失去6能量可执行，但攻击技能 response_rule 尚未自动装载。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功后在伤害后敌方失去6能量，能量最低0。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -3206,21 +3332,31 @@
         "notes": "应对状态成功时敌方失去6能量。"
       }
     ],
-    "structure_gaps": [
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_e69b6a7527",
     "skill_name": "感染病",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；击败敌方则将中毒转化为中毒印记需要击败条件和状态转换操作。",
+    "review_status": "structured",
+    "review_notes": "造成魔伤；击败敌方后将敌方中毒转化为中毒印记，已接入伤害后状态转换操作。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "convert_effect",
+        "from_effect_id": "effect_poison",
+        "to_effect_id": "effect_poison_mark",
+        "target": "enemy_side",
+        "condition": "target_defeated",
+        "timing": "after_damage",
+        "notes": "击败敌方后将敌方中毒层数转化为中毒印记。"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "convert_effect_on_defeat",
@@ -3229,10 +3365,6 @@
         "target": "enemy_side",
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "post_damage_defeat_condition",
-      "convert_effect_operation"
     ]
   },
   {
@@ -3263,14 +3395,31 @@
   {
     "skill_id": "rocom_skill_d760d29c0c",
     "skill_name": "截拳",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态额外打断并回复该技能能耗的能量，需要打断和按被应对技能费用动态资源变化。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功时打断被应对技能；若事件 payload 提供 responded_skill_id，则按该技能基础能耗回复能量。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "interrupt_action",
+        "target": "responded_skill",
+        "condition": "response_status_success",
+        "timing": "after_damage_or_skill_use",
+        "reason": "截拳应对状态成功"
+      },
+      {
+        "op_type": "resource_change",
+        "resource_type": "energy",
+        "change_type": "gain",
+        "target": "actor_side",
+        "value_from": "responded_skill_energy_cost",
+        "condition": "response_status_success",
+        "timing": "after_damage_or_skill_use"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "interrupt_responded_skill",
@@ -3284,17 +3433,14 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "interrupt_operation",
-      "resource_change_from_responded_skill_cost",
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_846bc7b044",
     "skill_name": "扇风",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；若先于敌方攻击威力+50%需要行动顺序条件接入威力修正。",
+    "review_status": "structured",
+    "review_notes": "先于敌方攻击时本次威力×1.5，已接入条件威力解析。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -3309,9 +3455,20 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "action_order_condition_in_power_rule"
-    ]
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "source": "manual_complex_branch_20260705",
+      "raw_description": "造成物伤，若先于敌方攻击，威力+50%。",
+      "dynamic_power_rules": [
+        {
+          "condition": "actor_moves_before_target",
+          "power_multiplier": 1.5,
+          "status": "executable"
+        }
+      ]
+    }
   },
   {
     "skill_id": "rocom_skill_3af4791eab",
@@ -3385,10 +3542,10 @@
   {
     "skill_id": "rocom_skill_109d575add",
     "skill_name": "技巧打击",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态时本次威力变为10倍，当前攻击技能 response_rule 尚未自动装载。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功时走现有威力体系，本次技能威力×10，不作最终伤害倍率。",
     "damage_rule": {
-      "status": "formula_unavailable",
+      "status": "structured",
       "damage_type": "normal_formula",
       "attack_stat": "physical_attack",
       "defense_stat": "physical_defense",
@@ -3400,7 +3557,7 @@
         "modifier": "power_multiplier"
       },
       "raw_description": "造成物伤，应对状态：本次技能威力变为10倍。",
-      "source": "manual_review_20260611_03"
+      "source": "manual_complex_branch_batch_20260705_02"
     },
     "hit_rule": {
       "damage_display_type": "single_damage",
@@ -3408,9 +3565,9 @@
       "source": "manual_review_20260611_03"
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_08a2c808e4",
@@ -3474,8 +3631,8 @@
   {
     "skill_id": "rocom_skill_3743cefd25",
     "skill_name": "抛石",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；回合结束本技能能耗永久-5需要技能槽持久费用修正。",
+    "review_status": "structured",
+    "review_notes": "只要当前精灵在场，回合末本技能槽能耗持久-5；最低0，不需要本回合使用该技能。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -3487,13 +3644,13 @@
         "hook_type": "persistent_skill_cost_modifier",
         "target": "source_skill",
         "cost_delta": -5,
-        "trigger": "end_turn_after_use",
-        "status": "reserved"
+        "trigger": "end_turn_in_field",
+        "status": "executable"
       }
     ],
-    "structure_gaps": [
-      "persistent_skill_slot_cost_modifier"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_56f5a7e806",
@@ -3530,8 +3687,8 @@
   {
     "skill_id": "rocom_skill_8b86189764",
     "skill_name": "抽枝",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态成功时自己回复50%生命和5能量可执行，但攻击技能 response_rule 尚未自动装载。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功后自己按最大生命回复50%，并回复5能量；满HP时仍然回复能量。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -3561,9 +3718,9 @@
         "notes": "应对状态成功时自己回复5能量。"
       }
     ],
-    "structure_gaps": [
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_25f55ef597",
@@ -3592,14 +3749,23 @@
   {
     "skill_id": "rocom_skill_b39bab4117",
     "skill_name": "持续高温",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；应对状态后下次攻击技能威力翻倍需要一次性下次攻击威力修正。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功后，自己下次攻击技能威力翻倍。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_next_attack_power_double_once",
+        "target": "actor_side",
+        "layers": 1,
+        "condition": "response_status_success",
+        "timing": "after_damage_or_skill_use"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "next_attack_power_multiplier_once",
@@ -3608,10 +3774,8 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "next_attack_power_multiplier_once",
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_a70a3f5ddc",
@@ -3731,7 +3895,7 @@
     "skill_id": "rocom_skill_dcf8863d78",
     "skill_name": "掩护",
     "review_status": "partial",
-    "review_notes": "确认减伤70%；紧急脱离和下个入场精灵获得减伤需要强制切换、延迟给下个入场精灵施加减伤。",
+    "review_notes": "先保留：紧急脱离、指定下个入场精灵和“视作一次防御”需要切换/延迟目标机制统一落地。",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
@@ -3760,9 +3924,9 @@
       }
     ],
     "structure_gaps": [
-      "force_switch_out_operation",
-      "next_switch_in_damage_reduction_effect"
-    ]
+      "forced_switch_and_next_switch_in_target"
+    ],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_f1217099a9",
@@ -3795,8 +3959,8 @@
   {
     "skill_id": "rocom_skill_5a2d84ef54",
     "skill_name": "摇篮曲",
-    "review_status": "needs_review",
-    "review_notes": "敌方全技能能耗+3、应对防御打断且下回合眩晕；需要费用修正、打断、眩晕定义与延迟施加。",
+    "review_status": "partial",
+    "review_notes": "已确认规则，但“下回合眩晕无法行动”的强制行动校验尚未统一接入，暂缓写成完备规则。",
     "clear_damage_rule": true,
     "hit_rule": null,
     "effect_operations": null,
@@ -3821,11 +3985,9 @@
       }
     ],
     "structure_gaps": [
-      "all_skill_cost_modifier",
-      "interrupt_operation",
-      "missing_stun_effect_definition",
-      "delayed_effect_operation"
-    ]
+      "delayed_next_turn_action_block"
+    ],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_3300b90daa",
@@ -3861,8 +4023,8 @@
   {
     "skill_id": "rocom_skill_553350dfb1",
     "skill_name": "撕咬",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害和3连击已记录；自己生命低于50%时连击+2需要生命条件接入连击解析。",
+    "review_status": "structured",
+    "review_notes": "默认3连击；自己生命低于50%时连击+2，已接入生命条件连击解析。",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
       "runtime_record_strategy": "per_hit_damage",
@@ -3871,25 +4033,31 @@
       "conditional_hit_rule": {
         "condition": "actor_hp_percent_below_50",
         "hit_count_bonus": 2,
-        "status": "not_executable_yet"
+        "status": "executable"
       }
     },
-    "effect_operations": null,
-    "structure_gaps": [
-      "hp_percent_condition_in_hit_rule"
-    ]
+    "effect_operations": null
   },
   {
     "skill_id": "rocom_skill_0a80a81c87",
     "skill_name": "撕裂",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态时本次攻击吸血100%需要按伤害结果治疗。",
+    "review_status": "structured",
+    "review_notes": "造成物伤；应对状态成功时本次攻击吸血100%，已接入伤害后条件吸血。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "heal_from_damage_dealt",
+        "target": "actor_side",
+        "ratio": 1.0,
+        "condition": "response_status_success",
+        "timing": "after_damage",
+        "notes": "应对状态成功时按本次造成伤害的100%吸血。"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "lifesteal_from_damage",
@@ -3897,10 +4065,6 @@
         "trigger": "response_status_success",
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "lifesteal_from_damage_result",
-      "attacking_skill_response_rule_auto_load"
     ]
   },
   {
@@ -3918,33 +4082,50 @@
   {
     "skill_id": "rocom_skill_e21625c3c1",
     "skill_name": "操控",
-    "review_status": "needs_review",
-    "review_notes": "敌方本回合使用技能能耗+7，持续3回合，需要按回合持续的费用修正和技能使用监听。",
+    "review_status": "structured",
+    "review_notes": "只作用于敌方本回合已经使用过的技能槽，施加3回合能耗+7状态。若录入时尚未有敌方本回合技能事件，执行器会跳过并说明缺少目标技能槽。",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "skill_cost_modifier",
-        "target": "enemy_side_current_turn_used_skill",
-        "cost_delta": 7,
-        "duration_turns": 3,
-        "status": "reserved"
+        "op_type": "apply_effect",
+        "effect_id": "effect_skill_slot_energy_cost_up_7_3_turns",
+        "target": "enemy_current_turn_used_skill",
+        "layers": 1,
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "敌方本回合已使用技能能耗+7，持续3回合。"
       }
     ],
-    "structure_gaps": [
-      "turn_scoped_skill_cost_modifier",
-      "duration_turn_cost_modifier"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_e11ed8cd3b",
     "skill_name": "放晴",
-    "review_status": "needs_review",
-    "review_notes": "光系技能威力永久+50%，应对防御改为+100%，需要按系别的全技能永久威力修正。",
+    "review_status": "structured",
+    "review_notes": "自身光系技能威力永久增加；默认 +50%，应对防御成功改为 +100%，每层代表 +10%。",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_light_skill_power_up_persistent",
+        "target": "actor_side",
+        "layers": 10,
+        "condition": "response_defense_success",
+        "timing": "after_damage_or_skill_use"
+      },
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_light_skill_power_up_persistent",
+        "target": "actor_side",
+        "layers": 5,
+        "condition": "not_response_defense_success",
+        "timing": "after_damage_or_skill_use"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "element_skill_power_modifier",
@@ -3964,55 +4145,50 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "element_skill_power_modifier",
-      "exclusive_conditional_branch"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_8a1f8a4f58",
     "skill_name": "散手",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害和2连击已记录；应对状态改为6连击需要攻击技能应对规则接入连击解析。",
+    "review_status": "structured",
+    "review_notes": "默认 2 连击；应对状态（敌方本回合使用状态技能）成功时改为 6 连击。",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
-      "runtime_record_strategy": "per_hit_damage",
+      "runtime_record_strategy": "per_hit_same_damage",
+      "source": "manual_review_20260705",
       "hit_count": 2,
-      "source": "manual_review_20260611_03",
       "conditional_hit_rule": {
         "condition": "response_status_success",
-        "hit_count": 6,
-        "status": "not_executable_yet"
+        "hit_count": 6
       }
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "attacking_skill_response_rule_auto_load",
-      "conditional_hit_count_modifier"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_5e6abf2159",
     "skill_name": "斩断",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态额外打断被应对技能需要打断操作。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功时记录打断被应对技能；当前手动事件流不会自动撤销已录入的对方结算事件。",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "interrupt_responded_skill",
-        "trigger": "response_status_success",
-        "status": "reserved"
+        "op_type": "interrupt_action",
+        "target": "enemy_side",
+        "condition": "response_status_success",
+        "timing": "after_damage_or_skill_use",
+        "reason": "response_status_interrupt"
       }
     ],
-    "structure_gaps": [
-      "interrupt_operation",
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_c494092866",
@@ -4030,8 +4206,8 @@
   {
     "skill_id": "rocom_skill_de11d511df",
     "skill_name": "无影脚",
-    "review_status": "partial",
-    "review_notes": "基础物理伤害已保留；应对状态时本次威力2倍，当前攻击技能 response_rule 尚未自动装载。",
+    "review_status": "structured",
+    "review_notes": "应对状态成功时本次技能威力变为 2 倍；攻击技能 response_rule 已可自动读取。",
     "damage_rule": {
       "status": "formula_unavailable",
       "damage_type": "normal_formula",
@@ -4040,9 +4216,7 @@
       "power_source": "base_power",
       "response_rule": {
         "target": "status",
-        "condition": "response_status_success",
-        "success_multiplier": 2,
-        "modifier": "power_multiplier"
+        "power_multiplier": 2
       },
       "raw_description": "造成物伤，应对状态：本次技能威力变为2倍。",
       "source": "manual_review_20260611_03"
@@ -4053,15 +4227,14 @@
       "source": "manual_review_20260611_03"
     },
     "effect_operations": null,
-    "structure_gaps": [
-      "attacking_skill_response_rule_auto_load"
-    ]
+    "structure_gaps": [],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_9707d5cf5f",
     "skill_name": "无畏之心",
     "review_status": "partial",
-    "review_notes": "确认减伤100%；应对攻击时减免伤害转治疗和本技能能耗永久+2需要按减免量治疗和技能槽持久费用修正。",
+    "review_notes": "先保留：需要从公式上下文读取“实际减免伤害”并转治疗，同时持久 +2 能耗。",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
@@ -4092,9 +4265,9 @@
       }
     ],
     "structure_gaps": [
-      "heal_from_prevented_damage",
-      "persistent_skill_slot_cost_modifier"
-    ]
+      "prevented_damage_to_heal"
+    ],
+    "reviewed_at": "2026-07-05"
   },
   {
     "skill_id": "rocom_skill_32cd578268",
@@ -4187,11 +4360,20 @@
   {
     "skill_id": "rocom_skill_a0cbb3d12b",
     "skill_name": "晒太阳",
-    "review_status": "partial",
-    "review_notes": "驱散敌方所有增益需要按正面极性清除状态；当前 clear_effects 只能按类别/effect_id，不能安全按 polarity 清除。",
+    "review_status": "structured",
+    "review_notes": "驱散敌方所有正面增益，已接入按状态极性清除。",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "clear_effects",
+        "target": "enemy_side",
+        "polarity": "positive",
+        "condition": "always",
+        "timing": "on_skill_use",
+        "notes": "驱散敌方所有正面增益。"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "clear_effects",
@@ -4199,16 +4381,13 @@
         "polarity": "positive",
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "clear_effects_by_polarity"
     ]
   },
   {
     "skill_id": "rocom_skill_3dc535afc0",
     "skill_name": "暗突袭",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed executable part is kept; unsupported dynamic/branch mechanics are reserved in future_hooks and structure_gaps.",
+    "review_status": "structured",
+    "review_notes": "造成物伤并吸血50%；应对状态本次威力翻倍，已接入吸血和应对威力分支。",
     "review_source": "manual_review_20260612_04",
     "reviewed_at": "2026-06-12",
     "damage_rule": {
@@ -4239,8 +4418,15 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "heal_from_damage_dealt"
+    "effect_operations": [
+      {
+        "op_type": "heal_from_damage_dealt",
+        "target": "actor_side",
+        "ratio": 0.5,
+        "condition": "always",
+        "timing": "after_damage",
+        "notes": "按本次造成伤害的50%向下取整吸血。"
+      }
     ]
   },
   {
@@ -4303,13 +4489,22 @@
   {
     "skill_id": "rocom_skill_b6ebf82dc0",
     "skill_name": "暴风眼",
-    "review_status": "needs_review",
-    "review_notes": "Manual review: effect is unclear or not safely representable yet; no executable rule is written.",
+    "review_status": "structured",
+    "review_notes": "获得连击数 +100% 状态；1 层代表连击数翻倍。",
     "review_source": "manual_review_20260612_04",
-    "reviewed_at": "2026-06-12",
+    "reviewed_at": "2026-07-05",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_hit_count_percent_up_layered",
+        "target": "actor_side",
+        "layers": 1,
+        "condition": "always",
+        "timing": "after_damage_or_skill_use"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "hit_count_modifier",
@@ -4319,9 +4514,7 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "hit_count_modifier_effect"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_7baf2eecde",
@@ -4461,8 +4654,8 @@
   {
     "skill_id": "rocom_skill_379e2e198e",
     "skill_name": "极寒领域",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed executable part is kept; unsupported dynamic/branch mechanics are reserved in future_hooks and structure_gaps.",
+    "review_status": "structured",
+    "review_notes": "敌方有冻结时威力+60；应对状态使冻结翻倍，已接入条件威力和层数翻倍操作。",
     "review_source": "manual_review_20260612_04",
     "reviewed_at": "2026-06-12",
     "damage_rule": {
@@ -4472,7 +4665,15 @@
       "defense_stat": "magic_defense",
       "power_source": "base_power",
       "raw_description": "造成魔伤，若敌方有冻结，本次技能威力+60，应对状态：使冻结翻倍。",
-      "source": "manual_review_20260612_04"
+      "source": "manual_review_20260612_04",
+      "dynamic_power_rules": [
+        {
+          "source_effect_id": "effect_freeze",
+          "source_target": "enemy_side",
+          "power_add_if_present": 60,
+          "status": "executable"
+        }
+      ]
     },
     "hit_rule": {
       "damage_display_type": "single_damage",
@@ -4498,9 +4699,6 @@
         "power_add": 60,
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "power_modifier_condition_from_effect_layers"
     ]
   },
   {
@@ -4786,8 +4984,8 @@
   {
     "skill_id": "rocom_skill_fd4cffe72b",
     "skill_name": "毒液渗透",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed executable part is kept; unsupported dynamic/branch mechanics are reserved in future_hooks and structure_gaps.",
+    "review_status": "structured",
+    "review_notes": "敌方每有1层中毒或中毒印记，本技能能耗-1；同时施加中毒，已接入动态能耗读取。",
     "review_source": "manual_review_20260612_04",
     "reviewed_at": "2026-06-12",
     "hit_rule": {
@@ -4815,9 +5013,23 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "dynamic_skill_cost_from_effect_layers"
-    ]
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "source": "manual_complex_branch_20260705",
+      "raw_description": "造成魔伤，敌方每有1层中毒或中毒印记，本技能能耗-1，并使敌方中毒。",
+      "dynamic_energy_cost_rule": {
+        "source_effect_ids": [
+          "effect_poison",
+          "effect_poison_mark"
+        ],
+        "source_target": "enemy_side",
+        "energy_cost_delta_per_layer": -1,
+        "min_energy_cost": 0,
+        "status": "executable"
+      }
+    }
   },
   {
     "skill_id": "rocom_skill_f27004754a",
@@ -4904,8 +5116,8 @@
   {
     "skill_id": "rocom_skill_e80d5278cc",
     "skill_name": "气势一击",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed executable part is kept; unsupported dynamic/branch mechanics are reserved in future_hooks and structure_gaps.",
+    "review_status": "structured",
+    "review_notes": "若上回合本方成功应对，本次威力+180，已接入上一回合应对历史条件威力解析。",
     "review_source": "manual_review_20260612_04",
     "reviewed_at": "2026-06-12",
     "hit_rule": {
@@ -4920,17 +5132,28 @@
         "status": "reserved"
       }
     ],
-    "structure_gaps": [
-      "previous_turn_response_context"
-    ]
+    "damage_rule": {
+      "status": "formula_unavailable",
+      "damage_type": "normal_formula",
+      "power_source": "base_power",
+      "source": "manual_complex_branch_20260705",
+      "raw_description": "造成物伤，如果上回合成功应对，本次威力+180。",
+      "dynamic_power_rules": [
+        {
+          "condition": "previous_turn_response_success",
+          "power_add": 180,
+          "status": "executable"
+        }
+      ]
+    }
   },
   {
     "skill_id": "rocom_skill_b8260ebed4",
     "skill_name": "气沉丹田",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed executable part is kept; unsupported dynamic/branch mechanics are reserved in future_hooks and structure_gaps.",
-    "review_source": "manual_review_20260612_04",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "每次本精灵应对成功时，本技能槽能耗持久-3；使用气沉丹田后重置为基础能耗。",
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05",
     "clear_damage_rule": true,
     "hit_rule": null,
     "effect_operations": [
@@ -4958,17 +5181,20 @@
     ],
     "future_hooks": [
       {
-        "hook_type": "skill_cost_modifier_on_response",
+        "hook_type": "response_success_skill_cost_listener",
         "target": "source_skill",
         "cost_delta": -3,
-        "reset_after_use": true,
-        "status": "reserved"
+        "trigger": "any_response_success",
+        "status": "executable"
+      },
+      {
+        "hook_type": "reset_skill_cost_modifier",
+        "target": "source_skill",
+        "trigger": "after_skill_use",
+        "status": "executable"
       }
     ],
-    "structure_gaps": [
-      "response_count_skill_cost_modifier",
-      "reset_skill_cost_after_use"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_d9be7c73a4",
@@ -5149,10 +5375,10 @@
   {
     "skill_id": "rocom_skill_5a547b8e5a",
     "skill_name": "水波术",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed executable part is kept; unsupported dynamic/branch mechanics are reserved in future_hooks and structure_gaps.",
-    "review_source": "manual_review_20260612_04",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "只要当前精灵在场，回合末本技能槽威力持久+20；无上限，切换/返场保留。",
+    "review_source": "manual_complex_branch_batch_20260705_02",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -5160,17 +5386,14 @@
     },
     "future_hooks": [
       {
-        "hook_type": "persistent_skill_power_add",
+        "hook_type": "persistent_skill_power_modifier",
         "target": "source_skill",
         "power_add": 20,
-        "trigger": "end_turn_after_use",
-        "status": "reserved"
+        "trigger": "end_turn_in_field",
+        "status": "executable"
       }
     ],
-    "structure_gaps": [
-      "persistent_skill_slot_power_modifier",
-      "end_turn_skill_slot_trigger"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_588acb92d8",
@@ -7187,9 +7410,9 @@
   {
     "skill_id": "rocom_skill_7e5d8bf2b5",
     "skill_name": "碎冰冰",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "敌方每有 1 层冻结，本次技能威力 +20。",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -7205,9 +7428,14 @@
         "power_add_per_layer": 20
       }
     ],
-    "structure_gaps": [
-      "power_add_from_effect_layers"
-    ]
+    "structure_gaps": [],
+    "damage_rule": {
+      "dynamic_power_rule": {
+        "source_effect_id": "effect_freeze",
+        "source_target": "defender_side",
+        "power_add_per_layer": 20
+      }
+    }
   },
   {
     "skill_id": "rocom_skill_c586536e0f",
@@ -7437,9 +7665,9 @@
   {
     "skill_id": "rocom_skill_9e9b2ea952",
     "skill_name": "穿膛",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "若敌方能量 ≤2，本次技能威力 5 倍。",
+    "reviewed_at": "2026-07-05",
     "damage_rule": {
       "status": "formula_unavailable",
       "damage_type": "normal_formula",
@@ -7453,6 +7681,13 @@
         "condition": "defender_energy_lte_2",
         "success_multiplier": 5,
         "modifier": "power_multiplier"
+      },
+      "dynamic_power_rule": {
+        "source_resource": "energy",
+        "source_target": "defender_side",
+        "operator": "lte",
+        "threshold": 2,
+        "power_multiplier": 5
       }
     },
     "hit_rule": {
@@ -7469,9 +7704,7 @@
         "power_multiplier": 5
       }
     ],
-    "structure_gaps": [
-      "defender_energy_condition_in_power_rule"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_5933e4eaf2",
@@ -7536,9 +7769,9 @@
   {
     "skill_id": "rocom_skill_9b132d403a",
     "skill_name": "筛管奔流",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "自身生命大于 80% 时，本次技能威力 +75。",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -7553,9 +7786,15 @@
         "power_add": 75
       }
     ],
-    "structure_gaps": [
-      "hp_percent_condition_in_power_rule"
-    ]
+    "structure_gaps": [],
+    "damage_rule": {
+      "dynamic_power_rule": {
+        "source_target": "actor",
+        "hp_percent_threshold": 80,
+        "operator": "gt",
+        "power_add": 75
+      }
+    }
   },
   {
     "skill_id": "rocom_skill_9577b541d2",
@@ -7697,8 +7936,8 @@
     "skill_id": "rocom_skill_ecd935f5f6",
     "skill_name": "羽刃",
     "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_notes": "用户确认本轮先不做。",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -7716,8 +7955,7 @@
       }
     ],
     "structure_gaps": [
-      "delayed_force_switch_out",
-      "attacking_skill_response_rule_auto_load"
+      "deferred_by_user"
     ]
   },
   {
@@ -7865,12 +8103,21 @@
   {
     "skill_id": "rocom_skill_180eb99ab5",
     "skill_name": "聒噪",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "敌方获得攻击技能能耗 +2 状态，持续三回合。",
+    "reviewed_at": "2026-07-05",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_attack_skill_energy_cost_up_3_turns",
+        "target": "enemy_side",
+        "layers": 1,
+        "condition": "always",
+        "timing": "after_damage_or_skill_use"
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "attack_skill_cost_modifier",
@@ -7880,9 +8127,7 @@
         "duration_turns": 3
       }
     ],
-    "structure_gaps": [
-      "skill_category_filtered_cost_modifier"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_6bb722f6d0",
@@ -7964,9 +8209,9 @@
   {
     "skill_id": "rocom_skill_dddc6c0e01",
     "skill_name": "背袭",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "若敌方能量 =0，本次技能威力 20 倍。",
+    "reviewed_at": "2026-07-05",
     "damage_rule": {
       "status": "formula_unavailable",
       "damage_type": "normal_formula",
@@ -7980,6 +8225,13 @@
         "condition": "defender_energy_eq_0",
         "success_multiplier": 20,
         "modifier": "power_multiplier"
+      },
+      "dynamic_power_rule": {
+        "source_resource": "energy",
+        "source_target": "defender_side",
+        "operator": "eq",
+        "threshold": 0,
+        "power_multiplier": 20
       }
     },
     "hit_rule": {
@@ -7996,9 +8248,7 @@
         "power_multiplier": 20
       }
     ],
-    "structure_gaps": [
-      "defender_energy_condition_in_power_rule"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_620dc1fd3d",
@@ -8159,12 +8409,12 @@
     "skill_id": "rocom_skill_feb29d2c03",
     "skill_name": "花炮",
     "review_status": "structured",
-    "review_notes": "Manual review: confirmed executable structured rule has been recorded.",
-    "reviewed_at": "2026-06-12",
+    "review_notes": "确认按当前有效连击次数结算：自己获得魔攻+60%，2连击；每次连击折算为魔攻+60%（6层）。",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
-      "runtime_record_strategy": "per_hit_damage",
-      "source": "manual_review_20260612_02",
+      "runtime_record_strategy": "status_effect_per_hit",
+      "source": "manual_review_20260705_combo_status",
       "hit_count": 2
     },
     "effect_operations": [
@@ -8174,8 +8424,9 @@
         "condition": "always",
         "timing": "after_damage_or_skill_use",
         "effect_id": "effect_magic_attack_up_layered",
-        "layers": 12,
-        "notes": "Manual review: confirmed executable part is recorded; unsupported or unclear mechanics are preserved in future_hooks and structure_gaps."
+        "layers_from": "current_hit_count",
+        "layers_per_hit": 6,
+        "notes": "按 skill_runtime.effective_hit_count 或本次记录的 hit_count 动态计算层数；默认 2 连击即 12 层。"
       }
     ]
   },
@@ -9552,18 +9803,17 @@
   {
     "skill_id": "rocom_skill_465b46196a",
     "skill_name": "连续爪击",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "默认 2 连击；应对状态成功时固定为 4 连击。",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
-      "runtime_record_strategy": "per_hit_damage",
-      "source": "manual_review_20260612_03",
+      "runtime_record_strategy": "per_hit_same_damage",
+      "source": "manual_review_20260705",
       "hit_count": 2,
       "conditional_hit_rule": {
         "condition": "response_status_success",
-        "hit_count_multiplier": 2,
-        "status": "not_executable_yet"
+        "hit_count": 4
       }
     },
     "effect_operations": null,
@@ -9575,9 +9825,7 @@
         "trigger": "response_status_success"
       }
     ],
-    "structure_gaps": [
-      "conditional_hit_count_modifier"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_16056e9e4c",
@@ -9617,18 +9865,17 @@
   {
     "skill_id": "rocom_skill_2cc36609a5",
     "skill_name": "追打",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "默认 1 段；应对状态成功时改为 3 连击。",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
-      "damage_display_type": "single_damage",
-      "runtime_record_strategy": "single_value",
-      "source": "manual_review_20260612_03",
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_same_damage",
+      "source": "manual_review_20260705",
       "hit_count": 1,
       "conditional_hit_rule": {
         "condition": "response_status_success",
-        "hit_count": 3,
-        "status": "not_executable_yet"
+        "hit_count": 3
       }
     },
     "effect_operations": null,
@@ -9640,9 +9887,7 @@
         "trigger": "response_status_success"
       }
     ],
-    "structure_gaps": [
-      "conditional_hit_count_modifier"
-    ]
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_30385a23b2",
@@ -9667,9 +9912,9 @@
   {
     "skill_id": "rocom_skill_b233b8c803",
     "skill_name": "逆袭",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
-    "reviewed_at": "2026-06-12",
+    "review_status": "structured",
+    "review_notes": "本技能当前能耗每高于基础能耗 1 点，本次技能威力 +50。",
+    "reviewed_at": "2026-07-05",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
@@ -9685,9 +9930,13 @@
         "cost_delta_unit": 1
       }
     ],
-    "structure_gaps": [
-      "power_modifier_from_skill_slot_cost_delta"
-    ]
+    "structure_gaps": [],
+    "damage_rule": {
+      "dynamic_power_rule": {
+        "source_skill_slot": "current_skill_cost_delta",
+        "power_add_per_cost_delta": 50
+      }
+    }
   },
   {
     "skill_id": "rocom_skill_836d73f741",

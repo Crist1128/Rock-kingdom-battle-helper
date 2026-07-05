@@ -153,11 +153,12 @@ def list_rocom_sync_jobs(_: None = Depends(verify_admin_token)) -> list[RocomDat
 )
 def check_static_skill_rule_sync(
     limit: int = 100,
+    q: str | None = None,
     _: None = Depends(verify_admin_token),
     db: Session = Depends(get_db),
 ) -> StaticSkillRuleSyncResponse:
     """只检查本地 seed 与数据库差异，不写库。"""
-    result = check_structured_skill_rule_sync(db, limit=limit)
+    result = check_structured_skill_rule_sync(db, limit=limit, q=q)
     return StaticSkillRuleSyncResponse(**result)
 
 
@@ -176,5 +177,6 @@ def sync_static_skill_rules(
         db,
         skill_ids=request.skill_ids,
         commit=request.commit,
+        q=request.q,
     )
     return StaticSkillRuleSyncResponse(**result)
