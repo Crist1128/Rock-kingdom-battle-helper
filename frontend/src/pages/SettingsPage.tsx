@@ -4,6 +4,7 @@ import { API_BASE_URL, ApiError, api } from "@/lib/api";
 import type {
   BattleOut,
   BattlePurgeResultOut,
+  ProjectDataBootstrapStatus,
   RocomCheckResponse,
   RocomDataUpdateAccepted,
   RocomDataUpdateJobStatus,
@@ -49,6 +50,8 @@ export function SettingsPage() {
   const [localCleanedDir, setLocalCleanedDir] = useState("");
   const [localDataVersion, setLocalDataVersion] = useState("");
   const [localUpdateMode, setLocalUpdateMode] = useState<"full" | "incremental">("full");
+  const [bootstrapCleanedDir, setBootstrapCleanedDir] = useState("");
+  const [bootstrapDataVersion, setBootstrapDataVersion] = useState("");
   const [lastCheckResult, setLastCheckResult] = useState<RocomCheckResponse | null>(null);
   const [lastAcceptedJob, setLastAcceptedJob] = useState<RocomDataUpdateAccepted | null>(null);
   const [staticRuleCheckLimit, setStaticRuleCheckLimit] = useState("100");
@@ -77,6 +80,15 @@ export function SettingsPage() {
     },
   });
 
+  const bootstrapStatus = useQuery({
+    queryKey: ["data-updates", "bootstrap", "status", bootstrapCleanedDir, Boolean(adminToken)],
+    queryFn: () =>
+      api.adminDataUpdates.bootstrapStatus(
+        { cleaned_dir: emptyToNull(bootstrapCleanedDir) },
+        adminToken || undefined,
+      ),
+  });
+
   const runningJob = useMemo(
     () => dataUpdateJobs.data?.find((job) => job.status === "queued" || job.status === "running"),
     [dataUpdateJobs.data],
@@ -98,6 +110,7 @@ export function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["natures"] }),
       queryClient.invalidateQueries({ queryKey: ["player-builds"] }),
       queryClient.invalidateQueries({ queryKey: ["data-updates", "rocom", "jobs"] }),
+      queryClient.invalidateQueries({ queryKey: ["data-updates", "bootstrap"] }),
     ]);
   };
 
@@ -141,6 +154,22 @@ export function SettingsPage() {
         adminToken || undefined,
       );
     },
+    onSuccess: async (result) => {
+      setLastAcceptedJob(result);
+      await refreshRuleQueries();
+    },
+  });
+
+  const bootstrapLocalMutation = useMutation({
+    mutationFn: (commit: boolean) =>
+      api.adminDataUpdates.bootstrapImportLocal(
+        {
+          cleaned_dir: emptyToNull(bootstrapCleanedDir),
+          commit,
+          data_version: emptyToNull(bootstrapDataVersion),
+        },
+        adminToken || undefined,
+      ),
     onSuccess: async (result) => {
       setLastAcceptedJob(result);
       await refreshRuleQueries();
@@ -237,6 +266,7 @@ export function SettingsPage() {
 
   const checkError = getApiErrorText(checkMutation.error);
   const syncError = getApiErrorText(syncMutation.error);
+  const bootstrapError = getApiErrorText(bootstrapLocalMutation.error ?? bootstrapStatus.error);
   const importLocalError = getApiErrorText(importLocalMutation.error);
   const staticRuleCheckError = getApiErrorText(staticRuleCheckMutation.error);
   const staticRuleSyncError = getApiErrorText(staticRuleSyncMutation.error);
@@ -305,6 +335,69 @@ export function SettingsPage() {
           <div className="rounded-2xl border bg-amber-50 p-4 text-sm text-amber-900">
             爬虫更新不是常驻服务，也不会随后端启动自动运行。日常使用只启动前后端；只有本地规则库为空或需要更新精灵/技能数据时，才在这里主动触发。
           </div>
+
+          <section className="space-y-3 rounded-2xl border bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">0. 新用户 / 空库一键初始化</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  会一次性补齐核心性格、默认聚能技能、BWIKI 静态数据、状态定义 seed 和人工技能分支 seed。
+                  优先使用本地 cleaned 数据包，不访问远程，适合发给新用户快速初始化。
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => bootstrapStatus.refetch()}>
+                刷新数据状态
+              </Button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-sm font-medium">本地 cleaned 数据包目录</span>
+                <Input
+                  value={bootstrapCleanedDir}
+                  placeholder="留空 = 后端 ROCOM_DATA_DIR/cleaned"
+                  onChange={(event) => setBootstrapCleanedDir(event.target.value)}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium">覆盖 data_version</span>
+                <Input
+                  value={bootstrapDataVersion}
+                  placeholder="可选，例如 rocom_bwiki_20260609"
+                  onChange={(event) => setBootstrapDataVersion(event.target.value)}
+                />
+              </label>
+            </div>
+
+            {bootstrapStatus.data ? <BootstrapStatusPanel status={bootstrapStatus.data} /> : null}
+            {bootstrapError ? <ErrorBox text={bootstrapError} /> : null}
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => bootstrapLocalMutation.mutate(false)}
+                disabled={Boolean(runningJob) || bootstrapLocalMutation.isPending}
+              >
+                预检查一键初始化（dry-run）
+              </Button>
+              <Button
+                onClick={() => {
+                  if (window.confirm("确认执行空库一键初始化并写入数据库？建议先 dry-run 检查结果。")) {
+                    bootstrapLocalMutation.mutate(true);
+                  }
+                }}
+                disabled={
+                  Boolean(runningJob) ||
+                  bootstrapLocalMutation.isPending ||
+                  bootstrapStatus.data?.local_package_ready === false ||
+                  bootstrapStatus.data?.seed_files.some((file) => !file.exists) === true
+                }
+              >
+                一键初始化本地数据库
+              </Button>
+            </div>
+            {bootstrapLocalMutation.isPending ? <InlineProgressBar label="正在创建初始化任务..." /> : null}
+          </section>
 
           <section className="space-y-3 rounded-2xl border bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -409,6 +502,7 @@ export function SettingsPage() {
                 一键导入本地数据（提交）
               </Button>
             </div>
+            {importLocalMutation.isPending ? <InlineProgressBar label="正在创建本地导入任务..." /> : null}
             {importLocalError ? <ErrorBox text={importLocalError} /> : null}
           </section>
 
@@ -494,6 +588,9 @@ export function SettingsPage() {
             </div>
             {staticRuleCheckError ? <ErrorBox text={staticRuleCheckError} /> : null}
             {staticRuleSyncError ? <ErrorBox text={staticRuleSyncError} /> : null}
+            {staticRuleSyncMutation.isPending ? (
+              <InlineProgressBar label="正在同步 structured 技能规则 seed..." />
+            ) : null}
             {lastStaticRuleResult ? (
               <StaticSkillRuleSyncPanel
                 result={lastStaticRuleResult}
@@ -599,6 +696,7 @@ export function SettingsPage() {
                 一键导入远程数据（提交）
               </Button>
             </div>
+            {syncMutation.isPending ? <InlineProgressBar label="正在创建远程同步任务..." /> : null}
             {syncError ? <ErrorBox text={syncError} /> : null}
           </section>
 
@@ -606,7 +704,7 @@ export function SettingsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold">数据更新任务</h3>
-                <p className="mt-1 text-sm text-muted-foreground">sync/import-local 会创建后台任务；运行中每 3 秒自动刷新。</p>
+                <p className="mt-1 text-sm text-muted-foreground">一键初始化、远程同步和本地导入都会创建后台任务；运行中每 1 秒自动刷新并显示进度条。</p>
               </div>
               <Button variant="outline" size="sm" onClick={() => dataUpdateJobs.refetch()}>刷新任务</Button>
             </div>
@@ -704,6 +802,92 @@ export function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }) {
+  const seedFilesReady = status.seed_files.every((file) => file.exists);
+  return (
+    <div className="rounded-2xl border bg-slate-50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-semibold">空库初始化数据状态</div>
+        <Badge
+          variant={
+            status.ready ? "success" : status.local_package_ready && seedFilesReady ? "warning" : "destructive"
+          }
+        >
+          {status.ready
+            ? "已具备基础数据"
+            : status.local_package_ready && seedFilesReady
+              ? "可本地初始化"
+              : "缺少初始化文件"}
+        </Badge>
+      </div>
+      <div className="mt-2 text-sm text-muted-foreground">{status.recommended_action}</div>
+      <div className="mt-3 grid gap-2 text-sm md:grid-cols-4">
+        <InfoMini label="精灵" value={String(status.counts.elves ?? 0)} />
+        <InfoMini label="技能" value={String(status.counts.skills ?? 0)} />
+        <InfoMini label="可学习技能" value={String(status.counts.learnable_skills ?? 0)} />
+        <InfoMini label="状态定义" value={String(status.counts.effects ?? 0)} />
+      </div>
+      {status.missing_required.length ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          缺少：{status.missing_required.join("、")}
+        </div>
+      ) : null}
+      <details className="mt-3">
+        <summary className="cursor-pointer text-sm font-medium">查看必要数据清单与本地文件</summary>
+        <div className="mt-3 space-y-3 text-sm">
+          <div className="rounded-xl border bg-white p-3">
+            <div className="font-medium">使用前必要数据</div>
+            <div className="mt-2 space-y-2">
+              {status.required_data.map((item) => (
+                <div key={item.key} className="rounded-lg bg-slate-50 p-2">
+                  <div className="font-medium">{item.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    来源：{item.source}；导入：{item.import_path}
+                    {item.auto_on_startup ? "；后端启动会自动补齐" : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border bg-white p-3">
+            <div className="font-medium">本地 cleaned 目录</div>
+            <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+              {status.local_cleaned_dir}
+            </div>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              {status.cleaned_files.map((file) => (
+                <div
+                  key={file.name}
+                  className={file.exists ? "rounded-lg bg-emerald-50 p-2" : "rounded-lg bg-red-50 p-2"}
+                >
+                  <span className="font-mono text-xs">{file.name}</span>
+                  <span className="ml-2 text-xs">{file.exists ? formatBytes(file.size_bytes) : "缺失"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border bg-white p-3">
+            <div className="font-medium">项目 seed 文件</div>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              {status.seed_files.map((file) => (
+                <div
+                  key={file.path}
+                  className={file.exists ? "rounded-lg bg-emerald-50 p-2" : "rounded-lg bg-red-50 p-2"}
+                >
+                  <div className="font-mono text-xs">{file.name}</div>
+                  <div className="mt-1 break-all text-xs text-muted-foreground">
+                    {file.exists ? formatBytes(file.size_bytes) : "缺失"} · {file.path}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
@@ -850,6 +1034,17 @@ function AcceptedJobBanner({ job }: { job: RocomDataUpdateAccepted }) {
   );
 }
 
+function InlineProgressBar({ label }: { label: string }) {
+  return (
+    <div className="rounded-xl border bg-slate-50 p-3">
+      <div className="mb-1 text-xs text-muted-foreground">{label}</div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
+      </div>
+    </div>
+  );
+}
+
 function RocomJobCard({ job }: { job: RocomDataUpdateJobStatus }) {
   return (
     <div className="rounded-xl border bg-slate-50 p-3">
@@ -982,6 +1177,18 @@ function emptyToNull(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
 function getJobBadgeVariant(status: RocomDataUpdateJobStatus["status"]): "secondary" | "warning" | "success" | "destructive" {
   if (status === "succeeded") return "success";
   if (status === "failed") return "destructive";
@@ -1003,6 +1210,8 @@ function translateProgressStage(stage?: string): string {
   const dict: Record<string, string> = {
     queued: "Queued",
     running: "Running",
+    bootstrap_check: "检查初始化数据",
+    ensure_core_rules: "补齐核心规则",
     fetch_sprite_list: "Fetch sprite list",
     scrape_sprites: "Scrape sprites",
     fetch_skill_list: "Fetch skill list",

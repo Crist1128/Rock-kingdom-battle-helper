@@ -34,6 +34,7 @@
   - 支持洛克王国世界 BWIKI 数据爬取、清洗、dry-run 和导入。
   - 已覆盖精灵、技能、可学习技能、属性克制等基础数据。
   - 技能定义已新增 `raw_description`，前端规则库和工作台技能卡优先展示中文原文描述。
+  - 设置页已提供“新用户 / 空库一键初始化”，可检查必要数据、从本地 cleaned 包 dry-run/提交初始化，并显示后台任务进度条。
 - **手动战斗 MVP**
   - 支持战斗创建、阵容录入、首发确认、切换、伤害事件、资源事件、状态事件、技能事件、时间线和快照。
   - 准备阶段已补充必做项校验，缺漏时前端会提示。
@@ -160,17 +161,45 @@ npm.cmd run typecheck
 npm.cmd run build
 ```
 
-### 数据导入建议
+### 新用户 / 空库数据初始化
 
-涉及规则 seed、BWIKI cleaned 数据或批量更新时，优先先 dry-run，再显式 commit：
+空库电脑首次使用前需要准备的数据分为四类：
+
+1. **数据库结构**：后端启动或 `init_db` 会通过 Alembic 自动迁移。
+2. **核心规则**：30 种核心性格和默认通用技能“聚能”，后端启动会幂等补齐。
+3. **BWIKI 静态数据**：精灵、技能、可学习技能、属性克制，来自 `data/rocom/cleaned` 或远程 BWIKI 爬取。
+4. **项目规则 seed**：状态定义和人工技能分支，位于 `backend/app/seed/*.json`，会随本地/远程导入并入同一事务。
+
+推荐新用户走前端：
+
+1. 启动后端和前端。
+2. 打开 `设置 / 数据管理`。
+3. 查看“新用户 / 空库一键初始化”的数据状态。
+4. 先点 dry-run 预检查，再点“一键初始化本地数据库”。
+
+该入口使用后台任务，前端会轮询并显示进度条；如果本地 `data/rocom/cleaned` 缺失，再使用远程 BWIKI 同步。
+
+### 本地 cleaned 数据包
+
+如果已有可用的 cleaned JSON，可打包成 zip 发给新用户，避免每台电脑重新爬取：
 
 ```powershell
-cd backend
-python -m app.data_pipeline.skill_rule_reviews.importer --reviews-json app/seed/manual_skill_rule_reviews_all_20260612.json --skip-init-db
-python -m app.data_pipeline.effects.importer --effects-json app/seed/manual_skill_effect_definitions_all_20260612.json --skip-init-db
+python scripts/package_rocom_cleaned_data.py --output data/packages/rocom_cleaned_YYYYMMDD.zip
 ```
 
-确认摘要无误后再加 `--commit`。
+数据包只包含：
+
+- `elves.json`
+- `skills.json`
+- `elf_learnable_skills.json`
+- `type_effectiveness_rules.json`
+- `import_summary.json`（如存在）
+
+新用户解压后放到 `data/rocom/cleaned/`，再走设置页“一键初始化”。不要直接分发 `data/app.db`，避免把本机战斗记录、缓存或未来的个人数据一起带出去。
+
+### 命令行导入建议
+
+涉及规则 seed、BWIKI cleaned 数据或批量更新时，仍然优先先 dry-run，再显式 commit。前端设置页已经覆盖常用的一键初始化、本地导入和远程同步；命令行导入主要用于调试或批量维护。
 
 ---
 

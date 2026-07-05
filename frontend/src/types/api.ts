@@ -960,6 +960,43 @@ export interface RocomLocalImportRequest {
   update_mode?: "incremental" | "full";
 }
 
+export interface ProjectBootstrapLocalRequest {
+  /** cleaned JSON 目录；留空时使用后端 ROCOM_DATA_DIR/cleaned。 */
+  cleaned_dir?: string | null;
+  /** 是否实际提交数据库事务；false 为 dry-run。 */
+  commit?: boolean;
+  /** 可选：覆盖 cleaned 数据中的 data_version。 */
+  data_version?: string | null;
+}
+
+export interface ProjectDataFileStatus {
+  name: string;
+  path: string;
+  exists: boolean;
+  size_bytes: number;
+}
+
+export interface ProjectRequiredDataItem {
+  key: string;
+  name: string;
+  source: string;
+  import_path: string;
+  auto_on_startup: boolean;
+}
+
+export interface ProjectDataBootstrapStatus {
+  ready: boolean;
+  checked_at: string;
+  counts: Record<string, number>;
+  missing_required: string[];
+  local_cleaned_dir: string;
+  local_package_ready: boolean;
+  cleaned_files: ProjectDataFileStatus[];
+  seed_files: ProjectDataFileStatus[];
+  recommended_action: string;
+  required_data: ProjectRequiredDataItem[];
+}
+
 export interface StaticSkillRuleSyncItem {
   skill_id: string;
   skill_name: string;

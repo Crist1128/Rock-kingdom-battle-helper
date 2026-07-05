@@ -16,6 +16,8 @@ from app.data_pipeline.static_rule_sync import (
 )
 from app.db.session import get_db
 from app.schemas.data_update import (
+    ProjectBootstrapLocalRequest,
+    ProjectDataBootstrapStatus,
     RocomCheckRequest,
     RocomCheckResponse,
     RocomDataUpdateAccepted,
@@ -26,14 +28,18 @@ from app.schemas.data_update import (
     StaticSkillRuleSyncResponse,
 )
 from app.services.rocom_data_update_service import (
+    ProjectBootstrapLocalParams,
     RocomCheckParams,
     RocomImportLocalParams,
     RocomUpdateParams,
     check_rocom_remote_updates,
+    create_project_bootstrap_local_job,
     create_rocom_import_local_job,
     create_rocom_update_job,
+    get_project_bootstrap_status,
     get_rocom_update_job,
     list_rocom_update_jobs,
+    run_project_bootstrap_local_job,
     run_rocom_import_local_job,
     run_rocom_update_job,
 )
@@ -113,6 +119,47 @@ def start_rocom_import_local(
         job_id=job["job_id"],
         status=job["status"],
         message="本地导入任务已创建；GET /api/v1/admin/data-updates/rocom/jobs/{job_id} 查询状态。",
+    )
+
+
+@router.get(
+    "/bootstrap/status",
+    response_model=ProjectDataBootstrapStatus,
+    summary="检查空库初始化所需数据是否齐备",
+)
+def get_bootstrap_status(
+    cleaned_dir: str | None = None,
+    _: None = Depends(verify_admin_token),
+) -> ProjectDataBootstrapStatus:
+    """汇总 schema/core rules/rocom cleaned/项目 seed 的状态，供设置页展示。"""
+    return ProjectDataBootstrapStatus(**get_project_bootstrap_status(cleaned_dir))
+
+
+@router.post(
+    "/bootstrap/import-local",
+    response_model=RocomDataUpdateAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="一键从本地 cleaned 数据初始化空库",
+)
+def start_bootstrap_import_local(
+    request: ProjectBootstrapLocalRequest,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(verify_admin_token),
+) -> RocomDataUpdateAccepted:
+    """一键补齐核心规则、BWIKI 静态数据和项目 seed；默认仍支持 dry-run。"""
+    params = ProjectBootstrapLocalParams(**request.model_dump())
+    try:
+        job = create_project_bootstrap_local_job(params)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    background_tasks.add_task(run_project_bootstrap_local_job, job["job_id"])
+    return RocomDataUpdateAccepted(
+        job_id=job["job_id"],
+        status=job["status"],
+        message=(
+            "空库初始化任务已创建；"
+            "GET /api/v1/admin/data-updates/rocom/jobs/{job_id} 查询状态。"
+        ),
     )
 
 

@@ -12,8 +12,10 @@ from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.static import EffectDefinition, SkillDefinition
+from app.seed.core_natures import NatureSeedResult
+from app.seed.core_skills import CoreSkillSeedResult
 from app.services import rocom_data_update_service as service
-from app.services.rocom_data_update_service import RocomUpdateParams
+from app.services.rocom_data_update_service import ProjectBootstrapLocalParams, RocomUpdateParams
 from app.utils.json import dumps_json, loads_json
 
 
@@ -88,6 +90,82 @@ def test_rocom_update_job_progress_is_returned_in_status() -> None:
     assert status is not None
     assert status["progress"]["stage"] == "scrape_sprites"
     assert status["progress"]["percent"] == 50
+
+
+def test_create_project_bootstrap_local_job_records_job_type() -> None:
+    """Empty-database bootstrap should use the shared progress job registry."""
+    job = service.create_project_bootstrap_local_job(
+        ProjectBootstrapLocalParams(cleaned_dir="data/rocom/cleaned", commit=False)
+    )
+
+    assert job["job_type"] == "bootstrap_local"
+    assert job["status"] == "queued"
+    assert job["params"]["cleaned_dir"] == "data/rocom/cleaned"
+
+
+def test_import_dataset_with_transaction_can_ensure_core_in_same_transaction(monkeypatch) -> None:
+    """Bootstrap core rules must be merged into the dataset import transaction."""
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.events: list[str] = []
+
+        def commit(self) -> None:
+            self.events.append("commit")
+
+        def rollback(self) -> None:
+            self.events.append("rollback")
+
+        def close(self) -> None:
+            self.events.append("close")
+
+    fake_db = FakeSession()
+
+    monkeypatch.setattr(service, "init_db", lambda: None)
+    monkeypatch.setattr(service, "SessionLocal", lambda: fake_db)
+    monkeypatch.setattr(
+        service,
+        "ensure_core_natures",
+        lambda db: db.events.append("ensure_natures")
+        or NatureSeedResult(expected_count=30, created=30, updated=0, restored=0),
+    )
+    monkeypatch.setattr(
+        service,
+        "ensure_core_skills",
+        lambda db: db.events.append("ensure_core_skills")
+        or CoreSkillSeedResult(expected_count=1, created=1, updated=0, restored=0),
+    )
+    monkeypatch.setattr(
+        service,
+        "import_dataset",
+        lambda db, dataset, refresh_static=False: db.events.append("import_dataset")
+        or {"elves": {"created": 1}, "refresh_static": refresh_static},
+    )
+    monkeypatch.setattr(
+        service,
+        "import_project_seed_rules",
+        lambda db: db.events.append("import_project_seed_rules") or {"effect_seed_files": []},
+    )
+
+    import_summary, project_rule_summary, transaction = service._import_dataset_with_transaction(
+        dataset=object(),
+        commit=True,
+        refresh_static=True,
+        ensure_core=True,
+    )
+
+    assert transaction == "committed"
+    assert import_summary["refresh_static"] is True
+    assert project_rule_summary["core_rules"]["natures"]["created"] == 30
+    assert project_rule_summary["core_rules"]["core_skills"]["created"] == 1
+    assert fake_db.events == [
+        "ensure_natures",
+        "ensure_core_skills",
+        "import_dataset",
+        "import_project_seed_rules",
+        "commit",
+        "close",
+    ]
 
 
 def test_import_project_seed_rules_adds_effects_and_updates_strength_skill(

@@ -21,7 +21,7 @@ from threading import Lock, Thread
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import BACKEND_DIR, settings
@@ -35,7 +35,16 @@ from app.data_pipeline.skill_rule_reviews.importer import (
 )
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
-from app.models.static import ElfDefinition
+from app.models.static import (
+    EffectDefinition,
+    ElfDefinition,
+    ElfLearnableSkill,
+    NatureDefinition,
+    SkillDefinition,
+    TypeEffectivenessRule,
+)
+from app.seed.core_natures import ensure_core_natures
+from app.seed.core_skills import ensure_core_skills
 
 PROJECT_EFFECT_SEED_FILES = (
     BACKEND_DIR / "app" / "seed" / "manual_skill_effect_definitions_all_20260612.json",
@@ -86,6 +95,15 @@ class RocomImportLocalParams:
     data_version: str | None = None
     refresh_static: bool = False
     update_mode: str = "incremental"
+
+
+@dataclass(slots=True)
+class ProjectBootstrapLocalParams:
+    """空库一键初始化参数。"""
+
+    cleaned_dir: str | None = None
+    commit: bool = False
+    data_version: str | None = None
 
 
 @dataclass(slots=True)
@@ -170,6 +188,11 @@ def create_rocom_update_job(params: RocomUpdateParams) -> dict[str, Any]:
 def create_rocom_import_local_job(params: RocomImportLocalParams) -> dict[str, Any]:
     """创建本地 cleaned JSON 导入任务记录。"""
     return _create_job(asdict(params), job_type="import_local")
+
+
+def create_project_bootstrap_local_job(params: ProjectBootstrapLocalParams) -> dict[str, Any]:
+    """创建空库一键初始化任务。"""
+    return _create_job(asdict(params), job_type="bootstrap_local")
 
 
 def _finish_job_success(job_id: str, result: dict[str, Any]) -> None:
@@ -530,6 +553,222 @@ def _resolve_cleaned_dir(cleaned_dir: str | None) -> Path:
     return path if path.is_absolute() else (BACKEND_DIR / path).resolve()
 
 
+def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, Any]:
+    """汇总空库启动前必须导入的数据状态。"""
+    cleaned_path = _resolve_cleaned_dir(cleaned_dir)
+    required_cleaned_files = [
+        "elves.json",
+        "skills.json",
+        "elf_learnable_skills.json",
+        "type_effectiveness_rules.json",
+    ]
+    cleaned_files = [
+        {
+            "name": name,
+            "path": str((cleaned_path / name).resolve()),
+            "exists": (cleaned_path / name).exists(),
+            "size_bytes": (cleaned_path / name).stat().st_size
+            if (cleaned_path / name).exists()
+            else 0,
+        }
+        for name in required_cleaned_files
+    ]
+    seed_files = [
+        {
+            "name": path.name,
+            "path": str(path.resolve()),
+            "exists": path.exists(),
+            "size_bytes": path.stat().st_size if path.exists() else 0,
+        }
+        for path in [*PROJECT_EFFECT_SEED_FILES, *PROJECT_SKILL_REVIEW_SEED_FILES]
+    ]
+
+    init_db()
+    db = SessionLocal()
+    try:
+        counts = {
+            "natures": _table_count(db, NatureDefinition),
+            "core_skill": 1 if db.get(SkillDefinition, "core_skill_focus_energy") else 0,
+            "elves": _table_count(db, ElfDefinition),
+            "skills": _table_count(db, SkillDefinition),
+            "learnable_skills": _table_count(db, ElfLearnableSkill),
+            "type_effectiveness_rules": _table_count(db, TypeEffectivenessRule),
+            "effects": _table_count(db, EffectDefinition),
+        }
+    finally:
+        db.close()
+
+    has_static_data = (
+        counts["elves"] > 0
+        and counts["skills"] > 1
+        and counts["learnable_skills"] > 0
+        and counts["type_effectiveness_rules"] > 0
+    )
+    has_project_rules = counts["effects"] > 0
+    local_package_ready = all(item["exists"] for item in cleaned_files)
+    seed_files_ready = all(item["exists"] for item in seed_files)
+    ready = has_static_data and has_project_rules
+    missing_required = []
+    if counts["natures"] == 0:
+        missing_required.append("核心性格")
+    if counts["core_skill"] == 0:
+        missing_required.append("核心默认技能：聚能")
+    if not has_static_data:
+        missing_required.append("BWIKI 静态数据：精灵、技能、可学习技能、属性克制")
+    if not has_project_rules:
+        missing_required.append("项目规则 seed：状态定义与人工技能分支")
+    if not seed_files_ready:
+        missing_required.append("仓库内项目 seed 文件")
+
+    return {
+        "ready": ready,
+        "checked_at": utc_now_iso(),
+        "counts": counts,
+        "missing_required": missing_required,
+        "local_cleaned_dir": str(cleaned_path.resolve()),
+        "local_package_ready": local_package_ready,
+        "cleaned_files": cleaned_files,
+        "seed_files": seed_files,
+        "recommended_action": (
+            "数据库已具备运行所需基础数据"
+            if ready
+            else (
+                "优先使用一键本地初始化；如果本地 cleaned 数据缺失，再使用远程 BWIKI 同步"
+                if local_package_ready
+                else "本地 cleaned 数据缺失，请先放入数据包或执行远程 BWIKI 同步"
+            )
+        ),
+        "required_data": [
+            {
+                "key": "schema",
+                "name": "数据库结构",
+                "source": "Alembic",
+                "import_path": "后端启动或 init_db 自动迁移",
+                "auto_on_startup": True,
+            },
+            {
+                "key": "core_rules",
+                "name": "核心性格与默认聚能技能",
+                "source": "backend/app/seed/core_natures.py, core_skills.py",
+                "import_path": "后端启动自动幂等写入；一键初始化也会补齐",
+                "auto_on_startup": True,
+            },
+            {
+                "key": "rocom_cleaned",
+                "name": "BWIKI 静态数据",
+                "source": "data/rocom/cleaned 或远程 BWIKI 爬取",
+                "import_path": "设置页一键本地初始化 / 本地 cleaned 导入 / 远程同步",
+                "auto_on_startup": False,
+            },
+            {
+                "key": "project_seed_rules",
+                "name": "项目规则 seed",
+                "source": "backend/app/seed/*.json",
+                "import_path": "一键初始化、本地 cleaned 导入和远程同步都会并入导入事务",
+                "auto_on_startup": False,
+            },
+        ],
+    }
+
+
+def _table_count(db: Session, model: type[Any]) -> int:
+    """返回模型表行数。"""
+    return int(db.scalar(select(func.count()).select_from(model)) or 0)
+
+
+def run_project_bootstrap_local_job(job_id: str) -> None:
+    """执行空库一键本地初始化。"""
+    _, raw_params = _mark_job_running(job_id)
+    params = ProjectBootstrapLocalParams(**raw_params)
+    cleaned_dir = _resolve_cleaned_dir(params.cleaned_dir)
+
+    try:
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "bootstrap_check",
+                "message": "检查本地 cleaned 数据包与 seed 文件",
+                "current": 0,
+                "total": 4,
+                "percent": 0,
+            },
+        )
+        before_status = get_project_bootstrap_status(params.cleaned_dir)
+        if not before_status["local_package_ready"]:
+            raise FileNotFoundError(
+                f"本地 cleaned 数据不完整，请检查目录：{before_status['local_cleaned_dir']}"
+            )
+        missing_seed_files = [
+            item["path"] for item in before_status["seed_files"] if not item["exists"]
+        ]
+        if missing_seed_files:
+            raise FileNotFoundError(
+                "项目 seed 文件缺失，无法完成初始化："
+                + "、".join(missing_seed_files)
+            )
+
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "ensure_core_rules",
+                "message": "准备在同一事务内补齐核心规则",
+                "current": 1,
+                "total": 4,
+                "percent": 25,
+            },
+        )
+
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "load_cleaned",
+                "message": "读取本地 cleaned JSON 数据包",
+                "current": 2,
+                "total": 4,
+                "percent": 50,
+            },
+        )
+        dataset = load_cleaned_dataset(cleaned_dir)
+        if params.data_version:
+            _override_dataset_version(dataset, params.data_version)
+
+        _update_job_progress(
+            job_id,
+            {
+                "stage": "import",
+                "message": "导入 BWIKI 静态数据与项目规则 seed",
+                "current": 3,
+                "total": 4,
+                "percent": 75,
+            },
+        )
+        import_summary, project_rule_summary, transaction = _import_dataset_with_transaction(
+            dataset=dataset,
+            commit=params.commit,
+            refresh_static=True,
+            ensure_core=True,
+        )
+        after_status = get_project_bootstrap_status(params.cleaned_dir) if params.commit else None
+        _finish_job_success(
+            job_id,
+            {
+                "transaction": transaction,
+                "commit": params.commit,
+                "update_mode": "bootstrap_full",
+                "cleaned_dir": str(cleaned_dir.resolve()),
+                "core_rule_summary": project_rule_summary.get("core_rules"),
+                "bootstrap_status_before": before_status,
+                "bootstrap_status_after": after_status,
+                "clean_stats": dataset.stats,
+                "import_summary": import_summary,
+                "project_rule_summary": project_rule_summary,
+                "warnings": dataset.warnings[:50],
+            },
+        )
+    except Exception as exc:
+        _finish_job_error(job_id, exc)
+
+
 def run_rocom_import_local_job(job_id: str) -> None:
     """执行本地 cleaned JSON 导入。
 
@@ -625,17 +864,29 @@ def _import_dataset_with_transaction(
     dataset: Any,
     commit: bool,
     refresh_static: bool = False,
+    ensure_core: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any], str]:
     """导入数据集和项目规则种子，并按 commit 决定提交或回滚。"""
     init_db()
     db = SessionLocal()
     try:
+        core_rule_summary: dict[str, Any] | None = None
+        if ensure_core:
+            core_rule_summary = {
+                "natures": asdict(ensure_core_natures(db)),
+                "core_skills": asdict(ensure_core_skills(db)),
+            }
         import_summary = import_dataset(
             db,
             dataset,
             refresh_static=refresh_static,
         )
         project_rule_summary = import_project_seed_rules(db)
+        if core_rule_summary is not None:
+            project_rule_summary = {
+                **project_rule_summary,
+                "core_rules": core_rule_summary,
+            }
         if commit:
             db.commit()
             transaction = "committed"

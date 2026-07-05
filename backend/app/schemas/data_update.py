@@ -64,6 +64,20 @@ class RocomLocalImportRequest(BaseModel):
     )
 
 
+class ProjectBootstrapLocalRequest(BaseModel):
+    """空库一键本地初始化请求。"""
+
+    cleaned_dir: str | None = Field(
+        default=None,
+        description="cleaned JSON 目录；为空时使用 ROCOM_DATA_DIR/cleaned",
+    )
+    commit: bool = Field(default=False, description="是否实际提交数据库事务；False 为 dry-run")
+    data_version: str | None = Field(
+        default=None,
+        description="可选：覆盖 cleaned 数据中的 data_version",
+    )
+
+
 class RocomDataUpdateAccepted(BaseModel):
     """数据更新任务已受理响应。"""
 
@@ -101,6 +115,49 @@ class RocomCheckResponse(BaseModel):
     new_elves_truncated: bool = False
     remote_fingerprint: str
     note: str
+
+
+class ProjectDataFileStatus(BaseModel):
+    """本地数据文件状态。"""
+
+    name: str = Field(description="文件名")
+    path: str = Field(description="后端本机绝对路径")
+    exists: bool = Field(description="文件是否存在")
+    size_bytes: int = Field(default=0, description="文件大小，单位 byte")
+
+
+class ProjectRequiredDataItem(BaseModel):
+    """空库使用前需要准备的数据项说明。"""
+
+    key: str = Field(description="数据项稳定键")
+    name: str = Field(description="面向用户展示的数据项名称")
+    source: str = Field(description="数据来源或仓库位置")
+    import_path: str = Field(description="推荐导入路径")
+    auto_on_startup: bool = Field(description="是否会在后端启动时自动补齐")
+
+
+class ProjectDataBootstrapStatus(BaseModel):
+    """空库初始化数据状态响应。"""
+
+    ready: bool = Field(description="数据库是否已具备当前基础运行所需数据")
+    checked_at: str = Field(description="检查时间 ISO 字符串")
+    counts: dict[str, int] = Field(default_factory=dict, description="关键静态表当前行数")
+    missing_required: list[str] = Field(default_factory=list, description="缺失的必要数据说明")
+    local_cleaned_dir: str = Field(description="当前检查的本地 cleaned 目录")
+    local_package_ready: bool = Field(description="本地 cleaned 必需文件是否齐备")
+    cleaned_files: list[ProjectDataFileStatus] = Field(
+        default_factory=list,
+        description="本地 cleaned 必需文件状态",
+    )
+    seed_files: list[ProjectDataFileStatus] = Field(
+        default_factory=list,
+        description="仓库内项目 seed 文件状态",
+    )
+    recommended_action: str = Field(description="面向用户的下一步建议")
+    required_data: list[ProjectRequiredDataItem] = Field(
+        default_factory=list,
+        description="空库使用前必要数据清单",
+    )
 
 
 class StaticSkillRuleSyncItem(BaseModel):

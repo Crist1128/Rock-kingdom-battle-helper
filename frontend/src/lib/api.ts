@@ -29,6 +29,8 @@ import type {
   ObservationProcessResult,
   PlayerElfBuildCreate,
   PlayerElfBuildOut,
+  ProjectBootstrapLocalRequest,
+  ProjectDataBootstrapStatus,
   ResourceChangeEventCreate,
   RocomCheckRequest,
   RocomCheckResponse,
@@ -348,6 +350,19 @@ export const api = {
   },
 
   adminDataUpdates: {
+    bootstrapStatus: (params: { cleaned_dir?: string | null } = {}, adminToken?: string) =>
+      request<ProjectDataBootstrapStatus>(
+        `/admin/data-updates/bootstrap/status${qs({ cleaned_dir: params.cleaned_dir })}`,
+        {
+          headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        },
+      ),
+    bootstrapImportLocal: (payload: ProjectBootstrapLocalRequest, adminToken?: string) =>
+      request<RocomDataUpdateAccepted>("/admin/data-updates/bootstrap/import-local", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        body: JSON.stringify(payload),
+      }),
     checkRocom: (payload: RocomCheckRequest = {}, adminToken?: string) =>
       request<RocomCheckResponse>("/admin/data-updates/rocom/check", {
         method: "POST",
