@@ -101,8 +101,10 @@ def test_create_for_enemy_state_uses_auto_default_config(db_session: Session) ->
     assert out.default_config["nature_id"] == "magic_attack_plus_physical_attack_minus"
     talents = out.default_config["individual_talent_distribution"]
     assert talents["hp"] == 10
+    assert talents["physical_defense"] == 10
     assert talents["magic_attack"] == 10
-    assert talents["speed"] == 10
+    assert talents["speed"] == 0
+    assert out.default_config["heuristic"]["archetype"] == "low_speed_high_attack"
     assert out.estimated_panel is not None
     assert out.estimated_panel["source"] == "auto_default_config"
     assert out.unknown_factors
@@ -116,7 +118,7 @@ def test_auto_default_config_uses_speed_nature_for_fast_physical_elf(
     assert elf is not None
     elf.base_physical_attack_talent = 130
     elf.base_magic_attack_talent = 90
-    elf.base_speed_talent = 115
+    elf.base_speed_talent = 120
     state = _enemy_state()
     db_session.add(state)
 
@@ -134,6 +136,40 @@ def test_auto_default_config_uses_speed_nature_for_fast_physical_elf(
     assert talents["physical_attack"] == 10
     assert talents["magic_attack"] == 0
     assert talents["speed"] == 10
+    assert out.default_config["heuristic"]["speed_threshold"] == 120
+
+
+def test_auto_default_config_uses_hp_nature_for_strong_tank(
+    db_session: Session,
+) -> None:
+    """强肉盾优先使用生命性格，并把三项 10 给生命/双抗。"""
+    elf = db_session.get(ElfDefinition, "enemy_elf")
+    assert elf is not None
+    elf.base_hp_talent = 130
+    elf.base_physical_attack_talent = 120
+    elf.base_magic_attack_talent = 80
+    elf.base_physical_defense_talent = 120
+    elf.base_magic_defense_talent = 120
+    elf.base_speed_talent = 90
+    state = _enemy_state()
+    db_session.add(state)
+
+    EstimateService(db_session).create_for_enemy_state(
+        "battle_estimate",
+        state,
+        commit=True,
+    )
+    out = EstimateService(db_session).get_estimate("battle_estimate", "enemy_elf")
+
+    assert out.default_config is not None
+    assert out.default_config["nature_id"] == "hp_plus_magic_attack_minus"
+    talents = out.default_config["individual_talent_distribution"]
+    assert talents["hp"] == 10
+    assert talents["physical_defense"] == 10
+    assert talents["magic_defense"] == 10
+    assert talents["physical_attack"] == 0
+    assert talents["speed"] == 0
+    assert out.default_config["heuristic"]["archetype"] == "strong_tank"
 
 
 def test_update_default_config_calculates_display_panel(db_session: Session) -> None:
@@ -418,7 +454,8 @@ def test_hp_only_observation_repairs_invalid_player_default_to_base_heuristic(
     talents = out.default_config["individual_talent_distribution"]
     assert talents["hp"] == 10
     assert talents["physical_attack"] == 10
-    assert talents["speed"] == 10
+    assert talents["physical_defense"] == 10
+    assert talents["speed"] == 0
     assert out.default_panel is not None
     assert 448 <= out.default_panel["hp"] <= 474
 

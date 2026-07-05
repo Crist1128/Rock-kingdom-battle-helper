@@ -28,6 +28,15 @@ from app.schemas.estimate import (
 )
 from app.utils.json import dumps_json, loads_json
 
+HIGH_SPEED_THRESHOLD = 120
+MID_SPEED_THRESHOLD = 110
+HIGH_ATTACK_THRESHOLD = 120
+MID_SPEED_ATTACK_THRESHOLD = 115
+TANK_HP_THRESHOLD = 110
+RESISTANCE_DEFENSE_THRESHOLD = 115
+RESISTANCE_BULK_THRESHOLD = 220
+TANK_MIN_BULK_THRESHOLD = 210
+
 
 class EstimateService:
     """维护敌方精灵的实时面板估计档案。"""
@@ -559,37 +568,17 @@ class EstimateService:
         self,
         elf_id: str,
     ) -> tuple[dict[str, Any], dict[str, Any]] | None:
-        """按种族值启发式生成敌方未知面板的默认展示配置。"""
+        """按已确认的敌方默认配置文档生成未知面板的默认展示配置。"""
         elf = self.db.get(ElfDefinition, elf_id)
         if elf is None or elf.deleted_at is not None:
             return None
 
-        uses_physical = elf.base_physical_attack_talent > elf.base_magic_attack_talent
-        is_fast = elf.base_speed_talent >= 115
-        if is_fast:
-            positive_stat = StatKey.SPEED
-            negative_stat = StatKey.MAGIC_ATTACK if uses_physical else StatKey.PHYSICAL_ATTACK
-        else:
-            positive_stat = StatKey.PHYSICAL_ATTACK if uses_physical else StatKey.MAGIC_ATTACK
-            negative_stat = StatKey.MAGIC_ATTACK if uses_physical else StatKey.PHYSICAL_ATTACK
-
-        nature = self.db.scalars(
-            select(NatureDefinition).where(
-                NatureDefinition.positive_stat == positive_stat.value,
-                NatureDefinition.negative_stat == negative_stat.value,
-                NatureDefinition.deleted_at.is_(None),
-            )
-        ).first()
+        rule = self._default_config_rule_for_elf(elf)
+        nature = self._find_nature(rule["positive_stat"], rule["negative_stat"])
         if nature is None:
             return None
 
-        talents = {stat.value: 0 for stat in StatKey}
-        talents[StatKey.HP.value] = 10
-        talents[StatKey.SPEED.value] = 10
-        talents[
-            StatKey.PHYSICAL_ATTACK.value if uses_physical else StatKey.MAGIC_ATTACK.value
-        ] = 10
-        individual = IndividualTalentDistribution(**talents)
+        individual = IndividualTalentDistribution(**rule["talents"])
         panel = StatCalculator.calculate_panel_stats(
             base=self._elf_to_base_talent_block(elf),
             individual=individual,
@@ -597,18 +586,196 @@ class EstimateService:
         )
         return (
             {
-                "preset": "auto_by_base_stats",
+                "preset": "auto_by_documented_default_rules",
                 "nature_id": nature.nature_id,
                 "individual_talent_distribution": individual.model_dump(),
                 "heuristic": {
-                    "uses_physical": uses_physical,
-                    "speed_threshold": 115,
+                    **rule["heuristic"],
+                    "speed_threshold": HIGH_SPEED_THRESHOLD,
+                    "mid_speed_threshold": MID_SPEED_THRESHOLD,
+                    "high_attack_threshold": HIGH_ATTACK_THRESHOLD,
+                    "mid_speed_attack_threshold": MID_SPEED_ATTACK_THRESHOLD,
+                    "tank_hp_threshold": TANK_HP_THRESHOLD,
+                    "resistance_defense_threshold": RESISTANCE_DEFENSE_THRESHOLD,
+                    "resistance_bulk_threshold": RESISTANCE_BULK_THRESHOLD,
+                    "tank_min_bulk_threshold": TANK_MIN_BULK_THRESHOLD,
+                    "base_hp_talent": elf.base_hp_talent,
                     "base_physical_attack_talent": elf.base_physical_attack_talent,
+                    "base_physical_defense_talent": elf.base_physical_defense_talent,
                     "base_magic_attack_talent": elf.base_magic_attack_talent,
+                    "base_magic_defense_talent": elf.base_magic_defense_talent,
                     "base_speed_talent": elf.base_speed_talent,
                 },
             },
             {**panel.model_dump(), "source": "auto_default_config"},
+        )
+
+    def _default_config_rule_for_elf(self, elf: ElfDefinition) -> dict[str, Any]:
+        """根据种族值分类生成默认性格方向和三项 10 资质。"""
+        dominant_attack = self._dominant_attack_stat(elf)
+        main_attack_value = self._stat_talent(elf, dominant_attack)
+        speed = elf.base_speed_talent
+        physical_resistance = self._has_physical_resistance(elf)
+        magic_resistance = self._has_magic_resistance(elf)
+        is_strong_tank = (
+            elf.base_hp_talent >= TANK_HP_THRESHOLD
+            and physical_resistance
+            and magic_resistance
+        )
+        is_tank_candidate = (
+            elf.base_hp_talent >= TANK_HP_THRESHOLD
+            and min(
+                elf.base_hp_talent + elf.base_physical_defense_talent,
+                elf.base_hp_talent + elf.base_magic_defense_talent,
+            )
+            >= TANK_MIN_BULK_THRESHOLD
+        )
+
+        if is_strong_tank:
+            positive_stat = StatKey.HP
+            negative_stat = self._lower_attack_stat(elf)
+            talents = self._talents_for_stats(
+                StatKey.HP,
+                StatKey.PHYSICAL_DEFENSE,
+                StatKey.MAGIC_DEFENSE,
+            )
+            archetype = "strong_tank"
+        elif speed >= HIGH_SPEED_THRESHOLD:
+            positive_stat = StatKey.SPEED
+            negative_stat = self._opposite_attack_stat(dominant_attack)
+            talents = self._talents_for_stats(StatKey.HP, StatKey.SPEED, dominant_attack)
+            archetype = "high_speed_output"
+        elif speed >= MID_SPEED_THRESHOLD and main_attack_value >= MID_SPEED_ATTACK_THRESHOLD:
+            positive_stat = dominant_attack
+            negative_stat = self._opposite_attack_stat(dominant_attack)
+            talents = self._talents_for_stats(StatKey.HP, dominant_attack, StatKey.SPEED)
+            archetype = "mid_speed_high_attack"
+        elif main_attack_value >= HIGH_ATTACK_THRESHOLD:
+            positive_stat = dominant_attack
+            negative_stat = self._opposite_attack_stat(dominant_attack)
+            talents = self._talents_for_stats(
+                StatKey.HP,
+                dominant_attack,
+                self._preferred_resistance_stat(elf),
+            )
+            archetype = "low_speed_high_attack"
+        elif is_tank_candidate:
+            positive_stat = StatKey.HP
+            negative_stat = self._lower_attack_stat(elf)
+            talents = self._talents_for_stats(
+                StatKey.HP,
+                StatKey.PHYSICAL_DEFENSE,
+                StatKey.MAGIC_DEFENSE,
+            )
+            archetype = "tank_candidate"
+        else:
+            positive_stat = dominant_attack
+            negative_stat = self._opposite_attack_stat(dominant_attack)
+            third_stat = (
+                StatKey.SPEED
+                if speed >= MID_SPEED_THRESHOLD
+                else self._preferred_resistance_stat(elf)
+            )
+            talents = self._talents_for_stats(StatKey.HP, dominant_attack, third_stat)
+            archetype = "balanced_fallback"
+
+        return {
+            "positive_stat": positive_stat,
+            "negative_stat": negative_stat,
+            "talents": talents,
+            "heuristic": {
+                "archetype": archetype,
+                "dominant_attack": dominant_attack.value,
+                "main_attack_value": main_attack_value,
+                "physical_resistance": physical_resistance,
+                "magic_resistance": magic_resistance,
+                "is_strong_tank": is_strong_tank,
+                "is_tank_candidate": is_tank_candidate,
+            },
+        }
+
+    @staticmethod
+    def _talents_for_stats(*stats: StatKey) -> dict[str, int]:
+        talents = {stat.value: 0 for stat in StatKey}
+        for stat in stats:
+            talents[stat.value] = 10
+        return talents
+
+    def _find_nature(
+        self,
+        positive_stat: StatKey,
+        negative_stat: StatKey,
+    ) -> NatureDefinition | None:
+        return self.db.scalars(
+            select(NatureDefinition).where(
+                NatureDefinition.positive_stat == positive_stat.value,
+                NatureDefinition.negative_stat == negative_stat.value,
+                NatureDefinition.deleted_at.is_(None),
+            )
+        ).first()
+
+    @staticmethod
+    def _dominant_attack_stat(elf: ElfDefinition) -> StatKey:
+        return (
+            StatKey.PHYSICAL_ATTACK
+            if elf.base_physical_attack_talent >= elf.base_magic_attack_talent
+            else StatKey.MAGIC_ATTACK
+        )
+
+    @staticmethod
+    def _lower_attack_stat(elf: ElfDefinition) -> StatKey:
+        return (
+            StatKey.MAGIC_ATTACK
+            if elf.base_physical_attack_talent >= elf.base_magic_attack_talent
+            else StatKey.PHYSICAL_ATTACK
+        )
+
+    @staticmethod
+    def _opposite_attack_stat(stat: StatKey) -> StatKey:
+        return (
+            StatKey.MAGIC_ATTACK
+            if stat == StatKey.PHYSICAL_ATTACK
+            else StatKey.PHYSICAL_ATTACK
+        )
+
+    @staticmethod
+    def _stat_talent(elf: ElfDefinition, stat: StatKey) -> int:
+        return {
+            StatKey.HP: elf.base_hp_talent,
+            StatKey.PHYSICAL_ATTACK: elf.base_physical_attack_talent,
+            StatKey.PHYSICAL_DEFENSE: elf.base_physical_defense_talent,
+            StatKey.MAGIC_ATTACK: elf.base_magic_attack_talent,
+            StatKey.MAGIC_DEFENSE: elf.base_magic_defense_talent,
+            StatKey.SPEED: elf.base_speed_talent,
+        }[stat]
+
+    @staticmethod
+    def _has_physical_resistance(elf: ElfDefinition) -> bool:
+        return (
+            elf.base_physical_defense_talent >= RESISTANCE_DEFENSE_THRESHOLD
+            or elf.base_hp_talent + elf.base_physical_defense_talent
+            >= RESISTANCE_BULK_THRESHOLD
+        )
+
+    @staticmethod
+    def _has_magic_resistance(elf: ElfDefinition) -> bool:
+        return (
+            elf.base_magic_defense_talent >= RESISTANCE_DEFENSE_THRESHOLD
+            or elf.base_hp_talent + elf.base_magic_defense_talent
+            >= RESISTANCE_BULK_THRESHOLD
+        )
+
+    def _preferred_resistance_stat(self, elf: ElfDefinition) -> StatKey:
+        physical_score = elf.base_hp_talent + elf.base_physical_defense_talent
+        magic_score = elf.base_hp_talent + elf.base_magic_defense_talent
+        if self._has_physical_resistance(elf) and not self._has_magic_resistance(elf):
+            return StatKey.PHYSICAL_DEFENSE
+        if self._has_magic_resistance(elf) and not self._has_physical_resistance(elf):
+            return StatKey.MAGIC_DEFENSE
+        return (
+            StatKey.PHYSICAL_DEFENSE
+            if physical_score >= magic_score
+            else StatKey.MAGIC_DEFENSE
         )
 
     def _find_estimate(self, battle_id: str, elf_id: str) -> EnemyPanelEstimate | None:

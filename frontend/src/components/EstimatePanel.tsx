@@ -54,6 +54,7 @@ export function EstimatePanel({
   const queryClient = useQueryClient();
   const [defaultNatureId, setDefaultNatureId] = useState("");
   const [defaultTalents, setDefaultTalents] = useState<IndividualTalentInput>(EMPTY_TALENTS);
+  const [talentMode, setTalentMode] = useState<"auto" | "manual">("auto");
   const [defaultFormTouched, setDefaultFormTouched] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const enabled = Boolean(battleId && elfId);
@@ -75,7 +76,7 @@ export function EstimatePanel({
     },
     mutationFn: () =>
       api.estimates.updateDefaultConfig(battleId!, elfId!, {
-        preset: "custom",
+        preset: talentMode === "auto" ? "custom_auto_talents" : "custom_manual_talents",
         nature_id: defaultNatureId,
         individual_talent_distribution: defaultTalents,
       }),
@@ -144,6 +145,7 @@ export function EstimatePanel({
   useEffect(() => {
     setDefaultNatureId("");
     setDefaultTalents(EMPTY_TALENTS);
+    setTalentMode("auto");
     setDefaultFormTouched(false);
     setAdvancedOpen(false);
   }, [battleId, elfId]);
@@ -165,17 +167,19 @@ export function EstimatePanel({
           ? parseDefaultTalents(estimate?.default_config?.individual_talent_distribution)
           : EMPTY_TALENTS,
       );
+      setTalentMode("auto");
       setDefaultFormTouched(false);
     }
   }, [availableNatures, defaultNatureAllowed, defaultNatureId, estimate?.default_config, natures.data]);
 
   useEffect(() => {
     if (!preferredDefaultStat) return;
+    if (talentMode !== "auto") return;
     setDefaultTalents((current) => {
       if (current[preferredDefaultStat] >= 7) return current;
       return { ...current, [preferredDefaultStat]: 10 };
     });
-  }, [preferredDefaultStat]);
+  }, [preferredDefaultStat, talentMode]);
 
   useEffect(() => {
     if (!estimate || defaultFormTouched) return;
@@ -190,6 +194,9 @@ export function EstimatePanel({
     const talents = parseDefaultTalents(defaultConfig?.individual_talent_distribution);
     setDefaultNatureId(natureAllowedByCurrentConstraints ? natureId : "");
     setDefaultTalents(natureAllowedByCurrentConstraints ? talents : EMPTY_TALENTS);
+    setTalentMode(
+      defaultConfig && defaultConfig.preset === "custom_manual_talents" ? "manual" : "auto",
+    );
   }, [availableNatures, defaultFormTouched, estimate, natures.data]);
 
   useEffect(() => {
@@ -243,16 +250,15 @@ export function EstimatePanel({
                 className="mt-2"
                 value={defaultNatureId}
                 onChange={(event) => {
-                  setDefaultNatureId(event.target.value);
-                  if (preferredDefaultStat) {
-                    setDefaultTalents((current) => ({
-                      ...current,
-                      [preferredDefaultStat]:
-                        current[preferredDefaultStat] >= 7
-                          ? current[preferredDefaultStat]
-                          : 10,
-                    }));
-                  }
+                  const nextNatureId = event.target.value;
+                  const nextNature = availableNatures.find(
+                    (nature) => nature.nature_id === nextNatureId,
+                  );
+                  setDefaultNatureId(nextNatureId);
+                  setDefaultTalents((current) => {
+                    if (talentMode !== "auto") return current;
+                    return buildDefaultTalentsForNature(nextNature, current);
+                  });
                   setDefaultFormTouched(true);
                 }}
               >
@@ -273,6 +279,26 @@ export function EstimatePanel({
                   建议正修{statName(preferredDefaultStat)}，该资质至少 7。
                 </div>
               ) : null}
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>
+                  资质模式：{talentMode === "auto" ? "自动跟随性格" : "手动固定"}
+                </span>
+                {defaultNature && talentMode === "manual" ? (
+                  <button
+                    className="text-emerald-700 underline-offset-2 hover:underline"
+                    type="button"
+                    onClick={() => {
+                      setDefaultTalents((current) =>
+                        buildDefaultTalentsForNature(defaultNature, current),
+                      );
+                      setTalentMode("auto");
+                      setDefaultFormTouched(true);
+                    }}
+                  >
+                    按当前性格重置资质
+                  </button>
+                ) : null}
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {STAT_KEYS.map((statKey) => (
@@ -289,6 +315,7 @@ export function EstimatePanel({
                           preferredDefaultStat === statKey ? 7 : 0,
                         ),
                       }));
+                      setTalentMode("manual");
                       setDefaultFormTouched(true);
                     }}
                   >
@@ -732,6 +759,72 @@ function talentOptionsFor(
   return preferredStat === statKey
     ? TALENT_OPTIONS.filter((value) => value >= 7)
     : TALENT_OPTIONS;
+}
+
+function buildDefaultTalentsForNature(
+  nature: NatureDefinitionOut | undefined,
+  current: IndividualTalentInput,
+): IndividualTalentInput {
+  const talents = { ...EMPTY_TALENTS, hp: 10 };
+  if (!nature) return talents;
+
+  const positive = nature.positive_stat as keyof IndividualTalentInput;
+  const negative = nature.negative_stat as keyof IndividualTalentInput;
+  const add = (stat: keyof IndividualTalentInput) => {
+    if (stat !== negative) talents[stat] = 10;
+  };
+  const safeAttack = preferredAttackStat(current, negative);
+  const safeResistance = preferredResistanceStat(current, negative);
+
+  if (positive === "hp") {
+    if (negative === "physical_defense") {
+      add("magic_defense");
+      add(safeAttack);
+    } else if (negative === "magic_defense") {
+      add("physical_defense");
+      add(safeAttack);
+    } else {
+      add("physical_defense");
+      add("magic_defense");
+    }
+    return talents;
+  }
+
+  add(positive);
+  if (positive === "speed") {
+    add(safeAttack);
+  } else if (positive === "physical_attack" || positive === "magic_attack") {
+    if (negative !== "speed") {
+      add("speed");
+    } else {
+      add(safeResistance);
+    }
+  } else if (positive === "physical_defense") {
+    add(negative === "magic_defense" ? safeAttack : "magic_defense");
+  } else if (positive === "magic_defense") {
+    add(negative === "physical_defense" ? safeAttack : "physical_defense");
+  }
+  return talents;
+}
+
+function preferredAttackStat(
+  current: IndividualTalentInput,
+  negative: keyof IndividualTalentInput,
+): "physical_attack" | "magic_attack" {
+  if (negative === "physical_attack") return "magic_attack";
+  if (negative === "magic_attack") return "physical_attack";
+  if (current.magic_attack > current.physical_attack) return "magic_attack";
+  return "physical_attack";
+}
+
+function preferredResistanceStat(
+  current: IndividualTalentInput,
+  negative: keyof IndividualTalentInput,
+): "physical_defense" | "magic_defense" {
+  if (negative === "physical_defense") return "magic_defense";
+  if (negative === "magic_defense") return "physical_defense";
+  if (current.magic_defense > current.physical_defense) return "magic_defense";
+  return "physical_defense";
 }
 
 function preferredPositiveStatForSelection(
