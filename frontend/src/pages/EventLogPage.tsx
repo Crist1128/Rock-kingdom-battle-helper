@@ -25,10 +25,6 @@ export function EventLogPage() {
       setLastMessage("事件已作废；时间线刷新后将不再显示原事件。");
     },
   });
-  const replayMutation = useMutation({
-    mutationFn: () => api.battles.replayFrom(currentBattleId!, eventIdInput.trim()),
-    onSuccess: (result) => setLastMessage(result.message),
-  });
   const correctMutation = useMutation({
     mutationFn: () => api.battles.correctEvent(currentBattleId!, eventIdInput.trim(), {
       replacement_event: {
@@ -49,8 +45,8 @@ export function EventLogPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">事件日志与回放</h1>
-        <p className="mt-1 text-muted-foreground">查看时间线，并使用后端提供的事件作废与重放接口。</p>
+          <h1 className="text-2xl font-bold">事件日志</h1>
+          <p className="mt-1 text-muted-foreground">查看时间线，并使用后端提供的事件作废与基础修正接口。</p>
       </div>
       <Card>
         <CardContent className="flex items-end gap-3 pt-5">
@@ -67,7 +63,7 @@ export function EventLogPage() {
         <Card>
           <CardHeader>
             <CardTitle>纠错能力</CardTitle>
-            <CardDescription>事件作废接口已接入；重放接口会重建实时估计、运行时状态和事件后快照链。</CardDescription>
+            <CardDescription>事件作废和基础修正接口已接入；事件重放入口暂时隐藏，后续需要时再恢复。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div>
@@ -75,7 +71,6 @@ export function EventLogPage() {
               <Input value={eventIdInput} onChange={(e) => setEventIdInput(e.target.value)} placeholder="从时间线复制 event_id" />
             </div>
             <Button className="w-full" variant="destructive" disabled={!currentBattleId || !eventIdInput.trim() || voidMutation.isPending} onClick={() => voidMutation.mutate()}>作废事件</Button>
-            <Button className="w-full" variant="outline" disabled={!currentBattleId || !eventIdInput.trim() || replayMutation.isPending} onClick={() => replayMutation.mutate()}>从该事件开始重放</Button>
             <div className="rounded-2xl border bg-white p-3">
               <div className="mb-2 flex items-center gap-2">
                 <Badge variant="outline">通用修正</Badge>
@@ -99,7 +94,7 @@ export function EventLogPage() {
                 {correctMutation.isPending ? "修正中..." : "创建修正事件"}
               </Button>
             </div>
-            <div className="rounded-2xl border bg-white p-3"><Badge variant="success">可用</Badge><div className="mt-2">重放会重建实时估计、运行时状态、最终状态实例和事件后快照链。</div></div>
+            <div className="rounded-2xl border bg-white p-3"><Badge variant="secondary">暂缓</Badge><div className="mt-2">事件重放与复杂修正暂时不作为当前主流程功能展示。</div></div>
             {lastMessage ? <div className="rounded-2xl border bg-emerald-50 p-3 text-emerald-900">{lastMessage}</div> : null}
           </CardContent>
         </Card>

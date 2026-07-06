@@ -356,15 +356,6 @@ class BattleService:
         if pending_switch_results:
             event_payload["pending_next_switch_in_results"] = pending_switch_results
             event.payload_json = dumps_json(event_payload)
-        switch_out_skill_runtime_results = self._apply_switch_out_skill_runtime_hooks(
-            battle_event=event,
-            side=payload.side,
-            old_elf_id=old_elf_id,
-        )
-        if switch_out_skill_runtime_results:
-            event_payload["switch_out_skill_runtime_results"] = switch_out_skill_runtime_results
-            event.payload_json = dumps_json(event_payload)
-
         if old_elf_id is not None:
             BattleEffectService(self.db).switch_clear_effects(
                 battle_id=battle_id,
@@ -373,6 +364,14 @@ class BattleService:
                 turn_number=turn_number,
                 battle_event_id=event.event_id,
             )
+        switch_out_skill_runtime_results = self._apply_switch_out_skill_runtime_hooks(
+            battle_event=event,
+            side=payload.side,
+            old_elf_id=old_elf_id,
+        )
+        if switch_out_skill_runtime_results:
+            event_payload["switch_out_skill_runtime_results"] = switch_out_skill_runtime_results
+            event.payload_json = dumps_json(event_payload)
         switch_in_settlement_events = TurnSettlementService(self.db).settle_switch_in(
             battle=battle,
             turn_number=turn_number,
@@ -755,7 +754,7 @@ class BattleService:
                         recognition_source=EventSource.SYSTEM_CALCULATED.value,
                         recognition_confidence=1.0,
                         manual_override=False,
-                        notes="switch_out_persistent_skill_use_count_modifier",
+                        notes="switch_out_skill_slot_use_count_modifier",
                     )
                     self.db.add(instance)
                     layers_before = None
@@ -789,7 +788,7 @@ class BattleService:
                         source_skill_id=skill.skill_id,
                         source_elf_id=old_elf_id,
                         condition_branch="switch_out",
-                        reason="switch_out_skill_use_count_modifier",
+                        reason="switch_out_skill_slot_use_count_modifier",
                         source=EventSource.SYSTEM_CALCULATED.value,
                         recognition_confidence=1.0,
                         manual_override=False,
@@ -1135,6 +1134,20 @@ class BattleService:
             if panel_stats is not None:
                 panel_by_key[(state.side, state.elf_id)] = (panel_stats, panel_source)
         snapshot_payload = [model_to_dict(item) for item in effects]
+        effect_definitions = self._effect_definitions_for_instances(effects)
+        skill_slot_effects_by_slot: dict[str, list[dict[str, Any]]] = {}
+        for effect in effects:
+            if effect.owner_scope != "skill_slot" or not effect.owner_skill_slot_id:
+                continue
+            effect_payload = model_to_dict(effect)
+            definition = effect_definitions.get(effect.effect_id)
+            if definition is not None:
+                effect_payload["effect_name"] = definition.effect_name
+                effect_payload["display_group"] = definition.display_group
+                effect_payload["polarity"] = definition.polarity
+            skill_slot_effects_by_slot.setdefault(effect.owner_skill_slot_id, []).append(
+                effect_payload
+            )
         active_elf_by_side = {
             Side.SELF.value: battle.self_active_elf_id,
             Side.ENEMY.value: battle.enemy_active_elf_id,
@@ -1142,6 +1155,10 @@ class BattleService:
 
         enriched: list[dict[str, Any]] = []
         for slot in slot_dicts:
+            slot["skill_slot_effects"] = skill_slot_effects_by_slot.get(
+                str(slot.get("slot_id") or ""),
+                [],
+            )
             skill = skills.get(str(slot.get("skill_id")))
             if skill is not None:
                 slot["skill_name"] = skill.skill_name
@@ -1720,9 +1737,21 @@ class BattleService:
         if skill_modifier["items"]:
             resolved_context.rule_resolution_details["skill_modifier"] = skill_modifier["items"]
         result = DamageCalculator().calculate(resolved_context)
+        effective_use_count = max(1 + int(skill_modifier.get("use_count_delta") or 0), 1)
+        single_use_total_damage = result.damage_value
+        effective_total_damage = (
+            single_use_total_damage * effective_use_count
+            if single_use_total_damage is not None
+            else None
+        )
         percent = (
             round(result.damage_value / defender_panel.hp * 100, 2)
             if result.damage_value is not None and defender_panel.hp
+            else None
+        )
+        effective_percent = (
+            round(effective_total_damage / defender_panel.hp * 100, 2)
+            if effective_total_damage is not None and defender_panel.hp
             else None
         )
         explanation = result.explanation or {}
@@ -1745,6 +1774,10 @@ class BattleService:
             "hit_count": explanation.get("hit_count"),
             "hit_count_source": explanation.get("hit_count_source"),
             "total_damage": explanation.get("total_damage"),
+            "single_use_total_damage": single_use_total_damage,
+            "effective_use_count": effective_use_count,
+            "effective_total_damage": effective_total_damage,
+            "effective_total_damage_percent": effective_percent,
             "hit_rule": rule_details.get("hit_rule") if isinstance(rule_details, dict) else None,
             "multipliers": {
                 "display_power": explanation.get("display_power"),

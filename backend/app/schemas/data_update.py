@@ -173,6 +173,28 @@ class StaticSkillRuleSyncItem(BaseModel):
     has_effect_operations: bool = False
 
 
+class StaticEffectDefinitionSyncItem(BaseModel):
+    """待同步的状态定义条目。"""
+
+    effect_id: str
+    effect_name: str | None = None
+    source_file: str | None = None
+    changed_fields: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class StaticEffectDefinitionSyncSummary(BaseModel):
+    """项目状态定义 seed 同步摘要。"""
+
+    sources: list[str] = Field(default_factory=list)
+    total_rows: int = 0
+    up_to_date_count: int = 0
+    pending_count: int = 0
+    pending_items: list[StaticEffectDefinitionSyncItem] = Field(default_factory=list)
+    pending_items_truncated: bool = False
+    errors: list[str] = Field(default_factory=list)
+
+
 class StaticSkillRuleSyncRequest(BaseModel):
     """静态技能规则同步请求。"""
 
@@ -196,11 +218,20 @@ class StaticSkillRuleSyncResponse(BaseModel):
     status_counts: dict[str, int] = Field(default_factory=dict)
     structured_total: int
     up_to_date_count: int
+    skill_up_to_date_count: int = 0
+    effect_up_to_date_count: int = 0
     pending_count: int
+    pending_skill_count: int = 0
+    pending_effect_count: int = 0
     pending_items: list[StaticSkillRuleSyncItem] = Field(default_factory=list)
     pending_items_truncated: bool = False
+    effect_definition_sync: StaticEffectDefinitionSyncSummary | None = None
+    effect_pending_items: list[StaticEffectDefinitionSyncItem] = Field(default_factory=list)
     missing_skills: list[dict[str, Any]] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     applied_skill_ids: list[str] = Field(default_factory=list)
+    applied_effect_ids: list[str] = Field(default_factory=list)
     applied_count: int = 0
+    applied_skill_count: int = 0
+    applied_effect_count: int = 0
     transaction: str

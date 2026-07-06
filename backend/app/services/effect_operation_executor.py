@@ -1812,8 +1812,12 @@ class EffectOperationExecutor:
             }
         if definition.owner_scope == OwnerScope.SKILL_SLOT.value:
             owner_skill_slot_id = None
+            owner_side = target_side
+            owner_elf_id = None
             if target in {"source_skill", "self_skill"} and battle_event.skill_id:
                 owner_skill_slot_id = self._source_skill_slot_id(battle_event)
+                owner_side = battle_event.actor_side
+                owner_elf_id = battle_event.actor_elf_id
             elif target in {
                 "enemy_current_turn_used_skill",
                 "opponent_current_turn_used_skill",
@@ -1826,13 +1830,14 @@ class EffectOperationExecutor:
                     battle_event,
                     target_side_for_slot,
                 )
+                owner_side = target_side_for_slot
             if owner_skill_slot_id is None:
                 return {"status": "failed", "reason": "owner_skill_slot_id_missing"}
             return {
                 "status": "resolved",
                 "battle_id": battle_event.battle_id,
-                "owner_side": target_side,
-                "owner_elf_id": None,
+                "owner_side": owner_side,
+                "owner_elf_id": owner_elf_id,
                 "owner_skill_slot_id": owner_skill_slot_id,
                 "field_id": None,
             }

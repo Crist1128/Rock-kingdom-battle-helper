@@ -18,7 +18,7 @@ from app.models import battle as _battle_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
-from app.models.battle import Battle, BattleElfState
+from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.effect import BattleEffectInstance, BattleEffectSnapshot
 from app.models.event import BattleEvent, EffectChangeEvent, ResourceChangeEvent
 from app.models.static import EffectDefinition, ElfDefinition, SkillDefinition
@@ -1333,6 +1333,435 @@ def test_conditional_branch_executes_child_operations(
         assert instance.layers == 2
 
 
+def test_prepare_next_switch_in_resource_change_gives_new_elf_energy(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """下次切换入场效果可让新上场精灵获得能量，并只消费一次。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_power_up_next", layers=1)
+        session.add(_elf("elf_self_2", "己方后备", ["水"]))
+        session.flush()
+        session.add(
+            BattleElfState(
+                state_id="state_self_2",
+                battle_id="battle_ops",
+                side="self",
+                elf_id="elf_self_2",
+                elf_name="己方后备",
+                avatar="",
+                panel_stats_json=dumps_json({"hp": 500}),
+                current_hp_value=500,
+                current_hp_percent=100.0,
+                energy=0,
+                is_active_elf=False,
+                is_defeated=False,
+                manual_override=True,
+            )
+        )
+        skill = session.get(SkillDefinition, "skill_power_up_next")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "prepare_next_switch_in_effect",
+                    "effect_type": "resource_change",
+                    "target": "actor_side",
+                    "resource_type": "energy",
+                    "change_type": "gain",
+                    "value": 8,
+                    "max_value": 10,
+                }
+            ]
+        )
+        session.commit()
+
+    skill_response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_power_up_next",
+            "skill_confirmed": True,
+        },
+    )
+    assert skill_response.status_code == 201
+
+    switch_response = client.post(
+        "/api/v1/battles/battle_ops/switch",
+        json={"side": "self", "elf_id": "elf_self_2", "turn_number": 1},
+    )
+    assert switch_response.status_code == 200
+
+    with session_factory() as session:
+        new_state = session.get(BattleElfState, "state_self_2")
+        assert new_state is not None
+        assert new_state.energy == 8
+        switch_event = session.scalar(
+            select(BattleEvent).where(
+                BattleEvent.battle_id == "battle_ops",
+                BattleEvent.event_type == BattleEventType.SWITCH_ELF.value,
+            )
+        )
+        assert switch_event is not None
+        payload = loads_json(switch_event.payload_json, {})
+        assert payload["pending_next_switch_in_results"][0]["status"] == "executed"
+
+
+def test_resource_change_multi_target_restores_bench_allies(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """多目标资源变化只作用于场下队友。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_bench_energy", layers=1)
+        session.add(_elf("elf_self_2", "己方后备", ["水"]))
+        session.flush()
+        session.add(
+            BattleElfState(
+                state_id="state_self_2",
+                battle_id="battle_ops",
+                side="self",
+                elf_id="elf_self_2",
+                elf_name="己方后备",
+                avatar="",
+                panel_stats_json=dumps_json({"hp": 500}),
+                current_hp_value=500,
+                current_hp_percent=100.0,
+                energy=1,
+                is_active_elf=False,
+                is_defeated=False,
+                manual_override=True,
+            )
+        )
+        skill = session.get(SkillDefinition, "skill_bench_energy")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "resource_change_multi_target",
+                    "target": "bench_allies",
+                    "resource_type": "energy",
+                    "change_type": "gain",
+                    "value": 2,
+                    "max_value": 10,
+                }
+            ]
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_bench_energy",
+            "skill_confirmed": True,
+        },
+    )
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    assert payload["effect_operation_results"][0]["changed"][0]["after_value"] == 3
+    with session_factory() as session:
+        active_state = session.get(BattleElfState, "state_self")
+        bench_state = session.get(BattleElfState, "state_self_2")
+        assert active_state is not None and active_state.energy == 0
+        assert bench_state is not None and bench_state.energy == 3
+
+
+def test_swap_hp_percent_exchanges_life_ratios(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """生命比例互换会按双方最大生命重算当前 HP。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_swap_hp", layers=1)
+        self_state = session.get(BattleElfState, "state_self")
+        enemy_state = session.get(BattleElfState, "state_enemy")
+        assert self_state is not None and enemy_state is not None
+        self_state.current_hp_value = 100
+        self_state.current_hp_percent = 20
+        enemy_state.current_hp_value = 400
+        enemy_state.current_hp_percent = 80
+        skill = session.get(SkillDefinition, "skill_swap_hp")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [{"op_type": "swap_hp_percent", "target": "enemy_side"}]
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_swap_hp",
+            "skill_confirmed": True,
+        },
+    )
+    assert response.status_code == 201
+    with session_factory() as session:
+        self_state = session.get(BattleElfState, "state_self")
+        enemy_state = session.get(BattleElfState, "state_enemy")
+        assert self_state is not None and self_state.current_hp_percent == 80
+        assert self_state.current_hp_value == 400
+        assert enemy_state is not None and enemy_state.current_hp_percent == 20
+        assert enemy_state.current_hp_value == 100
+
+
+def test_convert_effects_by_polarity_turns_positive_layers_into_poison(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """按极性转换会统计目标当前精灵正面状态总层数并转换成中毒。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_convert_positive", layers=1)
+        session.add_all([_physical_attack_up_definition(), _poison_definition()])
+        session.flush()
+        session.add(
+            BattleEffectInstance(
+                instance_id="positive_enemy",
+                battle_id="battle_ops",
+                effect_id="effect_physical_attack_up_layered",
+                category="stat_modifier",
+                owner_scope="elf",
+                owner_side="enemy",
+                owner_elf_id="elf_enemy",
+                layers=3,
+                is_active=True,
+                applied_turn=1,
+                manual_override=True,
+            )
+        )
+        skill = session.get(SkillDefinition, "skill_convert_positive")
+        assert skill is not None
+        skill.effect_operations_json = dumps_json(
+            [
+                {
+                    "op_type": "convert_effects_by_polarity",
+                    "target": "enemy_side",
+                    "from_polarity": "positive",
+                    "to_effect_id": "effect_poison",
+                }
+            ]
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_convert_positive",
+            "skill_confirmed": True,
+        },
+    )
+    assert response.status_code == 201
+    with session_factory() as session:
+        source = session.get(BattleEffectInstance, "positive_enemy")
+        assert source is not None and source.is_active is False
+        poison = session.scalar(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == "battle_ops",
+                BattleEffectInstance.effect_id == "effect_poison",
+            )
+        )
+        assert poison is not None and poison.layers == 3
+
+
+def test_elf_skill_use_count_state_multiplies_next_skill_energy_and_is_consumed(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """精灵侧“技能使用次数”状态会让下次任意技能等效多使用一次，并在使用后消耗。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_use_count", layers=1)
+        session.add(_skill_use_count_definition())
+        skill = session.get(SkillDefinition, "skill_use_count")
+        assert skill is not None
+        skill.skill_category = "magic"
+        skill.base_energy_cost = 2
+        session.add(
+            BattleSkillSlot(
+                slot_id="slot_use_count",
+                battle_id="battle_ops",
+                side="self",
+                elf_id="elf_self",
+                slot_index=0,
+                skill_id="skill_use_count",
+                current_energy_cost=2,
+                current_power=50,
+                manual_override=True,
+            )
+        )
+        session.flush()
+        session.add(
+            BattleEffectInstance(
+                instance_id="effect_use_count_next_skill",
+                battle_id="battle_ops",
+                effect_id="effect_skill_use_count_up_switch_clear",
+                category="skill_modifier",
+                owner_scope="elf",
+                owner_side="self",
+                owner_elf_id="elf_self",
+                layers=1,
+                remaining_uses=1,
+                is_active=True,
+                applied_turn=1,
+                last_updated_turn=1,
+                recognition_source="manual_input",
+                recognition_confidence=1.0,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_use_count",
+            "skill_confirmed": True,
+        },
+    )
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    assert payload["skill_runtime"]["effective_use_count"] == 2
+    assert payload["skill_runtime"]["effective_energy_cost"] == 4
+    assert payload["skill_runtime"]["consumed_skill_modifier_effects"][0]["effect_instance_id"] == (
+        "effect_use_count_next_skill"
+    )
+    with session_factory() as session:
+        instance = session.get(BattleEffectInstance, "effect_use_count_next_skill")
+        assert instance is not None
+        assert instance.is_active is False
+        assert instance.remaining_uses == 0
+
+
+def test_persistent_skill_slot_use_count_modifier_multiplies_that_skill_energy(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    """“本技能使用次数永久+1”应挂在技能槽上，只影响该技能。"""
+    client, session_factory = api_client
+    with session_factory() as session:
+        _seed_battle_with_starfall_skill(session, skill_id="skill_use_count", layers=1)
+        session.add(_skill_slot_use_count_definition())
+        session.add(_elf("elf_self_2", "己方后备", ["水"]))
+        session.flush()
+        session.add(
+            BattleElfState(
+                state_id="state_self_2",
+                battle_id="battle_ops",
+                side="self",
+                elf_id="elf_self_2",
+                elf_name="己方后备",
+                avatar="",
+                panel_stats_json=dumps_json({"hp": 500}),
+                current_hp_value=500,
+                current_hp_percent=100.0,
+                energy=0,
+                is_active_elf=False,
+                is_defeated=False,
+                manual_override=True,
+            )
+        )
+        skill = session.get(SkillDefinition, "skill_use_count")
+        assert skill is not None
+        skill.skill_category = "magic"
+        skill.base_energy_cost = 2
+        skill.damage_rule_json = dumps_json(
+            {
+                "manual_review": {
+                    "future_hooks": [
+                        {
+                            "status": "executable",
+                            "trigger": "switch_out",
+                            "hook_type": "persistent_skill_use_count_modifier",
+                            "target": "source_skill",
+                            "use_count_delta": 1,
+                        }
+                    ]
+                }
+            }
+        )
+        session.add(
+            BattleSkillSlot(
+                slot_id="slot_use_count",
+                battle_id="battle_ops",
+                side="self",
+                elf_id="elf_self",
+                slot_index=0,
+                skill_id="skill_use_count",
+                current_energy_cost=2,
+                current_power=50,
+                manual_override=True,
+            )
+        )
+        session.commit()
+
+    switch_out = client.post(
+        "/api/v1/battles/battle_ops/switch",
+        json={"side": "self", "elf_id": "elf_self_2", "turn_number": 1},
+    )
+    assert switch_out.status_code == 200
+    with session_factory() as session:
+        use_count = session.scalar(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == "battle_ops",
+                BattleEffectInstance.effect_id == "effect_skill_slot_use_count_up_persistent",
+                BattleEffectInstance.owner_skill_slot_id == "slot_use_count",
+                BattleEffectInstance.is_active.is_(True),
+            )
+        )
+        assert use_count is not None and use_count.layers == 1
+
+    switch_back = client.post(
+        "/api/v1/battles/battle_ops/switch",
+        json={"side": "self", "elf_id": "elf_self", "turn_number": 1},
+    )
+    assert switch_back.status_code == 200
+    state_response = client.get("/api/v1/battles/battle_ops/state")
+    assert state_response.status_code == 200
+    skill_slots = state_response.json()["skill_slots"]
+    slot_payload = next(item for item in skill_slots if item["slot_id"] == "slot_use_count")
+    assert slot_payload["skill_slot_effects"][0]["effect_id"] == (
+        "effect_skill_slot_use_count_up_persistent"
+    )
+    assert slot_payload["skill_slot_effects"][0]["layers"] == 1
+
+    response = client.post(
+        "/api/v1/battles/battle_ops/skill-events",
+        json={
+            "turn_number": 1,
+            "actor_side": "self",
+            "actor_elf_id": "elf_self",
+            "target_side": "enemy",
+            "target_elf_id": "elf_enemy",
+            "skill_id": "skill_use_count",
+            "skill_confirmed": True,
+        },
+    )
+    assert response.status_code == 201
+    payload = loads_json(response.json()["payload_json"], {})
+    assert payload["skill_runtime"]["effective_use_count"] == 2
+    assert payload["skill_runtime"]["effective_energy_cost"] == 4
+
 def test_skill_operation_importer_updates_by_skill_name_and_can_rollback(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
@@ -1755,4 +2184,65 @@ def _switch_lock_definition() -> EffectDefinition:
         clear_on_switch=True,
         action_modifier_json=dumps_json({"switch_lock": True}),
         special_rule_id="switch_lock",
+    )
+
+
+def _skill_use_count_definition() -> EffectDefinition:
+    """构造技能使用次数状态定义。"""
+    return EffectDefinition(
+        effect_id="effect_skill_use_count_up_switch_clear",
+        effect_name="技能使用次数",
+        category="skill_modifier",
+        polarity="positive",
+        display_group="skill_modifier",
+        display_priority=502,
+        owner_scope="elf",
+        target_scope="single_elf",
+        attach_target_type="elf",
+        is_visible_icon=True,
+        is_recognizable_by_icon=False,
+        default_layers=1,
+        max_layers=None,
+        stack_rule="add_layers",
+        duration_type="until_switch_or_removed",
+        default_duration_uses=1,
+        clear_on_switch=True,
+        clear_by_skill_specific=True,
+        formula_hooks_json=dumps_json(["skill_modifier"]),
+        skill_modifier_json=dumps_json(
+            {
+                "modifier_type": "use_count_delta",
+                "use_count_delta_per_layer": 1,
+            }
+        ),
+    )
+
+
+def _skill_slot_use_count_definition() -> EffectDefinition:
+    """构造本技能使用次数持久修正状态定义。"""
+    return EffectDefinition(
+        effect_id="effect_skill_slot_use_count_up_persistent",
+        effect_name="本技能使用次数增加",
+        category="skill_modifier",
+        polarity="positive",
+        display_group="skill_modifier",
+        display_priority=503,
+        owner_scope="skill_slot",
+        target_scope="single_skill_slot",
+        attach_target_type="skill_slot",
+        is_visible_icon=True,
+        is_recognizable_by_icon=False,
+        default_layers=1,
+        max_layers=None,
+        stack_rule="add_layers",
+        duration_type="until_removed",
+        clear_on_switch=False,
+        clear_by_skill_specific=True,
+        formula_hooks_json=dumps_json(["skill_modifier"]),
+        skill_modifier_json=dumps_json(
+            {
+                "modifier_type": "use_count_delta",
+                "use_count_delta_per_layer": 1,
+            }
+        ),
     )

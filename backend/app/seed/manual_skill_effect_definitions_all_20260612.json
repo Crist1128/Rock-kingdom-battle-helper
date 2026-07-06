@@ -2489,13 +2489,69 @@
     "data_version": "manual_complex_branch_20260705_03"
   },
   {
+    "effect_id": "effect_skill_use_count_up_switch_clear",
+    "effect_name": "技能使用次数",
+    "icon": null,
+    "category": "skill_modifier",
+    "polarity": "positive",
+    "display_group": "skill_modifier",
+    "display_priority": 502,
+    "owner_scope": "elf",
+    "target_scope": "single_elf",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": false,
+    "recognition_alias_json": [
+      "技能使用次数",
+      "使用次数增加",
+      "一回合内多使用一次技能",
+      "下次技能使用次数增加",
+      "下次技能连续释放",
+      "本精灵下次技能使用次数+1"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": null,
+    "duration_type": "until_switch_or_removed",
+    "default_duration_turns": null,
+    "default_duration_uses": 1,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": false,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": false,
+    "can_be_converted": false,
+    "can_be_inherited": false,
+    "can_be_stolen": false,
+    "can_be_doubled": false,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "skill_modifier"
+    ],
+    "stat_modifier_json": null,
+    "damage_modifier_json": null,
+    "skill_modifier_json": {
+      "modifier_type": "use_count_delta",
+      "use_count_delta_per_layer": 1
+    },
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "精灵侧状态：每 1 层表示该精灵下次使用任意技能时等效多使用 1 次；默认消耗 1 次后清除，切换清除。",
+    "data_version": "manual_complex_branch_20260706_use_count_elf_scope"
+  },
+  {
     "effect_id": "effect_skill_slot_use_count_up_persistent",
     "effect_name": "本技能使用次数增加",
     "icon": null,
     "category": "skill_modifier",
     "polarity": "positive",
     "display_group": "skill_modifier",
-    "display_priority": 502,
+    "display_priority": 503,
     "owner_scope": "skill_slot",
     "target_scope": "single_skill_slot",
     "attach_target_type": "skill_slot",
@@ -2503,7 +2559,8 @@
     "is_recognizable_by_icon": false,
     "recognition_alias_json": [
       "本技能使用次数增加",
-      "使用次数增加"
+      "本技能使用次数+1",
+      "技能槽使用次数增加"
     ],
     "default_layers": 1,
     "max_layers": null,
@@ -2536,8 +2593,8 @@
     },
     "action_modifier_json": null,
     "resource_modifier_json": null,
-    "special_rule_id": null,
-    "developer_notes": "Persistent skill-slot use count modifier; not a combo-hit modifier. Runtime energy cost is multiplied by effective use count.",
-    "data_version": "manual_complex_branch_20260705_03"
+    "special_rule_id": "skill_slot_use_count_up_persistent",
+    "developer_notes": "技能槽侧持久修正：每 1 层表示该技能等效多使用 1 次；用于“本技能使用次数永久+1”等分支，换宠返场保留。",
+    "data_version": "manual_complex_branch_20260706_skill_slot_use_count"
   }
 ]

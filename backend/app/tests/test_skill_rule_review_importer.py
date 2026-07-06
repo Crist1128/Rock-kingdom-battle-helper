@@ -16,7 +16,7 @@ from app.models import battle as _battle_models  # noqa: F401
 from app.models import effect as _effect_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
-from app.models.static import SkillDefinition
+from app.models.static import EffectDefinition, SkillDefinition
 from app.utils.json import dumps_json, loads_json
 
 
@@ -118,6 +118,48 @@ def test_import_skill_rule_reviews_can_replace_rules(db_session: Session) -> Non
     assert operations[0]["effect_id"] == "effect_freeze"
 
 
+def test_import_skill_rule_reviews_preserves_nested_future_hooks(
+    db_session: Session,
+) -> None:
+    """damage_rule 内已有的可执行钩子不能被人工审阅元信息覆盖丢失。"""
+    db_session.add(_skill("skill_switch_out_hook"))
+    db_session.commit()
+
+    import_skill_rule_reviews(
+        db_session,
+        [
+            {
+                "skill_id": "skill_switch_out_hook",
+                "review_status": "structured",
+                "review_notes": "每离场一次，本技能使用次数永久+1。",
+                "future_hooks": [],
+                "damage_rule": {
+                    "damage_type": "magic_attack",
+                    "manual_review": {
+                        "future_hooks": [
+                            {
+                                "hook_type": "persistent_skill_use_count_modifier",
+                                "trigger": "switch_out",
+                                "target": "source_skill",
+                                "use_count_delta": 1,
+                                "status": "executable",
+                            }
+                        ]
+                    },
+                },
+            }
+        ],
+    )
+
+    skill = db_session.get(SkillDefinition, "skill_switch_out_hook")
+    assert skill is not None
+    rule = loads_json(skill.damage_rule_json, {})
+    hooks = rule["manual_review"]["future_hooks"]
+    assert hooks[0]["hook_type"] == "persistent_skill_use_count_modifier"
+    assert hooks[0]["trigger"] == "switch_out"
+    assert hooks[0]["use_count_delta"] == 1
+
+
 def test_import_skill_rule_reviews_falls_back_to_unique_skill_name(
     db_session: Session,
 ) -> None:
@@ -193,7 +235,11 @@ def test_static_rule_sync_checks_and_commits_structured_rules(
         encoding="utf-8",
     )
 
-    plan = check_structured_skill_rule_sync(db_session, reviews_json=reviews_json)
+    plan = check_structured_skill_rule_sync(
+        db_session,
+        reviews_json=reviews_json,
+        effect_json_paths=[],
+    )
     assert plan["pending_count"] == 1
     assert plan["pending_items"][0]["skill_id"] == "skill_sync"
 
@@ -202,6 +248,7 @@ def test_static_rule_sync_checks_and_commits_structured_rules(
         skill_ids=["skill_sync"],
         commit=False,
         reviews_json=reviews_json,
+        effect_json_paths=[],
     )
     assert dry_run["applied_count"] == 1
     assert dry_run["transaction"] == "rolled_back_dry_run"
@@ -212,6 +259,7 @@ def test_static_rule_sync_checks_and_commits_structured_rules(
         skill_ids=["skill_sync"],
         commit=True,
         reviews_json=reviews_json,
+        effect_json_paths=[],
     )
     assert committed["applied_count"] == 1
     assert committed["transaction"] == "committed"
@@ -219,6 +267,118 @@ def test_static_rule_sync_checks_and_commits_structured_rules(
     assert skill is not None
     assert loads_json(skill.damage_rule_json, {})["manual_review"]["status"] == "structured"
     assert loads_json(skill.hit_rule_json, {})["damage_display_type"] == "single_damage"
+
+
+def test_static_rule_sync_also_applies_effect_definitions(
+    db_session: Session,
+    tmp_path,
+) -> None:
+    """同步完备技能规则时，应同事务补齐项目状态定义 seed。"""
+    db_session.add(_skill("skill_with_effect_seed"))
+    db_session.commit()
+    reviews_json = tmp_path / "reviews.json"
+    reviews_json.write_text(
+        dumps_json(
+            [
+                {
+                    "skill_id": "skill_with_effect_seed",
+                    "skill_name": "状态同步技能",
+                    "review_status": "structured",
+                    "damage_rule": {"damage_type": "normal_formula"},
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    effect_json = tmp_path / "effects.json"
+    effect_json.write_text(
+        dumps_json(
+            [
+                {
+                    "effect_id": "effect_sync_state",
+                    "effect_name": "同步状态",
+                    "category": "skill_modifier",
+                    "polarity": "positive",
+                    "display_group": "skill_modifier",
+                    "owner_scope": "skill_slot",
+                    "target_scope": "single_skill_slot",
+                    "attach_target_type": "skill_slot",
+                    "is_visible_icon": True,
+                    "is_recognizable_by_icon": False,
+                    "default_layers": 1,
+                    "stack_rule": "replace",
+                    "duration_type": "until_removed",
+                    "clear_on_switch": False,
+                    "clear_by_abnormal_cleanse": False,
+                    "clear_by_stat_clear": False,
+                    "clear_by_mark_clear": False,
+                    "clear_by_weather_replace": False,
+                    "clear_by_skill_specific": False,
+                    "can_be_transferred": False,
+                    "can_be_converted": False,
+                    "can_be_inherited": False,
+                    "can_be_stolen": False,
+                    "can_be_doubled": False,
+                    "skill_modifier_json": {"modifier_type": "power_add", "power_add": 10},
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    fallback_effect_json = tmp_path / "fallback_effects.json"
+    fallback_effect_json.write_text(
+        dumps_json(
+            [
+                {
+                    "effect_id": "effect_sync_state",
+                    "effect_name": "旧版同步状态",
+                    "category": "skill_modifier",
+                    "polarity": "positive",
+                    "display_group": "legacy_modifier",
+                    "owner_scope": "skill_slot",
+                    "target_scope": "single_skill_slot",
+                    "attach_target_type": "skill_slot",
+                    "display_priority": 99,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    plan = check_structured_skill_rule_sync(
+        db_session,
+        reviews_json=reviews_json,
+        effect_json_paths=[effect_json, fallback_effect_json],
+    )
+    assert plan["pending_skill_count"] == 1
+    assert plan["pending_effect_count"] == 1
+    assert plan["pending_count"] == 2
+
+    dry_run = sync_structured_skill_rules(
+        db_session,
+        commit=False,
+        reviews_json=reviews_json,
+        effect_json_paths=[effect_json, fallback_effect_json],
+    )
+    assert dry_run["applied_skill_count"] == 1
+    assert dry_run["applied_effect_count"] == 1
+    assert db_session.get(EffectDefinition, "effect_sync_state") is None
+
+    committed = sync_structured_skill_rules(
+        db_session,
+        commit=True,
+        reviews_json=reviews_json,
+        effect_json_paths=[effect_json, fallback_effect_json],
+    )
+    assert committed["applied_skill_count"] == 1
+    assert committed["applied_effect_count"] == 1
+    assert committed["pending_skill_count"] == 0
+    assert committed["pending_effect_count"] == 0
+    assert committed["pending_count"] == 0
+    effect = db_session.get(EffectDefinition, "effect_sync_state")
+    assert effect is not None
+    assert effect.effect_name == "同步状态"
+    assert effect.display_group == "skill_modifier"
 
 
 def test_static_rule_sync_can_filter_by_skill_name(
@@ -253,6 +413,7 @@ def test_static_rule_sync_can_filter_by_skill_name(
     plan = check_structured_skill_rule_sync(
         db_session,
         reviews_json=reviews_json,
+        effect_json_paths=[],
         q="花炮",
     )
 

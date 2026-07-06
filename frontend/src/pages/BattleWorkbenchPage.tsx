@@ -17,7 +17,7 @@ import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
 import { HealthBar } from "@/components/HealthBar";
 import { cn, elementTypeName, phaseName, sideName, skillCategoryName } from "@/lib/utils";
-import type { BattleElfStateDict, BattleEventOut, BattleSkillSlotDict, BattleSpeedPreview, DamageEventCreateResult, EndTurnResult, Side, SkillDefinitionOut, SpeedPreviewRow, SpeedPreviewTarget, StatBlock } from "@/types/api";
+import type { BattleEffectInstanceDict, BattleElfStateDict, BattleEventOut, BattleSkillSlotDict, BattleSpeedPreview, DamageEventCreateResult, EndTurnResult, Side, SkillDefinitionOut, SpeedPreviewRow, SpeedPreviewTarget, StatBlock } from "@/types/api";
 
 type PlannedActionKind = "unknown" | "attack_skill" | "defense_skill" | "status_skill" | "switch";
 
@@ -1223,9 +1223,9 @@ function SkillSlotCard({
   return (
     <div
       className={cn(
-        "min-h-28 rounded-xl border bg-slate-50 p-3 text-xs",
+        "min-h-28 rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/90 p-3 text-xs shadow-sm",
         onSkillQuickSelect
-          && "cursor-pointer transition hover:scale-[1.015] hover:border-primary/60 hover:bg-primary/10 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40",
+          && "cursor-pointer transition hover:scale-[1.015] hover:border-primary/60 hover:from-primary/5 hover:to-sky-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40",
       )}
       role={onSkillQuickSelect ? "button" : undefined}
       tabIndex={onSkillQuickSelect ? 0 : undefined}
@@ -1240,24 +1240,53 @@ function SkillSlotCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-medium text-slate-700">{label}</div>
-          <div className="mt-1 truncate text-sm font-semibold text-slate-950">
+          <div className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+            {label}
+          </div>
+          <div className="mt-1.5 truncate text-[13px] font-semibold text-slate-950">
             {slot.skill_name ?? compactEventValue(slot.skill_id)}
           </div>
         </div>
-        <Badge variant={slot.is_virtual ? "warning" : "outline"}>{slot.is_virtual ? "补齐" : "运行"}</Badge>
+        <Badge
+          variant={slot.is_virtual ? "warning" : "outline"}
+          className="shrink-0 px-1.5 py-0 text-[10px]"
+        >
+          {slot.is_virtual ? "补齐" : "运行"}
+        </Badge>
       </div>
-      <div className="mt-2 flex flex-wrap gap-1 text-muted-foreground">
-        <Badge variant="outline">{elementTypeName(slot.element_type)}</Badge>
-        <Badge variant="outline">{skillCategoryName(slot.skill_category)}</Badge>
-        {slot.cooldown_remaining ? <Badge variant="outline">冷却 {slot.cooldown_remaining}</Badge> : null}
+      <div className="mt-2 flex flex-wrap items-center gap-1 text-muted-foreground">
+        <Badge variant="outline" className="border-slate-200 px-1.5 py-0 text-[10px]">
+          {elementTypeName(slot.element_type)}
+        </Badge>
+        <Badge variant="outline" className="border-slate-200 px-1.5 py-0 text-[10px]">
+          {skillCategoryName(slot.skill_category)}
+        </Badge>
+        {slot.cooldown_remaining ? (
+          <Badge variant="outline" className="border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-700">
+            冷却 {slot.cooldown_remaining}
+          </Badge>
+        ) : null}
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-muted-foreground">
-        <span>费用 {slot.effective_energy_cost ?? slot.current_energy_cost ?? slot.base_energy_cost ?? "--"}</span>
-        <span>
-          威力 {slot.current_power ?? slot.static_base_power ?? "--"}
-          {slot.current_power !== null && slot.current_power !== undefined ? "（覆盖）" : ""}
-        </span>
+      <SkillSlotEffectBadges effects={slot.skill_slot_effects ?? []} />
+      <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 text-[10px]">
+        <div>
+          <div className="text-muted-foreground">费用</div>
+          <div className="mt-0.5 font-semibold text-slate-900">
+            {slot.effective_energy_cost ?? slot.current_energy_cost ?? slot.base_energy_cost ?? "--"}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">威力</div>
+          <div className={cn(
+            "mt-0.5 font-semibold",
+            slot.current_power !== null && slot.current_power !== undefined
+              ? "text-primary"
+              : "text-slate-900",
+          )}>
+            {slot.current_power ?? slot.static_base_power ?? "--"}
+            {slot.current_power !== null && slot.current_power !== undefined ? "（覆盖）" : ""}
+          </div>
+        </div>
       </div>
       <div
         className="mt-2"
@@ -1266,7 +1295,7 @@ function SkillSlotCard({
       >
         <button
           type="button"
-          className="flex items-center gap-1 text-xs text-primary hover:underline"
+          className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
           onClick={() => {
             setPowerDraft(slot.current_power !== null && slot.current_power !== undefined ? String(slot.current_power) : "");
             setRuntimeExpanded((current) => !current);
@@ -1276,8 +1305,8 @@ function SkillSlotCard({
           调整技能威力
         </button>
         {runtimeExpanded ? (
-          <div className="mt-2 rounded-lg border bg-white p-2">
-            <div className="text-[11px] text-muted-foreground">
+          <div className="mt-2 rounded-lg border border-primary/15 bg-primary/5 p-2">
+            <div className="text-[10px] text-muted-foreground">
               手动填写后会优先参与理论伤害和伤害事件计算；留空并清除则回到技能基础威力。
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1350,7 +1379,7 @@ function SkillSlotCard({
 
 function DamagePreviewRefreshingNotice() {
   return (
-    <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-xs text-sky-700">
+    <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-[10px] text-sky-700">
       <span className="inline-flex items-center gap-2">
         <span className="h-2 w-2 animate-pulse rounded-full bg-sky-500" />
         理论伤害刷新中，暂时隐藏旧数值...
@@ -1368,7 +1397,7 @@ function SkillEffectPreviewPanel({
 }) {
   const displayDescription = description ?? originalDescriptionFromRawOperations(rawOperationsJson);
   return (
-    <div className="mt-2 rounded-lg border bg-slate-50 px-2 py-1.5 text-xs text-slate-800">
+    <div className="mt-2 rounded-lg border border-slate-200 bg-white/80 px-2 py-1.5 text-[10px] leading-5 text-slate-700 shadow-sm">
       {displayDescription ?? "暂无原始技能描述"}
     </div>
   );
@@ -1412,21 +1441,21 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
   const currentTarget = preview?.current_target ?? null;
 
   if (!preview || preview.status === "skill_definition_missing") {
-    return <div className="mt-2 text-xs text-muted-foreground">理论伤害 --</div>;
+    return <div className="mt-2 text-[10px] text-muted-foreground">理论伤害 --</div>;
   }
   if (preview.status === "not_attack_skill") {
-    return <div className="mt-2 text-xs text-muted-foreground">非攻击技能，暂无理论伤害</div>;
+    return <div className="mt-2 text-[10px] text-muted-foreground">非攻击技能，暂无理论伤害</div>;
   }
   if (!currentTarget) {
     return (
-      <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs text-muted-foreground">
+      <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] text-muted-foreground">
         理论伤害 --{preview.reason ? `（${preview.reason}）` : ""}
       </div>
     );
   }
 
   return (
-    <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
+    <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/40 px-2 py-1.5 text-[10px]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
@@ -1435,14 +1464,14 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
           setExpanded((value) => !value);
         }}
       >
-        <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1 text-emerald-800">
           {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-          <span>理论伤害</span>
+          <span className="font-medium">理论伤害</span>
         </span>
         <span className="font-semibold text-emerald-700">{damageTargetText(currentTarget)}</span>
       </button>
       {expanded ? (
-        <div className="mt-2 space-y-2 border-t pt-2">
+        <div className="mt-2 space-y-2 border-t border-emerald-100 pt-2">
           <div className="flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
             <span>{currentTarget.elf_name ?? compactEventValue(currentTarget.elf_id)}</span>
             <span>HP {currentTarget.defender_max_hp ?? "--"}</span>
@@ -1453,6 +1482,9 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
                 连击 {currentTarget.hit_count} 段
                 {currentTarget.hit_count_source ? `（${currentTarget.hit_count_source}）` : ""}
               </span>
+            ) : null}
+            {(currentTarget.effective_use_count ?? 1) > 1 ? (
+              <span>技能使用次数 {currentTarget.effective_use_count} 次</span>
             ) : null}
           </div>
           {currentTarget.unknown_factors?.length ? (
@@ -1474,7 +1506,7 @@ function SkillTeamDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
   if (targets.length <= 1) return null;
 
   return (
-    <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
+    <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
@@ -1511,6 +1543,13 @@ function damageTargetText(target: NonNullable<BattleSkillSlotDict["damage_previe
     return missing;
   }
   const percent = typeof target.damage_percent === "number" ? `${target.damage_percent}%` : "--";
+  const useCount = target.effective_use_count ?? 1;
+  if (useCount > 1) {
+    const effectivePercent = typeof target.effective_total_damage_percent === "number"
+      ? `${target.effective_total_damage_percent}%`
+      : percent;
+    return `${target.single_use_total_damage ?? target.damage_value ?? "--"}×${useCount}=${target.effective_total_damage ?? "--"} / ${effectivePercent}`;
+  }
   if ((target.hit_count ?? 1) > 1) {
     return `${target.single_damage ?? "--"}×${target.hit_count}=${target.total_damage ?? target.damage_value ?? "--"} / ${percent}`;
   }
@@ -1526,15 +1565,15 @@ function SkillPowerPreviewLine({
 }) {
   const [expanded, setExpanded] = useState(false);
   if (!preview || preview.status === "skill_definition_missing") {
-    return <div className="mt-2 text-xs text-muted-foreground">威力预览 --</div>;
+    return <div className="mt-2 text-[10px] text-muted-foreground">威力预览 --</div>;
   }
   if (preview.status === "no_power") {
-    return <div className="mt-2 text-xs text-muted-foreground">变化/状态技能，暂无威力</div>;
+    return <div className="mt-2 text-[10px] text-muted-foreground">变化/状态技能，暂无威力</div>;
   }
   const multipliers = preview.multipliers ?? {};
   const effectivePower = preview.effective_display_power_text ?? preview.effective_display_power ?? fallbackPower ?? "--";
   return (
-    <div className="mt-2 rounded-lg border bg-white px-2 py-1.5 text-xs">
+    <div className="mt-2 rounded-lg border border-violet-100 bg-violet-50/40 px-2 py-1.5 text-[10px]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
@@ -1543,14 +1582,14 @@ function SkillPowerPreviewLine({
           setExpanded((value) => !value);
         }}
       >
-        <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1 text-violet-800">
           {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-          <span>估算威力</span>
+          <span className="font-medium">估算威力</span>
         </span>
-        <span className="font-semibold text-emerald-700">{effectivePower}</span>
+        <span className="font-semibold text-violet-700">{effectivePower}</span>
       </button>
       {expanded ? (
-        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 border-t pt-2 text-muted-foreground">
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 border-t border-violet-100 pt-2 text-muted-foreground">
           <span>本系 x{multipliers.stab ?? "1"}</span>
           <span>攻防状态 x{multipliers.stat_stage ?? "1"}</span>
           <span>天气 x{multipliers.weather ?? "1"}</span>
@@ -1589,6 +1628,61 @@ function buildStaticSkillPreview(
       skill_power: "1",
     },
   };
+}
+
+function SkillSlotEffectBadges({ effects }: { effects: BattleEffectInstanceDict[] }) {
+  const activeEffects = effects.filter((effect) => effect.is_active !== false);
+  if (activeEffects.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+        特性
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {activeEffects.map((effect) => {
+          const name = typeof effect.effect_name === "string" && effect.effect_name
+            ? effect.effect_name
+            : effect.effect_id;
+          const layers = Number(effect.layers ?? 1);
+          const remaining = typeof effect.remaining_uses === "number"
+            ? `剩${effect.remaining_uses}次`
+            : "";
+          const layerText = Number.isFinite(layers) && layers !== 1 ? ` ×${layers}` : "";
+          const groupText = typeof effect.display_group === "string" && effect.display_group
+            ? effect.display_group
+            : "--";
+          const polarityText = typeof effect.polarity === "string" && effect.polarity
+            ? effect.polarity
+            : "--";
+          return (
+            <span
+              key={effect.instance_id}
+              className="group relative inline-flex"
+              tabIndex={0}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Badge
+                variant="outline"
+                className="border-indigo-200 bg-white px-1.5 py-0 text-[10px] text-indigo-700 shadow-sm"
+              >
+                {name}{layerText}{remaining ? ` · ${remaining}` : ""}
+              </Badge>
+              <span className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-64 rounded-lg border border-indigo-100 bg-white p-2 text-[10px] leading-5 text-slate-700 shadow-lg group-hover:block group-focus:block">
+                <span className="block font-semibold text-indigo-800">{name}{layerText}</span>
+                <span className="mt-1 block text-slate-600">状态ID：{effect.effect_id}</span>
+                <span className="block text-slate-600">层数：{Number.isFinite(layers) ? layers : "--"}</span>
+                <span className="block text-slate-600">分组：{groupText} · 极性：{polarityText}</span>
+                {remaining ? <span className="block text-slate-600">剩余使用：{effect.remaining_uses} 次</span> : null}
+                <span className="mt-1 block border-t border-indigo-50 pt-1 text-indigo-700">
+                  技能槽侧修正：绑定当前精灵的这个技能，通常在技能卡展示，不进入普通状态栏。
+                </span>
+              </span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function RuntimeFormControl({

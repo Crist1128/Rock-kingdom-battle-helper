@@ -408,6 +408,7 @@ export interface BattleSkillSlotDict {
   damage_rule_json?: string | null;
   hit_rule_json?: string | null;
   effect_operations_json?: string | null;
+  skill_slot_effects?: BattleEffectInstanceDict[];
   power_preview?: {
     status?: string;
     base_power?: number | null;
@@ -444,6 +445,10 @@ export interface SkillDamageTargetPreview {
   hit_count?: number | null;
   hit_count_source?: string | null;
   total_damage?: number | null;
+  single_use_total_damage?: number | null;
+  effective_use_count?: number | null;
+  effective_total_damage?: number | null;
+  effective_total_damage_percent?: number | null;
   hit_rule?: Record<string, unknown> | null;
   multipliers?: Record<string, unknown>;
 }
@@ -988,6 +993,7 @@ export interface ProjectDataBootstrapStatus {
   ready: boolean;
   checked_at: string;
   counts: Record<string, number>;
+  seed_rule_status?: Record<string, unknown>;
   missing_required: string[];
   local_cleaned_dir: string;
   local_package_ready: boolean;
@@ -1008,6 +1014,24 @@ export interface StaticSkillRuleSyncItem {
   has_effect_operations: boolean;
 }
 
+export interface StaticEffectDefinitionSyncItem {
+  effect_id: string;
+  effect_name?: string | null;
+  source_file?: string | null;
+  changed_fields: string[];
+  reason?: string | null;
+}
+
+export interface StaticEffectDefinitionSyncSummary {
+  sources: string[];
+  total_rows: number;
+  up_to_date_count: number;
+  pending_count: number;
+  pending_items: StaticEffectDefinitionSyncItem[];
+  pending_items_truncated: boolean;
+  errors: string[];
+}
+
 export interface StaticSkillRuleSyncRequest {
   /** 是否实际提交数据库事务；false 为 dry-run。 */
   commit?: boolean;
@@ -1024,13 +1048,22 @@ export interface StaticSkillRuleSyncResponse {
   status_counts: Record<string, number>;
   structured_total: number;
   up_to_date_count: number;
+  skill_up_to_date_count?: number;
+  effect_up_to_date_count?: number;
   pending_count: number;
+  pending_skill_count?: number;
+  pending_effect_count?: number;
   pending_items: StaticSkillRuleSyncItem[];
   pending_items_truncated: boolean;
+  effect_definition_sync?: StaticEffectDefinitionSyncSummary | null;
+  effect_pending_items?: StaticEffectDefinitionSyncItem[];
   missing_skills: Array<Record<string, unknown>>;
   errors: string[];
   applied_skill_ids: string[];
+  applied_effect_ids?: string[];
   applied_count: number;
+  applied_skill_count?: number;
+  applied_effect_count?: number;
   transaction: string;
 }
 

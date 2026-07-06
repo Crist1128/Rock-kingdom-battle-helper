@@ -38,6 +38,7 @@ MINIMAL_EXECUTABLE_HOOKS = {
 EXECUTABLE_WHEN_MARKED_HOOKS = {
     "persistent_skill_cost_modifier",
     "persistent_skill_power_modifier",
+    "persistent_skill_use_count_modifier",
 }
 
 

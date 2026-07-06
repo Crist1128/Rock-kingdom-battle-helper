@@ -74,6 +74,26 @@ JSON_FIELDS = {
     "resource_modifier_json",
 }
 
+DEFAULT_FIELD_VALUES: dict[str, Any] = {
+    "display_priority": 0,
+    "is_visible_icon": True,
+    "is_recognizable_by_icon": False,
+    "default_layers": 1,
+    "stack_rule": "replace",
+    "duration_type": "until_removed",
+    "clear_on_switch": False,
+    "clear_by_abnormal_cleanse": False,
+    "clear_by_stat_clear": False,
+    "clear_by_mark_clear": False,
+    "clear_by_weather_replace": False,
+    "clear_by_skill_specific": False,
+    "can_be_transferred": False,
+    "can_be_converted": False,
+    "can_be_inherited": False,
+    "can_be_stolen": False,
+    "can_be_doubled": False,
+}
+
 REQUIRED_FIELDS = {
     "effect_id",
     "effect_name",
@@ -206,6 +226,8 @@ def get_effect_definition_status(db: Session) -> dict[str, Any]:
 
 def _normalize_field(field: str, value: Any) -> Any:
     """把 JSON 字段统一序列化为数据库中的 TEXT(JSON)。"""
+    if value is None and field in DEFAULT_FIELD_VALUES:
+        return DEFAULT_FIELD_VALUES[field]
     if field in JSON_FIELDS and value is not None and not isinstance(value, str):
         return dumps_json(value)
     return value

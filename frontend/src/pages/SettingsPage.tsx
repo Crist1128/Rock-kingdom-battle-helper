@@ -274,6 +274,13 @@ export function SettingsPage() {
   const bulkError = getApiErrorText(bulkPurgeMutation.error);
   const singleError = getApiErrorText(singlePurgeMutation.error);
   const syncLimitedRefreshCommitBlocked = syncUpdateMode === "full" && toNumber(syncLimit, 0) > 0;
+  const pendingStaticRuleSkillCount = lastStaticRuleResult?.pending_skill_count ?? 0;
+  const pendingStaticRuleEffectCount = lastStaticRuleResult?.pending_effect_count ?? 0;
+  const canSyncSelectedStaticRules =
+    selectedStaticRuleSkillIds.length > 0
+    || (pendingStaticRuleSkillCount === 0 && pendingStaticRuleEffectCount > 0);
+  const selectedStaticRulePayload =
+    selectedStaticRuleSkillIds.length > 0 ? selectedStaticRuleSkillIds : null;
 
   return (
     <div className="space-y-6">
@@ -511,7 +518,7 @@ export function SettingsPage() {
               <h3 className="font-semibold">3. 同步已完备技能分支规则</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 只检查 seed 中 review_status = structured 且没有结构缺口的技能。默认先列出还没写入数据库或与 seed 不一致的规则，
-                你可以勾选后 dry-run 或提交写库。
+                你可以勾选后 dry-run 或提交写库；项目状态定义 seed 会随任意同步操作一起 dry-run/写库，不需要单独勾选。
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -545,39 +552,39 @@ export function SettingsPage() {
                 onClick={() =>
                   staticRuleSyncMutation.mutate({
                     commit: false,
-                    skillIds: selectedStaticRuleSkillIds,
+                    skillIds: selectedStaticRulePayload,
                   })
                 }
                 disabled={
-                  staticRuleSyncMutation.isPending || selectedStaticRuleSkillIds.length === 0
+                  staticRuleSyncMutation.isPending || !canSyncSelectedStaticRules
                 }
               >
-                预检查选中规则（dry-run）
+                预检查选中规则 / 状态定义（dry-run）
               </Button>
               <Button
                 onClick={() => {
                   if (
                     window.confirm(
-                      `确认写入 ${selectedStaticRuleSkillIds.length} 条已选 structured 技能规则？建议先 dry-run。`,
+                      `确认写入 ${selectedStaticRuleSkillIds.length} 条已选 structured 技能规则，并同步待更新状态定义？建议先 dry-run。`,
                     )
                   ) {
                     staticRuleSyncMutation.mutate({
                       commit: true,
-                      skillIds: selectedStaticRuleSkillIds,
+                      skillIds: selectedStaticRulePayload,
                     });
                   }
                 }}
                 disabled={
-                  staticRuleSyncMutation.isPending || selectedStaticRuleSkillIds.length === 0
+                  staticRuleSyncMutation.isPending || !canSyncSelectedStaticRules
                 }
               >
-                写入选中规则
+                写入选中规则 / 状态定义
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => {
                   const scopeText = staticRuleSearch.trim() ? `当前筛选“${staticRuleSearch.trim()}”下的` : "所有";
-                  if (window.confirm(`确认写入${scopeText}待同步 structured 技能规则？建议先查看列表。`)) {
+                  if (window.confirm(`确认写入${scopeText}待同步 structured 技能规则，并同步待更新状态定义？建议先查看列表。`)) {
                     staticRuleSyncMutation.mutate({ commit: true, skillIds: null });
                   }
                 }}
@@ -978,9 +985,31 @@ function StaticSkillRuleSyncPanel({
         {result.query ? ` · 筛选：${result.query}` : ""}
       </div>
       {result.errors.length ? <ErrorBox text={result.errors.join("\n")} /> : null}
-      {result.applied_skill_ids.length ? (
+      {result.applied_skill_ids.length || result.applied_effect_ids?.length ? (
         <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          已处理技能：{result.applied_skill_ids.join("、")}
+          {result.applied_skill_ids.length ? <div>已处理技能：{result.applied_skill_ids.join("、")}</div> : null}
+          {result.applied_effect_ids?.length ? <div>已处理状态定义：{result.applied_effect_ids.join("、")}</div> : null}
+        </div>
+      ) : null}
+
+      {result.effect_pending_items?.length ? (
+        <div className="mt-4 rounded-xl border bg-white p-3 text-sm">
+          <div className="font-medium">待同步状态定义</div>
+          <div className="mt-2 max-h-48 space-y-2 overflow-auto">
+            {result.effect_pending_items.map((item) => (
+              <div key={item.effect_id} className="rounded-lg border bg-slate-50 p-2">
+                <span className="font-medium">{item.effect_name ?? item.effect_id}</span>
+                <span className="ml-2 font-mono text-xs text-muted-foreground">{item.effect_id}</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {item.source_file ? `来源：${item.source_file} · ` : ""}
+                  变更字段：{item.changed_fields.join("、")}
+                </span>
+              </div>
+            ))}
+          </div>
+          {result.effect_definition_sync?.pending_items_truncated ? (
+            <div className="mt-2 text-xs text-muted-foreground">状态定义列表已截断，请提高列表上限查看更多。</div>
+          ) : null}
         </div>
       ) : null}
       {result.pending_items.length ? (

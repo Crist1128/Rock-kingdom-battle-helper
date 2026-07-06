@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.enums import BattleEventType, EventSource, OwnerScope
-from app.models.battle import Battle
+from app.models.battle import Battle, BattleSkillSlot
 from app.models.effect import BattleEffectInstance
 from app.models.event import BattleEvent, EffectChangeEvent
 from app.models.static import EffectDefinition
@@ -193,21 +193,41 @@ class BattleEffectService:
         """
         处理精灵切换时的状态清除/保留。
 
-        只处理 owner_scope=elf 且挂在离场精灵身上的状态。队伍侧、战场、技能槽
-        状态不会因精灵切换被这个流程清除。
+        处理 owner_scope=elf 且挂在离场精灵身上的状态；同时清理挂在该精灵
+        技能槽上且标记 clear_on_switch 的状态。
+        队伍侧、战场状态不会因精灵切换被这个流程清除。
         """
+        leaving_slot_ids = set(
+            self.db.scalars(
+                select(BattleSkillSlot.slot_id).where(
+                    BattleSkillSlot.battle_id == battle_id,
+                    BattleSkillSlot.side == side,
+                    BattleSkillSlot.elf_id == leaving_elf_id,
+                )
+            ).all()
+        )
         instances = self.db.scalars(
             select(BattleEffectInstance).where(
                 BattleEffectInstance.battle_id == battle_id,
-                BattleEffectInstance.owner_scope == OwnerScope.ELF.value,
                 BattleEffectInstance.owner_side == side,
-                BattleEffectInstance.owner_elf_id == leaving_elf_id,
                 BattleEffectInstance.is_active.is_(True),
             )
         ).all()
         events: list[EffectChangeEvent] = []
         for instance in instances:
+            is_leaving_elf_effect = (
+                instance.owner_scope == OwnerScope.ELF.value
+                and instance.owner_elf_id == leaving_elf_id
+            )
+            is_leaving_skill_slot_effect = (
+                instance.owner_scope == OwnerScope.SKILL_SLOT.value
+                and instance.owner_skill_slot_id in leaving_slot_ids
+            )
+            if not is_leaving_elf_effect and not is_leaving_skill_slot_effect:
+                continue
             definition = self._require_definition(instance.effect_id)
+            if is_leaving_skill_slot_effect and not definition.clear_on_switch:
+                continue
             if definition.clear_on_switch:
                 change_type = "switch_clear"
                 layers_after = 0

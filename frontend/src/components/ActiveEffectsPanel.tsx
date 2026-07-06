@@ -26,7 +26,10 @@ export function ActiveEffectsPanel({
 }) {
   const queryClient = useQueryClient();
   const [clearLayersByInstance, setClearLayersByInstance] = useState<Record<string, number>>({});
-  const { data: definitions = [] } = useQuery({ queryKey: ["effects", "all"], queryFn: () => api.effects.list({ limit: 500 }) });
+  const { data: definitions = [] } = useQuery({
+    queryKey: ["effects", "all"],
+    queryFn: () => api.effects.list({ limit: 500 }),
+  });
   const removeMutation = useMutation({
     mutationFn: (instanceId: string) => api.effects.remove(instanceId, { reason: "manual_remove" }),
     onSuccess: () => {
@@ -63,6 +66,7 @@ export function ActiveEffectsPanel({
     },
   });
   const defById = Object.fromEntries(definitions.map((item) => [item.effect_id, item]));
+  const hiddenSkillSlotCount = effects.filter((effect) => effect.owner_scope === "skill_slot").length;
 
   const groups: EffectGroup[] = [
     {
@@ -77,27 +81,21 @@ export function ActiveEffectsPanel({
     },
     {
       key: "side:self",
-      label: "我方队伍侧/印记",
+      label: "我方队伍侧 / 印记",
       match: (e) => e.owner_scope === "side" && e.owner_side === "self",
     },
     {
       key: "side:enemy",
-      label: "敌方队伍侧/印记",
+      label: "敌方队伍侧 / 印记",
       match: (e) => e.owner_scope === "side" && e.owner_side === "enemy",
     },
     {
       key: "side:unknown",
-      label: "未指定队伍侧/印记",
+      label: "未指定队伍侧 / 印记",
       match: (e) => e.owner_scope === "side" && !e.owner_side,
       hideWhenEmpty: true,
     },
-    { key: "field", label: "天气/战场", match: (e) => e.owner_scope === "field" },
-    {
-      key: "skill_slot",
-      label: "技能槽（高级）",
-      match: (e) => e.owner_scope === "skill_slot",
-      hideWhenEmpty: true,
-    },
+    { key: "field", label: "天气 / 战场", match: (e) => e.owner_scope === "field" },
     {
       key: "turn",
       label: "回合临时（高级）",
@@ -108,6 +106,11 @@ export function ActiveEffectsPanel({
 
   return (
     <div className="space-y-3">
+      {hiddenSkillSlotCount > 0 ? (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-sky-800">
+          有 {hiddenSkillSlotCount} 个技能槽侧修正已移到对应技能卡展示，不再混入普通状态栏。
+        </div>
+      ) : null}
       {groups.map((group) => {
         const items = effects.filter(group.match);
         if (group.hideWhenEmpty && items.length === 0) return null;
@@ -126,7 +129,9 @@ export function ActiveEffectsPanel({
                   <div key={effect.instance_id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-2 text-xs">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">{summary.displayName ?? def?.effect_name ?? effect.effect_id}</div>
-                      <div className="text-muted-foreground">{effectCategoryName(def?.category ?? effect.category)} · {ownerScopeName(effect.owner_scope)} · {effect.owner_side ? sideName(effect.owner_side) : "战场"} · {effect.owner_elf_id ?? effect.field_id ?? effect.owner_skill_slot_id ?? "--"}</div>
+                      <div className="text-muted-foreground">
+                        {effectCategoryName(def?.category ?? effect.category)} / {ownerScopeName(effect.owner_scope)} / {effect.owner_side ? sideName(effect.owner_side) : "战场"} / {effect.owner_elf_id ?? effect.field_id ?? "--"}
+                      </div>
                       {summary.finalTexts.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {summary.finalTexts.map((text) => (
@@ -173,7 +178,9 @@ export function ActiveEffectsPanel({
                         size="sm"
                         disabled={removeMutation.isPending}
                         onClick={() => removeMutation.mutate(effect.instance_id)}
-                      >移除</Button>
+                      >
+                        移除
+                      </Button>
                     </div>
                   </div>
                 );

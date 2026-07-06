@@ -182,6 +182,12 @@ def _damage_rule_with_review(skill: SkillDefinition, row: dict[str, Any]) -> str
         existing = loads_json(skill.damage_rule_json, {})
         rule = existing if isinstance(existing, dict) else {}
 
+    existing_manual_review = rule.get("manual_review") if isinstance(rule, dict) else None
+    nested_future_hooks = (
+        existing_manual_review.get("future_hooks")
+        if isinstance(existing_manual_review, dict)
+        else None
+    )
     rule["manual_review"] = {
         "status": row["review_status"],
         "notes": row.get("review_notes"),
@@ -197,6 +203,10 @@ def _damage_rule_with_review(skill: SkillDefinition, row: dict[str, Any]) -> str
     if isinstance(future_hooks, list) and future_hooks:
         rule["manual_review"]["future_hooks"] = [
             item for item in future_hooks if isinstance(item, dict)
+        ]
+    elif isinstance(nested_future_hooks, list) and nested_future_hooks:
+        rule["manual_review"]["future_hooks"] = [
+            item for item in nested_future_hooks if isinstance(item, dict)
         ]
     return dumps_json(rule)
 

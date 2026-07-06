@@ -33,6 +33,7 @@ from app.data_pipeline.skill_rule_reviews.importer import (
     import_skill_rule_reviews,
     read_review_rows,
 )
+from app.data_pipeline.static_rule_sync import check_effect_definition_seed_sync
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
 from app.models.static import (
@@ -595,6 +596,7 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
             "type_effectiveness_rules": _table_count(db, TypeEffectivenessRule),
             "effects": _table_count(db, EffectDefinition),
         }
+        seed_rule_status = check_effect_definition_seed_sync(db, limit=20)
     finally:
         db.close()
 
@@ -604,7 +606,10 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
         and counts["learnable_skills"] > 0
         and counts["type_effectiveness_rules"] > 0
     )
-    has_project_rules = counts["effects"] > 0
+    has_project_rules = (
+        counts["effects"] > 0
+        and int(seed_rule_status.get("pending_count") or 0) == 0
+    )
     local_package_ready = all(item["exists"] for item in cleaned_files)
     seed_files_ready = all(item["exists"] for item in seed_files)
     ready = has_static_data and has_project_rules
@@ -624,6 +629,16 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
         "ready": ready,
         "checked_at": utc_now_iso(),
         "counts": counts,
+        "seed_rule_status": {
+            "effect_pending_count": seed_rule_status.get("pending_count", 0),
+            "effect_up_to_date_count": seed_rule_status.get("up_to_date_count", 0),
+            "effect_pending_items": seed_rule_status.get("pending_items", []),
+            "effect_pending_items_truncated": seed_rule_status.get(
+                "pending_items_truncated",
+                False,
+            ),
+            "errors": seed_rule_status.get("errors", []),
+        },
         "missing_required": missing_required,
         "local_cleaned_dir": str(cleaned_path.resolve()),
         "local_package_ready": local_package_ready,

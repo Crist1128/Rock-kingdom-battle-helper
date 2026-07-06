@@ -1238,7 +1238,7 @@
     "skill_id": "rocom_skill_5656feeb59",
     "skill_name": "力量增效",
     "review_status": "structured",
-    "review_notes": "自己获得物攻+100%，使用既有 P0 状态定义。",
+    "review_notes": "自己获得物攻+100%，使用既有状态定义。",
     "clear_damage_rule": true,
     "hit_rule": null,
     "effect_operations": [
@@ -6946,8 +6946,8 @@
   {
     "skill_id": "rocom_skill_effcad40dc",
     "skill_name": "电磁偏转",
-    "review_status": "partial",
-    "review_notes": "Manual review: confirmed base or executable part has been recorded; unsupported mechanics are preserved in future_hooks and structure_gaps.",
+    "review_status": "structured",
+    "review_notes": "减伤70%；应对攻击成功时，自己获得精灵侧“技能使用次数”1层，用于下次使用任意技能等效多使用1次。",
     "reviewed_at": "2026-06-12",
     "damage_rule": {
       "status": "parsed_defense_reduction",
@@ -6962,19 +6962,20 @@
       "source": "manual_review_20260612_02"
     },
     "hit_rule": null,
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "next_turn_selected_skill_use_count_modifier",
-        "status": "reserved",
-        "count_delta": 1,
-        "trigger": "response_attack_success"
+        "op_type": "apply_effect",
+        "target": "actor_side",
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "effect_id": "effect_skill_use_count_up_switch_clear",
+        "layers": 1,
+        "remaining_uses": 1,
+        "notes": "应对攻击成功：自己获得技能使用次数+1；该状态挂当前精灵，下次使用任意技能后消耗，切换清除。"
       }
     ],
-    "structure_gaps": [
-      "skill_use_count_modifier",
-      "next_turn_selected_skill_context"
-    ]
+    "future_hooks": [],
+    "structure_gaps": []
   },
   {
     "skill_id": "rocom_skill_b4c8cd2b16",
@@ -9836,13 +9837,16 @@
         "hook_type": "next_turn_selected_skill_use_count_modifier",
         "status": "reserved",
         "target": "actor_side",
-        "count_delta": 1
+        "count_delta": 1,
+        "effect_id": "effect_skill_use_count_up_switch_clear",
+        "owner_scope": "elf",
+        "remaining_uses": 1,
+        "notes": "机制落地时应施加精灵侧技能使用次数状态，而不是技能槽状态。"
       }
     ],
     "structure_gaps": [
       "return_to_bench_operation",
-      "next_turn_selected_skill_context",
-      "skill_use_count_modifier"
+      "next_turn_selected_skill_context"
     ]
   },
   {
