@@ -347,6 +347,24 @@ class BattleService:
         self.db.add(event)
         self.db.flush()
 
+        pending_switch_results = self._apply_pending_next_switch_in_effects(
+            battle_event=event,
+            side=payload.side,
+            old_elf_id=old_elf_id,
+            new_elf_id=payload.elf_id,
+        )
+        if pending_switch_results:
+            event_payload["pending_next_switch_in_results"] = pending_switch_results
+            event.payload_json = dumps_json(event_payload)
+        switch_out_skill_runtime_results = self._apply_switch_out_skill_runtime_hooks(
+            battle_event=event,
+            side=payload.side,
+            old_elf_id=old_elf_id,
+        )
+        if switch_out_skill_runtime_results:
+            event_payload["switch_out_skill_runtime_results"] = switch_out_skill_runtime_results
+            event.payload_json = dumps_json(event_payload)
+
         if old_elf_id is not None:
             BattleEffectService(self.db).switch_clear_effects(
                 battle_id=battle_id,
@@ -375,6 +393,422 @@ class BattleService:
         self.db.commit()
         self.db.refresh(battle)
         return battle
+
+    def _apply_pending_next_switch_in_effects(
+        self,
+        *,
+        battle_event: BattleEvent,
+        side: str,
+        old_elf_id: str | None,
+        new_elf_id: str,
+    ) -> list[dict[str, Any]]:
+        """执行由上一技能登记的“下一只入场精灵”效果。"""
+        if old_elf_id is None:
+            return []
+        source_events = self.db.scalars(
+            select(BattleEvent)
+            .where(
+                BattleEvent.battle_id == battle_event.battle_id,
+                BattleEvent.event_type == BattleEventType.SKILL_USE.value,
+                BattleEvent.actor_side == side,
+                BattleEvent.actor_elf_id == old_elf_id,
+                BattleEvent.is_voided.is_(False),
+            )
+            .order_by(
+                BattleEvent.turn_number.desc(),
+                BattleEvent.action_order.desc().nullslast(),
+                BattleEvent.created_at.desc(),
+            )
+        ).all()
+        results: list[dict[str, Any]] = []
+        for source_event in source_events:
+            payload = loads_json(source_event.payload_json, {})
+            if not isinstance(payload, dict):
+                continue
+            pending = payload.get("pending_next_switch_in")
+            if not isinstance(pending, list):
+                continue
+            changed_payload = False
+            for item in pending:
+                if not isinstance(item, dict) or item.get("consumed_by_switch_event_id"):
+                    continue
+                if item.get("source_side") not in {None, side}:
+                    continue
+                if item.get("source_elf_id") not in {None, old_elf_id}:
+                    continue
+                effect_type = item.get("effect_type")
+                if effect_type == "inherit_positive_elf_effects":
+                    result = self._inherit_positive_elf_effects_on_switch(
+                        battle_event=battle_event,
+                        side=side,
+                        old_elf_id=old_elf_id,
+                        new_elf_id=new_elf_id,
+                    )
+                elif effect_type == "resource_change":
+                    result = self._apply_switch_in_resource_change(
+                        battle_event=battle_event,
+                        side=side,
+                        new_elf_id=new_elf_id,
+                        pending=item,
+                    )
+                elif effect_type == "force_switch":
+                    result = {
+                        "status": "recorded",
+                        "effect_type": "force_switch",
+                        "switch_mode": item.get("switch_mode"),
+                    }
+                else:
+                    result = {"status": "skipped", "reason": "unsupported_pending_effect"}
+                result["source_event_id"] = source_event.event_id
+                results.append(result)
+                item["consumed_by_switch_event_id"] = battle_event.event_id
+                changed_payload = True
+            if changed_payload:
+                source_event.payload_json = dumps_json(payload)
+        return results
+
+    def _inherit_positive_elf_effects_on_switch(
+        self,
+        *,
+        battle_event: BattleEvent,
+        side: str,
+        old_elf_id: str,
+        new_elf_id: str,
+    ) -> dict[str, Any]:
+        """击鼓传花：把离场精灵的正面 elf 状态复制给入场精灵。"""
+        if old_elf_id == new_elf_id:
+            return {
+                "status": "skipped",
+                "effect_type": "inherit_positive_elf_effects",
+                "reason": "same_elf_return_to_field",
+            }
+        definitions = {
+            item.effect_id: item
+            for item in self.db.scalars(
+                select(EffectDefinition).where(EffectDefinition.deleted_at.is_(None))
+            ).all()
+        }
+        inherited: list[dict[str, Any]] = []
+        instances = self.db.scalars(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == battle_event.battle_id,
+                BattleEffectInstance.owner_scope == "elf",
+                BattleEffectInstance.owner_side == side,
+                BattleEffectInstance.owner_elf_id == old_elf_id,
+                BattleEffectInstance.is_active.is_(True),
+            )
+        ).all()
+        for source_instance in instances:
+            definition = definitions.get(source_instance.effect_id)
+            if definition is None or definition.polarity != "positive":
+                continue
+            layers = max(int(source_instance.layers or 0), 0)
+            if layers <= 0:
+                continue
+            target_instance = self.db.scalars(
+                select(BattleEffectInstance).where(
+                    BattleEffectInstance.battle_id == battle_event.battle_id,
+                    BattleEffectInstance.effect_id == source_instance.effect_id,
+                    BattleEffectInstance.owner_scope == "elf",
+                    BattleEffectInstance.owner_side == side,
+                    BattleEffectInstance.owner_elf_id == new_elf_id,
+                    BattleEffectInstance.is_active.is_(True),
+                )
+            ).first()
+            if target_instance is None:
+                target_instance = BattleEffectInstance(
+                    instance_id=f"effect_instance_{uuid4().hex}",
+                    battle_id=battle_event.battle_id,
+                    effect_id=source_instance.effect_id,
+                    category=source_instance.category,
+                    owner_scope="elf",
+                    owner_side=side,
+                    owner_elf_id=new_elf_id,
+                    source_side=source_instance.source_side,
+                    source_elf_id=source_instance.source_elf_id,
+                    source_skill_id=source_instance.source_skill_id,
+                    source_event_id=battle_event.event_id,
+                    layers=layers,
+                    remaining_turns=source_instance.remaining_turns,
+                    remaining_uses=source_instance.remaining_uses,
+                    is_active=True,
+                    applied_turn=battle_event.turn_number,
+                    expire_turn=source_instance.expire_turn,
+                    last_updated_turn=battle_event.turn_number,
+                    recognition_source=EventSource.SYSTEM_CALCULATED.value,
+                    recognition_confidence=1.0,
+                    manual_override=False,
+                    notes="pending_switch_inherit_positive_effects",
+                )
+                self.db.add(target_instance)
+                layers_before = None
+                change_type = "inherit"
+            else:
+                layers_before = target_instance.layers
+                next_layers = target_instance.layers + layers
+                if definition.max_layers is not None:
+                    next_layers = min(next_layers, definition.max_layers)
+                target_instance.layers = next_layers
+                target_instance.last_updated_turn = battle_event.turn_number
+                change_type = "stack"
+            self.db.flush()
+            self.db.add(
+                EffectChangeEvent(
+                    event_id=f"effect_change_{uuid4().hex}",
+                    battle_id=battle_event.battle_id,
+                    battle_event_id=battle_event.event_id,
+                    turn_number=battle_event.turn_number,
+                    change_type=change_type,
+                    effect_instance_id=target_instance.instance_id,
+                    effect_id=definition.effect_id,
+                    effect_name=definition.effect_name,
+                    category=definition.category,
+                    target_side=side,
+                    target_elf_id=new_elf_id,
+                    owner_scope="elf",
+                    layers_before=layers_before,
+                    layers_after=target_instance.layers,
+                    duration_before=None,
+                    duration_after=target_instance.remaining_turns,
+                    source_skill_id=battle_event.skill_id,
+                    source_elf_id=old_elf_id,
+                    condition_branch="pending_next_switch_in",
+                    reason="switch_inherit_positive_effects",
+                    source=EventSource.SYSTEM_CALCULATED.value,
+                    recognition_confidence=1.0,
+                    manual_override=False,
+                )
+            )
+            inherited.append(
+                {
+                    "effect_id": definition.effect_id,
+                    "effect_name": definition.effect_name,
+                    "source_instance_id": source_instance.instance_id,
+                    "target_instance_id": target_instance.instance_id,
+                    "layers": layers,
+                    "layers_after": target_instance.layers,
+                }
+            )
+        return {
+            "status": "executed" if inherited else "skipped",
+            "effect_type": "inherit_positive_elf_effects",
+            "reason": None if inherited else "no_positive_elf_effects",
+            "inherited": inherited,
+        }
+
+    def _apply_switch_in_resource_change(
+        self,
+        *,
+        battle_event: BattleEvent,
+        side: str,
+        new_elf_id: str,
+        pending: dict[str, Any],
+    ) -> dict[str, Any]:
+        """切换入场资源变化，目前用于加大功率给新入场精灵回能。"""
+        state = self.db.scalars(
+            select(BattleElfState).where(
+                BattleElfState.battle_id == battle_event.battle_id,
+                BattleElfState.side == side,
+                BattleElfState.elf_id == new_elf_id,
+            )
+        ).first()
+        if state is None:
+            return {
+                "status": "skipped",
+                "effect_type": "resource_change",
+                "reason": "state_missing",
+            }
+        resource_type = str(pending.get("resource_type") or "energy")
+        change_type = str(pending.get("change_type") or "gain")
+        value = int(pending.get("value") or 0)
+        max_value = pending.get("max_value")
+        try:
+            max_value_int = int(max_value) if max_value is not None else None
+        except (TypeError, ValueError):
+            max_value_int = None
+        if resource_type != "energy":
+            return {
+                "status": "skipped",
+                "effect_type": "resource_change",
+                "reason": "unsupported_resource_type",
+            }
+        before = state.energy
+        if before is None:
+            return {
+                "status": "skipped",
+                "effect_type": "resource_change",
+                "reason": "energy_missing",
+            }
+        if change_type in {"gain", "heal", "recover"}:
+            state.energy = int(before + value)
+        elif change_type in {"consume", "lose", "damage"}:
+            state.energy = max(int(before - value), 0)
+        elif change_type == "manual_set":
+            state.energy = max(value, 0)
+        if max_value_int is not None:
+            state.energy = min(state.energy, max_value_int)
+        event = ResourceChangeEvent(
+            event_id=f"resource_event_{uuid4().hex}",
+            battle_id=battle_event.battle_id,
+            battle_event_id=battle_event.event_id,
+            resource_type=resource_type,
+            change_type=change_type,
+            source_side=battle_event.actor_side,
+            source_elf_id=battle_event.actor_elf_id,
+            target_side=side,
+            target_elf_id=new_elf_id,
+            value_type=str(pending.get("value_type") or "value"),
+            value=float(value),
+            before_value=float(before),
+            after_value=float(state.energy),
+            confidence=1.0,
+            manual_override=False,
+        )
+        self.db.add(event)
+        self.db.flush()
+        return {
+            "status": "executed",
+            "effect_type": "resource_change",
+            "resource_type": resource_type,
+            "change_type": change_type,
+            "target_side": side,
+            "target_elf_id": new_elf_id,
+            "value": value,
+            "before_value": before,
+            "after_value": state.energy,
+            "resource_event_id": event.event_id,
+        }
+
+    def _apply_switch_out_skill_runtime_hooks(
+        self,
+        *,
+        battle_event: BattleEvent,
+        side: str,
+        old_elf_id: str | None,
+    ) -> list[dict[str, Any]]:
+        """处理精灵离场时的技能槽持久修正。"""
+        if old_elf_id is None:
+            return []
+        effect_id = "effect_skill_slot_use_count_up_persistent"
+        definition = self.db.get(EffectDefinition, effect_id)
+        if definition is None or definition.deleted_at is not None:
+            return []
+        slots = self.db.scalars(
+            select(BattleSkillSlot).where(
+                BattleSkillSlot.battle_id == battle_event.battle_id,
+                BattleSkillSlot.side == side,
+                BattleSkillSlot.elf_id == old_elf_id,
+            )
+        ).all()
+        results: list[dict[str, Any]] = []
+        for slot in slots:
+            skill = self.db.get(SkillDefinition, slot.skill_id)
+            if skill is None or skill.deleted_at is not None:
+                continue
+            rule = loads_json(skill.damage_rule_json, {})
+            manual_review = rule.get("manual_review") if isinstance(rule, dict) else None
+            hooks = manual_review.get("future_hooks") if isinstance(manual_review, dict) else None
+            if not isinstance(hooks, list):
+                continue
+            for hook in hooks:
+                if not isinstance(hook, dict):
+                    continue
+                if hook.get("status") != "executable":
+                    continue
+                if hook.get("trigger") != "switch_out":
+                    continue
+                if hook.get("hook_type") != "persistent_skill_use_count_modifier":
+                    continue
+                delta = int(hook.get("use_count_delta") or 0)
+                if delta <= 0:
+                    continue
+                existing = self.db.scalars(
+                    select(BattleEffectInstance).where(
+                        BattleEffectInstance.battle_id == battle_event.battle_id,
+                        BattleEffectInstance.effect_id == effect_id,
+                        BattleEffectInstance.owner_scope == "skill_slot",
+                        BattleEffectInstance.owner_skill_slot_id == slot.slot_id,
+                        BattleEffectInstance.is_active.is_(True),
+                    )
+                ).first()
+                if existing is None:
+                    instance = BattleEffectInstance(
+                        instance_id=f"effect_instance_{uuid4().hex}",
+                        battle_id=battle_event.battle_id,
+                        effect_id=effect_id,
+                        category=definition.category,
+                        owner_scope="skill_slot",
+                        owner_side=side,
+                        owner_elf_id=old_elf_id,
+                        owner_skill_slot_id=slot.slot_id,
+                        source_side=side,
+                        source_elf_id=old_elf_id,
+                        source_skill_id=skill.skill_id,
+                        source_event_id=battle_event.event_id,
+                        layers=delta,
+                        remaining_turns=None,
+                        remaining_uses=None,
+                        is_active=True,
+                        applied_turn=battle_event.turn_number,
+                        expire_turn=None,
+                        last_updated_turn=battle_event.turn_number,
+                        recognition_source=EventSource.SYSTEM_CALCULATED.value,
+                        recognition_confidence=1.0,
+                        manual_override=False,
+                        notes="switch_out_persistent_skill_use_count_modifier",
+                    )
+                    self.db.add(instance)
+                    layers_before = None
+                    change_type = "apply"
+                else:
+                    instance = existing
+                    layers_before = existing.layers
+                    instance.layers += delta
+                    instance.last_updated_turn = battle_event.turn_number
+                    change_type = "stack"
+                self.db.flush()
+                self.db.add(
+                    EffectChangeEvent(
+                        event_id=f"effect_change_{uuid4().hex}",
+                        battle_id=battle_event.battle_id,
+                        battle_event_id=battle_event.event_id,
+                        turn_number=battle_event.turn_number,
+                        change_type=change_type,
+                        effect_instance_id=instance.instance_id,
+                        effect_id=effect_id,
+                        effect_name=definition.effect_name,
+                        category=definition.category,
+                        target_side=side,
+                        target_elf_id=old_elf_id,
+                        target_skill_slot_id=slot.slot_id,
+                        owner_scope="skill_slot",
+                        layers_before=layers_before,
+                        layers_after=instance.layers,
+                        duration_before=None,
+                        duration_after=None,
+                        source_skill_id=skill.skill_id,
+                        source_elf_id=old_elf_id,
+                        condition_branch="switch_out",
+                        reason="switch_out_skill_use_count_modifier",
+                        source=EventSource.SYSTEM_CALCULATED.value,
+                        recognition_confidence=1.0,
+                        manual_override=False,
+                    )
+                )
+                results.append(
+                    {
+                        "status": "executed",
+                        "hook_type": "persistent_skill_use_count_modifier",
+                        "trigger": "switch_out",
+                        "skill_id": skill.skill_id,
+                        "slot_id": slot.slot_id,
+                        "effect_id": effect_id,
+                        "use_count_delta": delta,
+                        "layers_before": layers_before,
+                        "layers_after": instance.layers,
+                    }
+                )
+        return results
 
     def change_runtime_form(
         self,
@@ -1460,6 +1894,7 @@ class BattleService:
         flat_power_bonus = Decimal("0")
         hit_count_delta = 0
         hit_count_multiplier = Decimal("1")
+        use_count_delta = 0
         energy_cost_delta = 0
         items: list[dict[str, Any]] = []
         for item in snapshot_payload:
@@ -1509,6 +1944,15 @@ class BattleService:
                 item_hit_count_multiplier = Decimal("0")
             hit_count_multiplier *= item_hit_count_multiplier
 
+            item_use_count_delta = 0
+            if rule.get("use_count_delta") is not None:
+                item_use_count_delta += int(rule["use_count_delta"])
+            if rule.get("use_count_delta_per_layer") is not None:
+                item_use_count_delta += int(
+                    Decimal(str(rule["use_count_delta_per_layer"])) * layers
+                )
+            use_count_delta += item_use_count_delta
+
             item_energy_cost_delta = 0
             if rule.get("energy_cost_delta") is not None:
                 item_energy_cost_delta += int(rule["energy_cost_delta"])
@@ -1524,6 +1968,7 @@ class BattleService:
                 and item_power_add == 0
                 and item_hit_count_delta == 0
                 and item_hit_count_multiplier == 1
+                and item_use_count_delta == 0
                 and item_energy_cost_delta == 0
             ):
                 continue
@@ -1541,6 +1986,7 @@ class BattleService:
                     "power_add": str(item_power_add),
                     "hit_count_delta": item_hit_count_delta,
                     "hit_count_multiplier": str(item_hit_count_multiplier),
+                    "use_count_delta": item_use_count_delta,
                     "energy_cost_delta": item_energy_cost_delta,
                     "requires_burst": rule.get("requires_burst") is True,
                 }
@@ -1550,6 +1996,7 @@ class BattleService:
             "flat_power_bonus": flat_power_bonus,
             "hit_count_delta": hit_count_delta,
             "hit_count_multiplier": hit_count_multiplier,
+            "use_count_delta": use_count_delta,
             "energy_cost_delta": energy_cost_delta,
             "items": items,
         }
@@ -2152,6 +2599,10 @@ class BattleService:
             )
             effect_operation_results.extend(manual_results)
         if skill_runtime_result or effect_operation_results:
+            latest_payload = loads_json(event.payload_json, {})
+            if isinstance(latest_payload, dict):
+                latest_payload.update(event_payload)
+                event_payload = latest_payload
             if skill_runtime_result:
                 event_payload["skill_runtime"] = skill_runtime_result
             event_payload["effect_operation_results"] = effect_operation_results
@@ -2249,6 +2700,7 @@ class BattleService:
                             "multiplier": item.get("multiplier"),
                             "power_add": item.get("power_add"),
                             "energy_cost_delta": item.get("energy_cost_delta"),
+                            "use_count_delta": item.get("use_count_delta"),
                             "source": "skill_modifier",
                         }
                     )
@@ -2318,6 +2770,7 @@ class BattleService:
         )
         energy_modifier = self._skill_effect_modifiers_for_event(event, skill, slot)
         dynamic_energy_modifier = self._skill_dynamic_energy_cost_modifier(event, skill)
+        dynamic_use_count_modifier = self._skill_dynamic_use_count_modifier(event, skill)
         hit_rule_result = self._resolve_skill_hit_count_for_event(event)
         combined_energy_cost_delta = (
             int(energy_modifier["energy_cost_delta"])
@@ -2326,7 +2779,14 @@ class BattleService:
         combined_modifier_items = [
             *energy_modifier["items"],
             *dynamic_energy_modifier["items"],
+            *dynamic_use_count_modifier["items"],
         ]
+        effective_use_count = max(
+            1
+            + int(energy_modifier.get("use_count_delta") or 0)
+            + int(dynamic_use_count_modifier.get("use_count_delta") or 0),
+            1,
+        )
         hit_count_modifier_delta = 0
         hit_count_modifier_multiplier = Decimal("1")
         if hit_rule_result["source"] not in {"manual_payload", "auto_effect_prefill"}:
@@ -2345,7 +2805,7 @@ class BattleService:
         effective_energy_cost = max(
             int(base_runtime_energy_cost + combined_energy_cost_delta),
             0,
-        )
+        ) * effective_use_count
         if charge_state["phase"] in {
             "charge_released",
             "charge_bypassed",
@@ -2360,6 +2820,7 @@ class BattleService:
             "static_energy_cost": static_energy_cost,
             "base_runtime_energy_cost": base_runtime_energy_cost,
             "effective_energy_cost": effective_energy_cost,
+            "effective_use_count": effective_use_count,
             "energy_cost_modifier": combined_modifier_items,
             "skill_modifier": combined_modifier_items,
             "current_power": slot.current_power if slot is not None else None,
@@ -2677,6 +3138,57 @@ class BattleService:
         if source_target in {Side.SELF.value, Side.ENEMY.value}:
             return source_target
         return None
+
+    def _skill_dynamic_use_count_modifier(
+        self,
+        event: BattleEvent,
+        skill: SkillDefinition,
+    ) -> dict[str, Any]:
+        """解析技能自身的一回合多次使用分支；不同于连击段数。"""
+        rule = loads_json(skill.damage_rule_json, {})
+        if not isinstance(rule, dict):
+            return {"use_count_delta": 0, "items": []}
+        use_rule = rule.get("dynamic_use_count_rule")
+        if not isinstance(use_rule, dict):
+            return {"use_count_delta": 0, "items": []}
+        condition = use_rule.get("condition")
+        if isinstance(condition, str) and condition:
+            payload = loads_json(event.payload_json, {})
+            if not isinstance(payload, dict) or not self._payload_condition_is_true(
+                payload,
+                condition,
+            ):
+                return {"use_count_delta": 0, "items": []}
+        delta = int(use_rule.get("use_count_delta") or use_rule.get("use_count_bonus") or 0)
+        if delta == 0:
+            return {"use_count_delta": 0, "items": []}
+        return {
+            "use_count_delta": delta,
+            "items": [
+                {
+                    "modifier_type": "dynamic_use_count",
+                    "source": "skill_definition.damage_rule_json",
+                    "skill_id": skill.skill_id,
+                    "condition": condition,
+                    "use_count_delta": delta,
+                    "requires_burst": condition in {"burst_active", "burst_triggered"},
+                }
+            ],
+        }
+
+    @staticmethod
+    def _payload_condition_is_true(payload: dict[str, Any], condition: str) -> bool:
+        """从事件 payload/condition_flags/manual_flags 判断条件是否为真。"""
+        manual_flags = payload.get("manual_flags")
+        condition_flags = payload.get("condition_flags")
+        for value in (
+            payload.get(condition),
+            manual_flags.get(condition) if isinstance(manual_flags, dict) else None,
+            condition_flags.get(condition) if isinstance(condition_flags, dict) else None,
+        ):
+            if value is True:
+                return True
+        return False
 
     def _apply_skill_use_mark_triggers(
         self,

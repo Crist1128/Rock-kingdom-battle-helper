@@ -312,7 +312,7 @@ class HitRuleResolver:
         for item in context.snapshot_payload:
             if not isinstance(item, dict) or item.get("effect_id") != source_effect_id:
                 continue
-            if not self._snapshot_item_matches(item, target):
+            if not target.get("all_teams") and not self._snapshot_item_matches(item, target):
                 continue
             item_layers = self._decimal(item.get("layers")) or Decimal("1")
             layers += item_layers
@@ -331,6 +331,8 @@ class HitRuleResolver:
         context: DamageFormulaContext,
         source_target: str,
     ) -> dict[str, str | None] | None:
+        if source_target in {"both_teams", "all_teams", "all_sides"}:
+            return {"owner_side": None, "owner_elf_id": None, "all_teams": "true"}
         if source_target in {"enemy_side", "defender_side", "target", "target_side"}:
             return {"owner_side": context.defender_side, "owner_elf_id": context.defender_elf_id}
         if source_target in {"actor_side", "self_side", "attacker_side"}:

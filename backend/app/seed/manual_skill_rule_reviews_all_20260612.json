@@ -1108,21 +1108,27 @@
   {
     "skill_id": "rocom_skill_46a57bf1ff",
     "skill_name": "击鼓传花",
-    "review_status": "needs_review",
-    "review_notes": "自己脱离、下个入场精灵继承增益，需要切换事件、增益筛选与继承规则。",
+    "review_status": "structured",
+    "review_notes": "Implemented: register pending_next_switch_in; switch_elf copies positive elf-scope effects from the leaving elf to the incoming elf.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "switch_out_and_inherit_buffs",
-        "target": "next_ally_switch_in",
-        "status": "reserved"
+        "op_type": "prepare_next_switch_in_effect",
+        "effect_type": "inherit_positive_elf_effects",
+        "target": "actor_side",
+        "timing": "on_skill_use",
+        "notes": "Register next allied switch_elf to inherit positive elf-scope effects."
       }
     ],
-    "structure_gaps": [
-      "forced_self_switch_out",
-      "inherit_active_buffs_to_next_elf"
+    "future_hooks": [
+      {
+        "hook_type": "force_switch_out",
+        "target": "actor_side",
+        "trigger": "after_skill_use",
+        "status": "manual_switch_required",
+        "notes": "Real switching remains manual/front-end switch_elf; this rule only registers inheritance."
+      }
     ]
   },
   {
@@ -1271,36 +1277,50 @@
   {
     "skill_id": "rocom_skill_1c03db7999",
     "skill_name": "加大功率",
-    "review_status": "needs_review",
-    "review_notes": "自己脱离并使替换入场精灵回复8能量，需要切换后目标绑定和延迟资源变化。",
+    "review_status": "structured",
+    "review_notes": "Implemented: register pending_next_switch_in; switch_elf grants the incoming elf 8 energy, capped at 10.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "switch_out_then_resource_change",
-        "target": "next_ally_switch_in",
+        "op_type": "prepare_next_switch_in_effect",
+        "effect_type": "resource_change",
+        "target": "actor_side",
         "resource_type": "energy",
         "change_type": "gain",
+        "value_type": "value",
         "value": 8,
-        "status": "reserved"
+        "max_value": 10,
+        "timing": "on_skill_use",
+        "notes": "Register next allied switch_elf to grant 8 energy to the incoming elf, capped at 10."
       }
     ],
-    "structure_gaps": [
-      "forced_self_switch_out",
-      "next_switch_in_resource_change"
+    "future_hooks": [
+      {
+        "hook_type": "force_switch_out",
+        "target": "actor_side",
+        "trigger": "after_skill_use",
+        "status": "manual_switch_required",
+        "notes": "Real switching remains manual/front-end switch_elf; this rule only registers resource change."
+      }
     ]
   },
   {
     "skill_id": "rocom_skill_1a736f5321",
     "skill_name": "加油",
-    "review_status": "needs_review",
-    "review_notes": "自己获得1层萌芽印记；萌芽印记效果和挂载范围未确认。",
+    "review_status": "structured",
+    "review_notes": "Implemented sprout mark through effect_cute_mark; gaining positive stat/skill modifiers now receives +1 extra layer.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
-    "structure_gaps": [
-      "missing_sprout_mark_definition"
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_cute_mark",
+        "target": "actor_side",
+        "layers": 1,
+        "timing": "on_skill_use",
+        "notes": "Actor side gains 1 layer of sprout mark; old cute-mark name remains an alias."
+      }
     ]
   },
   {
@@ -1431,27 +1451,26 @@
   {
     "skill_id": "rocom_skill_3e32bcd8c1",
     "skill_name": "双联脉冲",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；迸发使本技能使用次数+1，需要技能使用次数修正/额外计数规则。",
+    "review_status": "structured",
+    "review_notes": "Implemented effective_use_count: burst adds 1 extra use this turn, and energy cost is charged by effective use count.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_02"
     },
     "effect_operations": null,
-    "future_hooks": [
-      {
-        "hook_type": "skill_use_count_modifier",
-        "target": "source_skill",
-        "count_delta": 1,
-        "trigger": "burst",
-        "status": "reserved"
-      }
-    ],
-    "structure_gaps": [
-      "skill_use_count_modifier",
-      "burst_condition"
-    ]
+    "future_hooks": [],
+    "damage_rule": {
+      "status": "structured_attack_with_dynamic_use_count",
+      "damage_type": "magic_attack",
+      "dynamic_use_count_rule": {
+        "condition": "burst_active",
+        "use_count_delta": 1,
+        "notes": "Burst adds one extra use this turn; not a combo hit."
+      },
+      "raw_description": "迸发时本技能使用次数+1。",
+      "source": "manual_complex_branch_20260705_03"
+    }
   },
   {
     "skill_id": "rocom_skill_64a5cb63a8",
@@ -1615,8 +1634,8 @@
   {
     "skill_id": "rocom_skill_014f82cd25",
     "skill_name": "吓退",
-    "review_status": "partial",
-    "review_notes": "已确认减伤60%；应对攻击成功后敌方脱离需要强制切换操作，暂不执行。",
+    "review_status": "structured",
+    "review_notes": "Damage reduction 60% remains; response-attack success now records a force-switch prompt. Actual switch still uses switch_elf.",
     "damage_rule": {
       "status": "parsed_defense_reduction",
       "damage_type": "defense_modifier",
@@ -1630,17 +1649,24 @@
       "source": "manual_review_20260611_02"
     },
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "prepare_next_switch_in_effect",
+        "effect_type": "force_switch",
+        "target": "enemy_side",
+        "switch_mode": "force_out",
+        "condition": "response_attack_success",
+        "timing": "on_skill_use",
+        "notes": "On response-attack success, record that enemy should leave; actual switch still uses switch_elf."
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "force_switch_out",
         "target": "enemy_side",
         "trigger": "response_attack_success",
-        "status": "reserved"
+        "status": "manual_switch_required"
       }
-    ],
-    "structure_gaps": [
-      "force_switch_out_operation"
     ]
   },
   {
@@ -2611,11 +2637,23 @@
   {
     "skill_id": "rocom_skill_b646576b20",
     "skill_name": "富养化",
-    "review_status": "needs_review",
-    "review_notes": "为场下每个精灵回复3能量，需要队伍非出场目标选择与多目标资源变化。",
+    "review_status": "structured",
+    "review_notes": "Implemented multi-target bench resource change: each non-defeated bench ally gains 3 energy, capped at 10.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "resource_change_multi_target",
+        "target": "bench_allies",
+        "resource_type": "energy",
+        "change_type": "gain",
+        "value_type": "value",
+        "value": 3,
+        "max_value": 10,
+        "timing": "on_skill_use",
+        "notes": "Each non-defeated bench ally gains 3 energy, excluding current active elf."
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "resource_change_multi_target",
@@ -2625,9 +2663,6 @@
         "value": 3,
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "bench_target_resource_change"
     ]
   },
   {
@@ -2905,8 +2940,8 @@
   {
     "skill_id": "rocom_skill_f5493834b3",
     "skill_name": "引雷",
-    "review_status": "partial",
-    "review_notes": "造成魔法伤害，固定2连击；迸发威力+20需要迸发条件接入威力修正。",
+    "review_status": "structured",
+    "review_notes": "Fixed 2-hit rule remains; burst adds 20 current-cast base power, applied under the x10 power convention.",
     "hit_rule": {
       "damage_display_type": "combo_repeated_damage",
       "runtime_record_strategy": "per_hit_damage",
@@ -2914,41 +2949,47 @@
       "source": "manual_review_20260611_03"
     },
     "effect_operations": null,
-    "future_hooks": [
-      {
-        "hook_type": "power_add",
+    "future_hooks": [],
+    "damage_rule": {
+      "status": "structured_attack_with_burst_power_add",
+      "damage_type": "magic_attack",
+      "dynamic_power_rule": {
+        "condition": "burst_active",
         "power_add": 20,
-        "trigger": "burst",
-        "status": "reserved"
-      }
-    ],
-    "structure_gaps": [
-      "burst_condition"
-    ]
+        "notes": "Burst adds 20 base power to this cast; both fixed hits use the increased power."
+      },
+      "raw_description": "造成魔法伤害，2连击；迸发时威力+20。",
+      "source": "manual_complex_branch_20260705_03"
+    }
   },
   {
     "skill_id": "rocom_skill_cae00a80bb",
     "skill_name": "强制重启",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；应对状态时回合结束使敌方精灵返场需要延迟返场/切换操作。",
+    "review_status": "structured",
+    "review_notes": "Implemented response-status success prompt for return_to_field; actual down/up settlement still uses switch_elf.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
-    "effect_operations": null,
-    "future_hooks": [
+    "effect_operations": [
       {
-        "hook_type": "delayed_force_return_to_field",
+        "op_type": "prepare_next_switch_in_effect",
+        "effect_type": "force_switch",
         "target": "enemy_side",
-        "timing": "end_turn",
-        "trigger": "response_status_success",
-        "status": "reserved"
+        "switch_mode": "return_to_field",
+        "condition": "response_status_success",
+        "timing": "on_skill_use",
+        "notes": "On response-status success, record return_to_field; actual settlement still uses switch_elf."
       }
     ],
-    "structure_gaps": [
-      "delayed_force_return_operation",
-      "attacking_skill_response_rule_auto_load"
+    "future_hooks": [
+      {
+        "hook_type": "force_return_to_field",
+        "target": "enemy_side",
+        "trigger": "response_status_success",
+        "status": "manual_switch_required"
+      }
     ]
   },
   {
@@ -3254,47 +3295,60 @@
   {
     "skill_id": "rocom_skill_b54094864b",
     "skill_name": "恶念交换",
-    "review_status": "needs_review",
-    "review_notes": "与敌方交换生命比例需要双向按百分比设置生命，当前资源操作不支持百分比互换。",
+    "review_status": "structured",
+    "review_notes": "Implemented HP percentage swap between actor and enemy current elf, with resource events and no direct zero HP result.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "swap_hp_percent",
+        "target": "enemy_side",
+        "timing": "on_skill_use",
+        "notes": "Swap current HP percentages with enemy current elf; do not directly set either side to 0."
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "swap_hp_percent",
         "target": "enemy_side",
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "swap_hp_percent_operation"
     ]
   },
   {
     "skill_id": "rocom_skill_3e8f023716",
     "skill_name": "恶意逃离",
-    "review_status": "needs_review",
-    "review_notes": "脱离和应对防御额外使敌方攻击技能能耗+4，分别需要强制切换和攻击技能费用修正。",
+    "review_status": "structured",
+    "review_notes": "Implemented self force-switch prompt; on response-defense success, enemy current elf gets attack-skill energy cost +4, cleared on switch.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "prepare_next_switch_in_effect",
+        "effect_type": "force_switch",
+        "target": "actor_side",
+        "switch_mode": "force_out",
+        "timing": "on_skill_use",
+        "notes": "Self leaves; actual switch still uses switch_elf."
+      },
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_attack_skill_energy_cost_up_layered_switch_clear",
+        "target": "enemy_side",
+        "layers": 4,
+        "condition": "response_defense_success",
+        "timing": "on_skill_use",
+        "notes": "Enemy current elf attack-skill energy cost +4 on response-defense success; elf-scope and switch-clear."
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "force_switch_out",
         "target": "actor_side",
-        "status": "reserved"
-      },
-      {
-        "hook_type": "attack_skill_cost_modifier",
-        "target": "enemy_side",
-        "cost_delta": 4,
-        "trigger": "response_defense_success",
-        "status": "reserved"
+        "trigger": "after_skill_use",
+        "status": "manual_switch_required",
+        "notes": "Actual self switch remains manual/front-end switch_elf."
       }
-    ],
-    "structure_gaps": [
-      "force_switch_out_operation",
-      "attack_skill_cost_modifier"
     ]
   },
   {
@@ -3370,27 +3424,34 @@
   {
     "skill_id": "rocom_skill_d91d1ab7bb",
     "skill_name": "感电",
-    "review_status": "partial",
-    "review_notes": "基础魔法伤害已保留；每离场1次本技能使用次数永久+1需要离场监听和技能使用次数修正。",
+    "review_status": "structured",
+    "review_notes": "Implemented switch-out listener: each switch_elf leaving event gives this skill slot +1 persistent use count; later use costs energy by effective use count.",
     "hit_rule": {
       "damage_display_type": "single_damage",
       "runtime_record_strategy": "single_value",
       "source": "manual_review_20260611_03"
     },
     "effect_operations": null,
-    "future_hooks": [
-      {
-        "hook_type": "skill_use_count_modifier",
-        "target": "source_skill",
-        "count_delta": 1,
-        "trigger": "actor_switch_out",
-        "status": "reserved"
+    "future_hooks": [],
+    "damage_rule": {
+      "status": "structured_attack_with_switch_out_use_count",
+      "damage_type": "magic_attack",
+      "raw_description": "每离场1次，本技能使用次数永久+1。",
+      "source": "manual_complex_branch_20260705_03",
+      "manual_review": {
+        "status": "structured",
+        "future_hooks": [
+          {
+            "hook_type": "persistent_skill_use_count_modifier",
+            "trigger": "switch_out",
+            "target": "source_skill",
+            "use_count_delta": 1,
+            "status": "executable",
+            "notes": "On each switch_out, add 1 layer of persistent use-count-up to this skill slot."
+          }
+        ]
       }
-    ],
-    "structure_gaps": [
-      "switch_out_listener",
-      "skill_use_count_modifier"
-    ]
+    }
   },
   {
     "skill_id": "rocom_skill_d760d29c0c",
@@ -3931,11 +3992,29 @@
   {
     "skill_id": "rocom_skill_f1217099a9",
     "skill_name": "提气",
-    "review_status": "needs_review",
-    "review_notes": "自己全技能威力+40，敌方换精灵额外+50，需要全技能威力修正和切换事件监听。",
+    "review_status": "structured",
+    "review_notes": "Implemented skill-power layered state: base +4 layers; if enemy switched this turn, add another +5 layers.",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_skill_power_up_layered",
+        "target": "actor_side",
+        "layers": 4,
+        "timing": "on_skill_use",
+        "notes": "All-skill power +40 as 4 layers of +10."
+      },
+      {
+        "op_type": "apply_effect",
+        "effect_id": "effect_skill_power_up_layered",
+        "target": "actor_side",
+        "layers": 5,
+        "condition": "enemy_switched_this_turn",
+        "timing": "on_skill_use",
+        "notes": "If enemy switched this turn, add +50 as 5 layers of +10."
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "all_skill_power_modifier",
@@ -3950,10 +4029,6 @@
         "trigger": "enemy_switched_this_turn",
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "all_skill_power_modifier",
-      "current_turn_switch_listener"
     ]
   },
   {
@@ -4543,8 +4618,8 @@
   {
     "skill_id": "rocom_skill_722221788b",
     "skill_name": "月光合奏",
-    "review_status": "partial",
-    "review_notes": "Cute regression definition is now available; this skill still needs team-wide cute-regression layer counting for dynamic hit count.",
+    "review_status": "structured",
+    "review_notes": "Implemented dynamic hit count from both teams: base 1 hit; each total effect_cute_regression layer adds 1 hit, no cap.",
     "reviewed_at": "2026-06-12",
     "future_hooks": [
       {
@@ -4555,10 +4630,18 @@
         "hit_count_add_per_layer": 1
       }
     ],
-    "structure_gaps": [
-      "team_wide_effect_layer_counter",
-      "dynamic_hit_count_from_effect_layers"
-    ]
+    "hit_rule": {
+      "damage_display_type": "combo_repeated_damage",
+      "runtime_record_strategy": "per_hit_damage",
+      "hit_count": 1,
+      "conditional_hit_rule": {
+        "source_effect_id": "effect_cute_regression",
+        "source_target": "both_teams",
+        "hit_count_bonus_per_layer": 1,
+        "notes": "Base hit count is 1; total cute-regression layers across both teams add +1 hit per layer, no cap."
+      },
+      "source": "manual_complex_branch_20260705_03"
+    }
   },
   {
     "skill_id": "rocom_skill_23210d701e",
@@ -5092,13 +5175,22 @@
   {
     "skill_id": "rocom_skill_a6e7c7eb74",
     "skill_name": "毒雾",
-    "review_status": "needs_review",
-    "review_notes": "Manual review: effect is unclear or not safely representable yet; no executable rule is written.",
+    "review_status": "structured",
+    "review_notes": "Implemented polarity conversion: remove enemy current elf positive elf-scope effects and add the same total layers of poison.",
     "review_source": "manual_review_20260612_04",
     "reviewed_at": "2026-06-12",
     "clear_damage_rule": true,
     "hit_rule": null,
-    "effect_operations": null,
+    "effect_operations": [
+      {
+        "op_type": "convert_effects_by_polarity",
+        "target": "enemy_side",
+        "from_polarity": "positive",
+        "to_effect_id": "effect_poison",
+        "timing": "on_skill_use",
+        "notes": "Only enemy current elf owner_scope=elf and polarity=positive effects are removed; total layers become poison layers."
+      }
+    ],
     "future_hooks": [
       {
         "hook_type": "convert_effects_to_effect",
@@ -5108,9 +5200,6 @@
         "layers_policy": "preserve_or_count",
         "status": "reserved"
       }
-    ],
-    "structure_gaps": [
-      "convert_effects_by_polarity_to_effect"
     ]
   },
   {

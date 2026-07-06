@@ -260,7 +260,7 @@
   },
   {
     "effect_id": "effect_cute_mark",
-    "effect_name": "萌化印记",
+    "effect_name": "萌芽印记",
     "icon": null,
     "category": "mark",
     "polarity": "positive",
@@ -272,7 +272,8 @@
     "is_visible_icon": true,
     "is_recognizable_by_icon": false,
     "recognition_alias_json": [
-      "萌化印记"
+      "萌化印记",
+      "萌芽印记"
     ],
     "default_layers": 1,
     "max_layers": null,
@@ -303,8 +304,8 @@
     "action_modifier_json": null,
     "resource_modifier_json": null,
     "special_rule_id": "cute_mark_extra_buff_layer",
-    "developer_notes": "Confirmed: when gaining a positive buff, gain 1 extra layer. Source pending; listener not executable yet.",
-    "data_version": "manual_confirmed_mechanics_20260612"
+    "developer_notes": "Confirmed: old name cute mark, new name sprout mark; side-scope mark, not cleared on switch; positive stat/skill buffs gain +1 extra layer.",
+    "data_version": "manual_complex_branch_20260705_03"
   },
   {
     "effect_id": "effect_cute_regression",
@@ -2433,5 +2434,110 @@
     "special_rule_id": null,
     "developer_notes": "用于操控：挂在敌方本回合已使用的技能槽上，3回合内有效能耗+7。",
     "data_version": "manual_complex_branch_20260705_02"
+  },
+  {
+    "effect_id": "effect_attack_skill_energy_cost_up_layered_switch_clear",
+    "effect_name": "攻击技能能耗增加",
+    "icon": null,
+    "category": "skill_modifier",
+    "polarity": "negative",
+    "display_group": "skill_modifier",
+    "display_priority": 451,
+    "owner_scope": "elf",
+    "target_scope": "single_elf",
+    "attach_target_type": "elf",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": false,
+    "recognition_alias_json": [
+      "攻击技能能耗增加",
+      "攻击技能能耗+"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": null,
+    "duration_type": "until_removed",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": true,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": true,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": false,
+    "can_be_converted": false,
+    "can_be_inherited": false,
+    "can_be_stolen": false,
+    "can_be_doubled": false,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "skill_modifier"
+    ],
+    "stat_modifier_json": null,
+    "damage_modifier_json": null,
+    "skill_modifier_json": {
+      "modifier_type": "energy_cost_delta",
+      "skill_category": "attack",
+      "energy_cost_delta_per_layer": 1
+    },
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "Attack-skill energy cost increases by layers for current elf; owner_scope=elf, clear on switch. Used by malicious escape.",
+    "data_version": "manual_complex_branch_20260705_03"
+  },
+  {
+    "effect_id": "effect_skill_slot_use_count_up_persistent",
+    "effect_name": "本技能使用次数增加",
+    "icon": null,
+    "category": "skill_modifier",
+    "polarity": "positive",
+    "display_group": "skill_modifier",
+    "display_priority": 502,
+    "owner_scope": "skill_slot",
+    "target_scope": "single_skill_slot",
+    "attach_target_type": "skill_slot",
+    "is_visible_icon": true,
+    "is_recognizable_by_icon": false,
+    "recognition_alias_json": [
+      "本技能使用次数增加",
+      "使用次数增加"
+    ],
+    "default_layers": 1,
+    "max_layers": null,
+    "stack_rule": "add_layers",
+    "refresh_rule": null,
+    "duration_type": "until_removed",
+    "default_duration_turns": null,
+    "default_duration_uses": null,
+    "clear_on_switch": false,
+    "clear_by_abnormal_cleanse": false,
+    "clear_by_stat_clear": false,
+    "clear_by_mark_clear": false,
+    "clear_by_weather_replace": false,
+    "clear_by_skill_specific": true,
+    "can_be_transferred": false,
+    "can_be_converted": false,
+    "can_be_inherited": false,
+    "can_be_stolen": false,
+    "can_be_doubled": false,
+    "conflict_group": null,
+    "conflict_policy": null,
+    "formula_hooks_json": [
+      "skill_modifier"
+    ],
+    "stat_modifier_json": null,
+    "damage_modifier_json": null,
+    "skill_modifier_json": {
+      "modifier_type": "use_count_delta",
+      "use_count_delta_per_layer": 1
+    },
+    "action_modifier_json": null,
+    "resource_modifier_json": null,
+    "special_rule_id": null,
+    "developer_notes": "Persistent skill-slot use count modifier; not a combo-hit modifier. Runtime energy cost is multiplied by effective use count.",
+    "data_version": "manual_complex_branch_20260705_03"
   }
 ]

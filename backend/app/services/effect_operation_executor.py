@@ -32,15 +32,19 @@ class EffectOperationExecutor:
         "clear_effects",
         "change_weather",
         "resource_change",
+        "resource_change_multi_target",
         "resource_change_from_effect_layers",
         "heal_from_damage_dealt",
         "convert_effect",
+        "convert_effects_by_polarity",
+        "swap_hp_percent",
         "trigger_status_damage_now",
         "multiply_layers",
         "multiply_layers_by_polarity",
         "clear_effect_layers",
         "conditional_branch",
         "modify_skill_slots",
+        "prepare_next_switch_in_effect",
         "interrupt_action",
     }
     ALWAYS_CONDITIONS = {None, "", "always", "normal", "on_skill_use"}
@@ -157,10 +161,22 @@ class EffectOperationExecutor:
             return self._execute_conditional_branch(battle_event, operation, operation_index)
         if operation_type == "modify_skill_slots":
             return self._execute_modify_skill_slots(battle_event, operation, operation_index)
+        if operation_type == "prepare_next_switch_in_effect":
+            return self._execute_prepare_next_switch_in_effect(
+                battle_event,
+                operation,
+                operation_index,
+            )
         if operation_type == "interrupt_action":
             return self._execute_interrupt_action(battle_event, operation, operation_index)
         if operation_type == "resource_change":
             return self._execute_resource_change(battle_event, operation, operation_index)
+        if operation_type == "resource_change_multi_target":
+            return self._execute_resource_change_multi_target(
+                battle_event,
+                operation,
+                operation_index,
+            )
         if operation_type == "resource_change_from_effect_layers":
             return self._execute_resource_change_from_effect_layers(
                 battle_event,
@@ -171,6 +187,14 @@ class EffectOperationExecutor:
             return self._execute_heal_from_damage_dealt(battle_event, operation, operation_index)
         if operation_type == "convert_effect":
             return self._execute_convert_effect(battle_event, operation, operation_index)
+        if operation_type == "convert_effects_by_polarity":
+            return self._execute_convert_effects_by_polarity(
+                battle_event,
+                operation,
+                operation_index,
+            )
+        if operation_type == "swap_hp_percent":
+            return self._execute_swap_hp_percent(battle_event, operation, operation_index)
         if operation_type == "trigger_status_damage_now":
             return self._execute_trigger_status_damage_now(
                 battle_event,
@@ -316,8 +340,8 @@ class EffectOperationExecutor:
     ) -> list[dict]:
         """解析“获得属性增益时额外加层”的监听来源。
 
-        当前仅落地已确认的萌化印记口径：新获得的属性类增益额外 +1 层；
-        不作用于印记、天气、技能槽增益等非基础属性修正。
+        当前落地已确认的萌芽印记口径：新获得的属性/技能增益额外 +1 层；
+        不作用于印记、天气、技能槽增益等非可叠层增益。
         """
         if not self._eligible_for_positive_stat_layer_bonus(definition):
             return []
@@ -350,7 +374,7 @@ class EffectOperationExecutor:
     def _eligible_for_positive_stat_layer_bonus(definition: EffectDefinition) -> bool:
         if definition.polarity != "positive":
             return False
-        if definition.category != "stat_modifier":
+        if definition.category not in {"stat_modifier", "skill_modifier"}:
             return False
         if definition.owner_scope == OwnerScope.SKILL_SLOT.value:
             return False
@@ -391,6 +415,52 @@ class EffectOperationExecutor:
             "operation_index": operation_index,
             "operation": "conditional_branch",
             "child_results": child_results,
+        }
+
+    def _execute_prepare_next_switch_in_effect(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """把“下一次切换入场”待执行效果记录到技能事件 payload。"""
+        if battle_event.actor_side is None or battle_event.actor_elf_id is None:
+            return self._skipped(operation, operation_index, "actor_missing")
+        effect_type = str(operation.get("effect_type") or "")
+        if effect_type not in {"inherit_positive_elf_effects", "resource_change", "force_switch"}:
+            return self._skipped(operation, operation_index, "unsupported_pending_switch_effect")
+        item = {
+            "effect_type": effect_type,
+            "source_skill_id": battle_event.skill_id,
+            "source_event_id": battle_event.event_id,
+            "source_side": battle_event.actor_side,
+            "source_elf_id": battle_event.actor_elf_id,
+            "target": operation.get("target") or "actor_side",
+        }
+        for key in (
+            "resource_type",
+            "change_type",
+            "value",
+            "value_type",
+            "max_value",
+            "switch_mode",
+        ):
+            if key in operation:
+                item[key] = operation[key]
+        payload = loads_json(battle_event.payload_json, {})
+        if not isinstance(payload, dict):
+            payload = {}
+        pending = payload.get("pending_next_switch_in")
+        if not isinstance(pending, list):
+            pending = []
+        pending.append(item)
+        payload["pending_next_switch_in"] = pending
+        battle_event.payload_json = dumps_json(payload)
+        return {
+            "status": "executed",
+            "operation_index": operation_index,
+            "operation": "prepare_next_switch_in_effect",
+            **item,
         }
 
     def _execute_interrupt_action(
@@ -1028,6 +1098,217 @@ class EffectOperationExecutor:
             "target_effect_instance_id": instance.instance_id,
         }
 
+    def _execute_convert_effects_by_polarity(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """把目标当前精灵身上指定极性的状态转换为目标状态，层数按总层数继承。"""
+        from_polarity = str(operation.get("from_polarity") or "")
+        if from_polarity not in {"positive", "negative", "neutral"}:
+            return self._skipped(operation, operation_index, "invalid_from_polarity")
+        to_effect_id = operation.get("to_effect_id") or operation.get("effect_id")
+        if not isinstance(to_effect_id, str) or not to_effect_id:
+            return self._skipped(operation, operation_index, "to_effect_id_missing")
+        to_definition = self.db.get(EffectDefinition, to_effect_id)
+        if to_definition is None or to_definition.deleted_at is not None:
+            return self._skipped(operation, operation_index, "to_effect_definition_missing")
+
+        battle = self.db.get(Battle, battle_event.battle_id)
+        target_side = self._resolve_target_side(battle_event, operation.get("target"))
+        if battle is None or battle.deleted_at is not None or target_side is None:
+            return self._skipped(operation, operation_index, "target_side_missing")
+        target_elf_id = self._resolve_target_elf_id(battle, battle_event, target_side)
+        if target_elf_id is None:
+            return self._skipped(operation, operation_index, "target_elf_id_missing")
+
+        definitions_by_id = self._load_effect_definitions()
+        converted_layers = 0
+        removed: list[dict] = []
+        for instance in self.db.scalars(
+            select(BattleEffectInstance).where(
+                BattleEffectInstance.battle_id == battle_event.battle_id,
+                BattleEffectInstance.owner_scope == OwnerScope.ELF.value,
+                BattleEffectInstance.owner_side == target_side,
+                BattleEffectInstance.owner_elf_id == target_elf_id,
+                BattleEffectInstance.is_active.is_(True),
+            )
+        ).all():
+            definition = definitions_by_id.get(instance.effect_id)
+            if definition is None or definition.polarity != from_polarity:
+                continue
+            if instance.effect_id == to_effect_id:
+                continue
+            layers_before = max(int(instance.layers or 0), 0)
+            if layers_before <= 0:
+                continue
+            converted_layers += layers_before
+            instance.is_active = False
+            instance.layers = 0
+            instance.last_updated_turn = battle_event.turn_number
+            self._create_effect_change_event(
+                battle_event=battle_event,
+                definition=definition,
+                instance=instance,
+                change_type="convert",
+                layers_before=layers_before,
+                condition_branch=str(operation.get("condition") or "") or None,
+                reason="skill_convert_effects_by_polarity_source",
+            )
+            removed.append(
+                {
+                    "effect_id": instance.effect_id,
+                    "effect_instance_id": instance.instance_id,
+                    "layers_before": layers_before,
+                    "layers_after": 0,
+                }
+            )
+
+        if converted_layers <= 0:
+            return {
+                "status": "skipped",
+                "reason": "no_matching_effects",
+                "operation_index": operation_index,
+                "operation": "convert_effects_by_polarity",
+                "from_polarity": from_polarity,
+                "to_effect_id": to_effect_id,
+                "target_side": target_side,
+                "target_elf_id": target_elf_id,
+            }
+
+        apply_operation = dict(operation)
+        apply_operation.update(
+            {
+                "op_type": "apply_effect",
+                "effect_id": to_effect_id,
+                "target": operation.get("target"),
+                "layers": converted_layers,
+                "condition": "always",
+            }
+        )
+        target = self._resolve_target(battle_event, operation.get("target"), to_definition)
+        if target["status"] != "resolved":
+            return self._skipped(operation, operation_index, target["reason"])
+        target_layers_before = None
+        target_instance = self._find_existing_instance(
+            battle_id=battle_event.battle_id,
+            definition=to_definition,
+            owner_side=target.get("owner_side"),
+            owner_elf_id=target.get("owner_elf_id"),
+            owner_skill_slot_id=target.get("owner_skill_slot_id"),
+            field_id=target.get("field_id"),
+        )
+        layers_to_apply = converted_layers
+        if to_definition.max_layers is not None:
+            layers_to_apply = min(layers_to_apply, to_definition.max_layers)
+        if target_instance is None:
+            target_instance = self._create_instance(
+                battle_event=battle_event,
+                definition=to_definition,
+                target=target,
+                layers=layers_to_apply,
+                operation=apply_operation,
+            )
+            change_type = "apply"
+        else:
+            target_layers_before = target_instance.layers
+            self._update_existing_instance(
+                instance=target_instance,
+                definition=to_definition,
+                layers=layers_to_apply,
+                turn_number=battle_event.turn_number,
+                operation=apply_operation,
+            )
+            target_instance.is_active = True
+            change_type = "stack"
+        self._create_effect_change_event(
+            battle_event=battle_event,
+            definition=to_definition,
+            instance=target_instance,
+            change_type=change_type,
+            layers_before=target_layers_before,
+            condition_branch=str(operation.get("condition") or "") or None,
+            reason="skill_convert_effects_by_polarity_target",
+        )
+        return {
+            "status": "executed",
+            "operation_index": operation_index,
+            "operation": "convert_effects_by_polarity",
+            "from_polarity": from_polarity,
+            "to_effect_id": to_effect_id,
+            "converted_layers": converted_layers,
+            "target_side": target_side,
+            "target_elf_id": target_elf_id,
+            "removed_effects": removed,
+            "target_effect_instance_id": target_instance.instance_id,
+        }
+
+    def _execute_swap_hp_percent(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """交换行动方与目标的当前生命比例；结果不会把任一方置为 0 HP。"""
+        actor_state = self._resolve_resource_target(battle_event, "actor_side")
+        target_state = self._resolve_resource_target(battle_event, operation.get("target"))
+        if actor_state is None or target_state is None:
+            return self._skipped(operation, operation_index, "resource_target_missing")
+        actor_max_hp = self._max_hp(actor_state)
+        target_max_hp = self._max_hp(target_state)
+        if actor_max_hp is None or target_max_hp is None:
+            return self._skipped(operation, operation_index, "max_hp_missing")
+
+        actor_percent = self._current_hp_percent(actor_state, actor_max_hp)
+        target_percent = self._current_hp_percent(target_state, target_max_hp)
+        actor_before = actor_state.current_hp_value
+        target_before = target_state.current_hp_value
+        actor_state.current_hp_value = self._hp_from_percent(actor_max_hp, target_percent)
+        actor_state.current_hp_percent = round(target_percent, 4)
+        actor_state.is_defeated = False
+        target_state.current_hp_value = self._hp_from_percent(target_max_hp, actor_percent)
+        target_state.current_hp_percent = round(actor_percent, 4)
+        target_state.is_defeated = False
+        events = [
+            self._add_resource_event_for_state(
+                battle_event=battle_event,
+                state=actor_state,
+                resource_type="hp",
+                change_type="swap_percent",
+                value=target_percent,
+                before_value=actor_before,
+                after_value=actor_state.current_hp_value,
+                value_type="percent",
+            ),
+            self._add_resource_event_for_state(
+                battle_event=battle_event,
+                state=target_state,
+                resource_type="hp",
+                change_type="swap_percent",
+                value=actor_percent,
+                before_value=target_before,
+                after_value=target_state.current_hp_value,
+                value_type="percent",
+            ),
+        ]
+        return {
+            "status": "executed",
+            "operation_index": operation_index,
+            "operation": "swap_hp_percent",
+            "actor_side": actor_state.side,
+            "actor_elf_id": actor_state.elf_id,
+            "target_side": target_state.side,
+            "target_elf_id": target_state.elf_id,
+            "actor_percent_before": actor_percent,
+            "target_percent_before": target_percent,
+            "actor_hp_before": actor_before,
+            "actor_hp_after": actor_state.current_hp_value,
+            "target_hp_before": target_before,
+            "target_hp_after": target_state.current_hp_value,
+            "resource_event_ids": [event.event_id for event in events],
+        }
+
     def _execute_trigger_status_damage_now(
         self,
         battle_event: BattleEvent,
@@ -1114,28 +1395,20 @@ class EffectOperationExecutor:
                 target_state,
                 change_type,
                 float(raw_value),
+                max_value=self._optional_int(operation.get("max_value")),
             )
         else:
             return self._skipped(operation, operation_index, "unsupported_resource_type")
 
-        self.db.add(
-            ResourceChangeEvent(
-                event_id=f"resource_event_{uuid4().hex}",
-                battle_id=battle_event.battle_id,
-                battle_event_id=battle_event.event_id,
-                resource_type=resource_type,
-                change_type=change_type,
-                source_side=battle_event.actor_side,
-                source_elf_id=battle_event.actor_elf_id,
-                target_side=target_state.side,
-                target_elf_id=target_state.elf_id,
-                value_type=value_type,
-                value=float(raw_value),
-                before_value=float(before_value) if before_value is not None else None,
-                after_value=float(after_value) if after_value is not None else None,
-                confidence=1.0,
-                manual_override=False,
-            )
+        self._add_resource_event_for_state(
+            battle_event=battle_event,
+            state=target_state,
+            resource_type=resource_type,
+            change_type=change_type,
+            value=float(raw_value),
+            value_type=value_type,
+            before_value=before_value,
+            after_value=after_value,
         )
         return {
             "status": "executed",
@@ -1149,6 +1422,76 @@ class EffectOperationExecutor:
             "value": raw_value,
             "before_value": before_value,
             "after_value": after_value,
+        }
+
+    def _execute_resource_change_multi_target(
+        self,
+        battle_event: BattleEvent,
+        operation: dict,
+        operation_index: int,
+    ) -> dict:
+        """对多只精灵执行同一种资源变化，目前用于场下队友回复能量。"""
+        targets = self._resolve_resource_targets(battle_event, operation.get("target"))
+        if not targets:
+            return self._skipped(operation, operation_index, "resource_targets_missing")
+        resource_type = str(operation.get("resource_type") or "energy")
+        change_type = str(operation.get("change_type") or "gain")
+        value_type = str(operation.get("value_type") or "value")
+        raw_value = self._resolve_resource_change_value(battle_event, operation)
+        if not isinstance(raw_value, int | float):
+            return self._skipped(operation, operation_index, "resource_value_missing")
+
+        changed: list[dict] = []
+        for target_state in targets:
+            if resource_type == "hp":
+                before_value = target_state.current_hp_value
+                after_value = self._apply_hp_resource_change(
+                    target_state,
+                    change_type,
+                    float(raw_value),
+                    value_type,
+                )
+            elif resource_type == "energy":
+                before_value = target_state.energy
+                after_value = self._apply_energy_resource_change(
+                    target_state,
+                    change_type,
+                    float(raw_value),
+                    max_value=self._optional_int(operation.get("max_value")),
+                )
+            else:
+                continue
+            event = self._add_resource_event_for_state(
+                battle_event=battle_event,
+                state=target_state,
+                resource_type=resource_type,
+                change_type=change_type,
+                value=float(raw_value),
+                value_type=value_type,
+                before_value=before_value,
+                after_value=after_value,
+            )
+            changed.append(
+                {
+                    "target_side": target_state.side,
+                    "target_elf_id": target_state.elf_id,
+                    "before_value": before_value,
+                    "after_value": after_value,
+                    "resource_event_id": event.event_id,
+                }
+            )
+
+        return {
+            "status": "executed" if changed else "skipped",
+            "reason": None if changed else "no_supported_targets",
+            "operation_index": operation_index,
+            "operation": "resource_change_multi_target",
+            "resource_type": resource_type,
+            "change_type": change_type,
+            "value_type": value_type,
+            "value": raw_value,
+            "target": operation.get("target"),
+            "changed": changed,
         }
 
     def _execute_resource_change_from_effect_layers(
@@ -2042,6 +2385,7 @@ class EffectOperationExecutor:
         target_state: BattleElfState,
         change_type: str,
         raw_value: float,
+        max_value: int | None = None,
     ) -> float | int | None:
         """更新目标能量值。"""
         before_value = target_state.energy
@@ -2053,7 +2397,94 @@ class EffectOperationExecutor:
             target_state.energy = int(before_value + raw_value)
         elif change_type == "manual_set":
             target_state.energy = max(int(raw_value), 0)
+        if max_value is not None:
+            target_state.energy = min(target_state.energy, max_value)
         return target_state.energy
+
+    def _resolve_resource_targets(
+        self,
+        battle_event: BattleEvent,
+        target: object,
+    ) -> list[BattleElfState]:
+        """解析资源变化的多目标列表。"""
+        if target in {"bench_allies", "ally_bench", "self_bench"}:
+            battle = self.db.get(Battle, battle_event.battle_id)
+            if battle is None or battle.deleted_at is not None or battle_event.actor_side is None:
+                return []
+            active_elf_id = (
+                battle.self_active_elf_id
+                if battle_event.actor_side == Side.SELF.value
+                else battle.enemy_active_elf_id
+            )
+            return list(
+                self.db.scalars(
+                    select(BattleElfState).where(
+                        BattleElfState.battle_id == battle_event.battle_id,
+                        BattleElfState.side == battle_event.actor_side,
+                        BattleElfState.elf_id != active_elf_id,
+                        BattleElfState.is_defeated.is_(False),
+                    )
+                ).all()
+            )
+        resolved = self._resolve_resource_target(battle_event, target)
+        return [resolved] if resolved is not None else []
+
+    @staticmethod
+    def _optional_int(value: object) -> int | None:
+        """把可选数值解析为整数。"""
+        try:
+            return int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+
+    def _add_resource_event_for_state(
+        self,
+        *,
+        battle_event: BattleEvent,
+        state: BattleElfState,
+        resource_type: str,
+        change_type: str,
+        value: float,
+        value_type: str,
+        before_value: float | int | None,
+        after_value: float | int | None,
+    ) -> ResourceChangeEvent:
+        """为资源变化写入统一的 ResourceChangeEvent。"""
+        event = ResourceChangeEvent(
+            event_id=f"resource_event_{uuid4().hex}",
+            battle_id=battle_event.battle_id,
+            battle_event_id=battle_event.event_id,
+            resource_type=resource_type,
+            change_type=change_type,
+            source_side=battle_event.actor_side,
+            source_elf_id=battle_event.actor_elf_id,
+            target_side=state.side,
+            target_elf_id=state.elf_id,
+            value_type=value_type,
+            value=value,
+            before_value=float(before_value) if before_value is not None else None,
+            after_value=float(after_value) if after_value is not None else None,
+            confidence=1.0,
+            manual_override=False,
+        )
+        self.db.add(event)
+        self.db.flush()
+        return event
+
+    @staticmethod
+    def _current_hp_percent(target_state: BattleElfState, max_hp: int) -> float:
+        """读取当前生命百分比；字段缺失时从当前 HP 反推。"""
+        if target_state.current_hp_percent is not None:
+            return max(0.0, min(float(target_state.current_hp_percent), 100.0))
+        if target_state.current_hp_value is None or max_hp <= 0:
+            return 100.0
+        return max(0.0, min(float(target_state.current_hp_value) / max_hp * 100, 100.0))
+
+    @staticmethod
+    def _hp_from_percent(max_hp: int, percent: float) -> int:
+        """按百分比换算 HP，生命比例交换不会直接把任一方置为 0。"""
+        safe_percent = max(0.0, min(float(percent), 100.0))
+        return max(int(floor(max_hp * safe_percent / 100)), 1)
 
     @staticmethod
     def _max_hp(target_state: BattleElfState) -> int | None:
