@@ -90,6 +90,14 @@ function formatApiErrorMessage(status: number, detail: unknown): string {
   return `API request failed: ${status}`;
 }
 
+async function readResponseErrorDetail(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return response.statusText;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -100,13 +108,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    let detail: unknown = response.statusText;
-    try {
-      detail = await response.json();
-    } catch {
-      // keep response.statusText
-    }
-    throw new ApiError(response.status, detail);
+    throw new ApiError(response.status, await readResponseErrorDetail(response));
   }
 
   if (response.status === 204) return undefined as T;
@@ -120,13 +122,7 @@ async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
   });
 
   if (!response.ok) {
-    let detail: unknown = response.statusText;
-    try {
-      detail = await response.json();
-    } catch {
-      // keep response.statusText
-    }
-    throw new ApiError(response.status, detail);
+    throw new ApiError(response.status, await readResponseErrorDetail(response));
   }
 
   return (await response.json()) as T;

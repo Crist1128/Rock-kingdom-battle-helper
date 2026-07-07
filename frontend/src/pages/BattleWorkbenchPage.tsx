@@ -1775,7 +1775,7 @@ function ActiveSide({
 }: {
   battleId: string;
   title: string;
-  elf?: any;
+  elf?: BattleElfStateDict | null;
   skillSlots?: BattleSkillSlotDict[];
   estimatedStats?: StatBlock | null;
   estimateSource?: "default_config" | "expanded_config" | "base_talent" | "unknown";
