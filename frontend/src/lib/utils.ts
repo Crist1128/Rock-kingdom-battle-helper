@@ -25,6 +25,83 @@ export function elfElementTypes(elf?: Pick<ElfDefinitionOut, "element_types_json
   return parseElementTypes(elf?.element_types_json);
 }
 
+export function canonicalElementType(value?: string | null): string | null {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const aliases: Record<string, string> = {
+    普通: "normal",
+    普通系: "normal",
+    normal: "normal",
+    火: "fire",
+    火系: "fire",
+    fire: "fire",
+    水: "water",
+    水系: "water",
+    water: "water",
+    草: "grass",
+    草系: "grass",
+    grass: "grass",
+    电: "electric",
+    电系: "electric",
+    electric: "electric",
+    冰: "ice",
+    冰系: "ice",
+    ice: "ice",
+    翼: "wing",
+    翼系: "wing",
+    wing: "wing",
+    flying: "wing",
+    机械: "mechanical",
+    机械系: "mechanical",
+    mechanical: "mechanical",
+    steel: "mechanical",
+    土: "earth",
+    土系: "earth",
+    石: "earth",
+    石系: "earth",
+    earth: "earth",
+    ground: "earth",
+    幽灵: "ghost",
+    幽灵系: "ghost",
+    ghost: "ghost",
+    shadow: "ghost",
+    龙: "dragon",
+    龙系: "dragon",
+    dragon: "dragon",
+    恶魔: "dark",
+    恶魔系: "dark",
+    dark: "dark",
+    武: "fighting",
+    武系: "fighting",
+    fighting: "fighting",
+    毒: "poison",
+    毒系: "poison",
+    poison: "poison",
+    光: "light",
+    光系: "light",
+    light: "light",
+    fairy: "light",
+    萌: "cute",
+    萌系: "cute",
+    cute: "cute",
+    psychic: "cute",
+    幻: "illusion",
+    幻系: "illusion",
+    illusion: "illusion",
+    虫: "bug",
+    虫系: "bug",
+    bug: "bug",
+  };
+  return aliases[raw] ?? raw;
+}
+
+export function elementTypeMatches(left?: string | null, right?: string | null): boolean {
+  const leftValue = canonicalElementType(left);
+  const rightValue = canonicalElementType(right);
+  return Boolean(leftValue && rightValue && leftValue === rightValue);
+}
+
 export function isDevElf(elf?: Pick<ElfDefinitionOut, "data_version"> | null): boolean {
   return elf?.data_version === "dev";
 }

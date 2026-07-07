@@ -4,6 +4,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { PlayerBuildsPage } from "@/pages/PlayerBuildsPage";
 import { PreparationPage } from "@/pages/PreparationPage";
 import { BattleWorkbenchPage } from "@/pages/BattleWorkbenchPage";
+import { DamageCalculatorPage } from "@/pages/DamageCalculatorPage";
 import { EventLogPage } from "@/pages/EventLogPage";
 import { RulesPage } from "@/pages/RulesPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="builds" element={<PlayerBuildsPage />} />
         <Route path="preparation" element={<PreparationPage />} />
         <Route path="battle" element={<BattleWorkbenchPage />} />
+        <Route path="damage-calculator" element={<DamageCalculatorPage />} />
         <Route path="events" element={<EventLogPage />} />
         <Route path="rules" element={<RulesPage />} />
         <Route path="settings" element={<SettingsPage />} />

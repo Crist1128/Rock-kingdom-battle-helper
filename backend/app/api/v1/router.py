@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     admin_battles,
     assets,
     battles,
+    damage_calculator,
     data_updates,
     effects,
     elves,
@@ -33,6 +34,11 @@ router.include_router(effects.router, prefix="/effects", tags=["effects"])
 router.include_router(player_builds.router, prefix="/player-builds", tags=["player-builds"])
 router.include_router(team_presets.router, prefix="/team-presets", tags=["team-presets"])
 router.include_router(battles.router, prefix="/battles", tags=["battles"])
+router.include_router(
+    damage_calculator.router,
+    prefix="/damage-calculator",
+    tags=["damage-calculator"],
+)
 router.include_router(estimates.router, prefix="/estimates", tags=["estimates"])
 router.include_router(observations.router, prefix="/observations", tags=["observations"])
 router.include_router(assets.router, prefix="/assets", tags=["assets"])

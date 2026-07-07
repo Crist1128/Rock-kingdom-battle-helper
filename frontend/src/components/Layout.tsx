@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Activity, Database, Home, ListChecks, Settings, Shield, Sword } from "lucide-react";
+import { Activity, Calculator, Database, Home, ListChecks, Settings, Shield, Sword } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FormulaUnavailableBanner } from "./FormulaUnavailableBanner";
 
@@ -8,6 +8,7 @@ const navItems = [
   { to: "/", label: "战斗", icon: Home },
   { to: "/preparation", label: "准备阶段", icon: ListChecks },
   { to: "/battle", label: "战斗工作台", icon: Sword },
+  { to: "/damage-calculator", label: "伤害计算器", icon: Calculator },
   { to: "/events", label: "事件日志", icon: Activity },
   { to: "/rules", label: "规则库", icon: Database },
   { to: "/settings", label: "设置", icon: Settings },

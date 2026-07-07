@@ -13,6 +13,13 @@ import type {
   BattleTimelineTurnOut,
   DamageEventCreate,
   DamageEventCreateResult,
+  DamageCalculatorBootstrapOut,
+  DamageCalculatorCalculateInput,
+  DamageCalculatorInferDefenderBatchInput,
+  DamageCalculatorInferDefenderBatchOut,
+  DamageCalculatorInferDefenderInput,
+  DamageCalculatorInferDefenderOut,
+  DamageCalculatorResultOut,
   EffectApplyInput,
   EffectDefinitionOut,
   EnemyLineupRecognitionOut,
@@ -179,6 +186,25 @@ export const api = {
     list: (params: { q?: string; limit?: number; offset?: number } = {}) =>
       request<NatureDefinitionOut[]>(`/natures${qs({ limit: 100, ...params })}`),
     get: (natureId: string) => request<NatureDefinitionOut>(`/natures/${natureId}`),
+  },
+
+  damageCalculator: {
+    bootstrap: () => request<DamageCalculatorBootstrapOut>("/damage-calculator/bootstrap"),
+    calculate: (payload: DamageCalculatorCalculateInput) =>
+      request<DamageCalculatorResultOut>("/damage-calculator/calculate", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    inferDefender: (payload: DamageCalculatorInferDefenderInput) =>
+      request<DamageCalculatorInferDefenderOut>("/damage-calculator/infer-defender", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    inferDefenderBatch: (payload: DamageCalculatorInferDefenderBatchInput) =>
+      request<DamageCalculatorInferDefenderBatchOut>("/damage-calculator/infer-defender-batch", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
 
   effects: {

@@ -142,6 +142,239 @@ export interface NatureDefinitionOut {
   neutral_multiplier: number;
 }
 
+export interface DamageCalculatorTalentInput {
+  hp?: number;
+  physical_attack?: number;
+  physical_defense?: number;
+  magic_attack?: number;
+  magic_defense?: number;
+  speed?: number;
+}
+
+export interface DamageCalculatorPanelInput {
+  hp: number;
+  physical_attack: number;
+  physical_defense: number;
+  magic_attack: number;
+  magic_defense: number;
+  speed: number;
+}
+
+export interface DamageCalculatorParticipantInput {
+  elf_id: string;
+  nature_id?: string | null;
+  individual_talent_distribution?: DamageCalculatorTalentInput | null;
+  panel_stats?: DamageCalculatorPanelInput | null;
+}
+
+export interface DamageCalculatorModifierInput {
+  weather_multiplier?: number | null;
+  power_multiplier?: number | null;
+  flat_power_bonus?: number | null;
+  stat_stage_multiplier?: number | null;
+  stab_multiplier?: number | null;
+  type_multiplier?: number | null;
+  unstable_multiplier?: number | null;
+  damage_reductions?: number[];
+  hit_count?: number | null;
+  defender_hp_percent?: number | null;
+  condition_flags?: Record<string, boolean>;
+  response_attack_success?: boolean | null;
+  response_defense_success?: boolean | null;
+  response_status_success?: boolean | null;
+}
+
+export interface DamageCalculatorCalculateInput {
+  attacker: DamageCalculatorParticipantInput;
+  defender: DamageCalculatorParticipantInput;
+  skill_id: string;
+  formula_type?: "attack" | "status" | "starfall";
+  modifiers?: DamageCalculatorModifierInput;
+  observed_damage_value?: number | null;
+  notes?: string | null;
+}
+
+export interface DamageCalculatorParticipantOut {
+  elf_id: string;
+  elf_name?: string | null;
+  element_types: string[];
+  nature_id?: string | null;
+  nature_name?: string | null;
+  panel_stats: DamageCalculatorPanelInput;
+  panel_source: string;
+}
+
+export interface DamageCalculatorBattleOptionOut {
+  side: Side;
+  elf_id: string;
+  elf_name: string;
+  avatar?: string | null;
+  is_active_elf: boolean;
+  current_hp_percent?: number | null;
+  nature_id?: string | null;
+  nature_name?: string | null;
+  individual_talent_distribution?: DamageCalculatorTalentInput | null;
+  panel_stats?: DamageCalculatorPanelInput | null;
+  panel_source?: string | null;
+  skill_ids: string[];
+}
+
+export interface DamageCalculatorLatestBattleOut {
+  battle_id: string;
+  battle_name?: string | null;
+  phase: string;
+  turn_number: number;
+  self_active_elf_id?: string | null;
+  enemy_active_elf_id?: string | null;
+  self_lineup: DamageCalculatorBattleOptionOut[];
+  enemy_lineup: DamageCalculatorBattleOptionOut[];
+}
+
+export interface DamageCalculatorBootstrapOut {
+  latest_battle?: DamageCalculatorLatestBattleOut | null;
+  type_effectiveness_rules: DamageCalculatorTypeEffectivenessOut[];
+}
+
+export interface DamageCalculatorTypeEffectivenessOut {
+  attack_element_type: string;
+  defense_element_type: string;
+  multiplier: number;
+}
+
+export interface DamageCalculatorObservedComparisonOut {
+  observed_damage_value: number;
+  predicted_damage_value?: number | null;
+  delta_value?: number | null;
+  delta_percent_of_prediction?: number | null;
+  inference_status: string;
+  message: string;
+}
+
+export interface DamageCalculatorResultOut {
+  status: string;
+  formula_type: string;
+  attacker: DamageCalculatorParticipantOut;
+  defender: DamageCalculatorParticipantOut;
+  skill_id: string;
+  skill_name?: string | null;
+  damage_value?: number | null;
+  damage_percent?: number | null;
+  confidence: number;
+  missing_parts: string[];
+  unknown_factors: string[];
+  explanation: Record<string, unknown>;
+  multipliers: Record<string, unknown>;
+  observed_comparison?: DamageCalculatorObservedComparisonOut | null;
+  side_effect_policy: string;
+}
+
+export interface DamageCalculatorInferDefenderInput {
+  attacker: DamageCalculatorParticipantInput;
+  defender_elf_id: string;
+  skill_id: string;
+  formula_type?: "attack";
+  modifiers?: DamageCalculatorModifierInput;
+  observed_damage_value: number;
+  top_n?: number;
+  notes?: string | null;
+  candidate_mode?: "focused" | "default_templates";
+}
+
+export interface DamageCalculatorDefenderCandidateOut {
+  rank: number;
+  template_name?: string | null;
+  nature_id: string;
+  nature_name: string;
+  individual_talent_distribution: DamageCalculatorTalentInput;
+  relevant_defense_stat: string;
+  hp_talent: number;
+  defense_talent: number;
+  panel_stats: DamageCalculatorPanelInput;
+  predicted_damage_value?: number | null;
+  predicted_damage_percent?: number | null;
+  delta_value?: number | null;
+  absolute_delta?: number | null;
+  score: number;
+  matched_within_tolerance: boolean;
+  unknown_factors: string[];
+  missing_parts: string[];
+}
+
+export interface DamageCalculatorInferDefenderOut {
+  status: string;
+  observed_damage_value: number;
+  skill_id: string;
+  skill_name?: string | null;
+  searched_candidate_count: number;
+  returned_candidate_count: number;
+  candidates: DamageCalculatorDefenderCandidateOut[];
+  assumptions: string[];
+  side_effect_policy: string;
+}
+
+export interface DamageCalculatorInferDefenderSampleInput {
+  attacker: DamageCalculatorParticipantInput;
+  skill_id: string;
+  formula_type?: "attack";
+  modifiers?: DamageCalculatorModifierInput;
+  observed_damage_value: number;
+  label?: string | null;
+  notes?: string | null;
+}
+
+export interface DamageCalculatorInferDefenderBatchInput {
+  defender_elf_id: string;
+  samples: DamageCalculatorInferDefenderSampleInput[];
+  candidate_mode?: "focused" | "default_templates";
+  tolerance?: number;
+  top_n?: number;
+}
+
+export interface DamageCalculatorInferDefenderSampleResultOut {
+  sample_index: number;
+  sample_label?: string | null;
+  skill_id: string;
+  skill_name?: string | null;
+  observed_damage_value: number;
+  predicted_damage_value?: number | null;
+  delta_value?: number | null;
+  absolute_delta?: number | null;
+  matched_within_tolerance: boolean;
+  unknown_factors: string[];
+  missing_parts: string[];
+}
+
+export interface DamageCalculatorBatchDefenderCandidateOut {
+  rank: number;
+  template_name?: string | null;
+  nature_id: string;
+  nature_name: string;
+  individual_talent_distribution: DamageCalculatorTalentInput;
+  relevant_defense_stats: string[];
+  hp_talent: number;
+  physical_defense_talent: number;
+  magic_defense_talent: number;
+  panel_stats: DamageCalculatorPanelInput;
+  total_absolute_delta: number;
+  average_absolute_delta: number;
+  matched_sample_count: number;
+  sample_count: number;
+  score: number;
+  sample_results: DamageCalculatorInferDefenderSampleResultOut[];
+}
+
+export interface DamageCalculatorInferDefenderBatchOut {
+  status: string;
+  defender_elf_id: string;
+  searched_candidate_count: number;
+  returned_candidate_count: number;
+  tolerance: number;
+  candidate_mode: string;
+  candidates: DamageCalculatorBatchDefenderCandidateOut[];
+  assumptions: string[];
+  side_effect_policy: string;
+}
+
 export interface EffectDefinitionOut {
   effect_id: string;
   effect_name: string;
