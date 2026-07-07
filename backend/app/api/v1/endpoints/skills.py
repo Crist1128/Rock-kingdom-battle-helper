@@ -19,8 +19,8 @@ from app.schemas.static import (
     SkillRuleManualUpdate,
     SkillRuleReviewOut,
 )
+from app.services.skill_rule_capability_service import build_skill_rule_capability_audit
 from app.services.skill_rule_review_service import (
-    build_skill_rule_capability_audit,
     list_skill_rule_review_items,
     update_skill_rule_review,
 )
