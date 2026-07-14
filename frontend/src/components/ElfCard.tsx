@@ -18,16 +18,27 @@ export function ElfCard({
   onReturn?: () => void;
   onSelectEstimate?: () => void;
 }) {
-  const name = elf.elf_name ?? elf.elf_id;
+  const runtimeFormActive =
+    elf.effective_form_source === "runtime_form"
+    && typeof elf.effective_elf_id === "string"
+    && elf.effective_elf_id !== elf.elf_id;
+  const name = runtimeFormActive
+    ? elf.effective_elf_name ?? elf.effective_elf_id ?? elf.elf_name ?? elf.elf_id
+    : elf.elf_name ?? elf.elf_id;
+  const avatar = runtimeFormActive ? elf.effective_avatar ?? elf.avatar : elf.avatar;
+  const secondaryText = runtimeFormActive
+    ? `原始：${elf.elf_name ?? compactId(elf.elf_id)}`
+    : compactId(elf.elf_id);
   const maxHp = maxHpFromBattleElf(elf);
   return (
     <div className={active ? "rounded-xl border-2 border-primary bg-white p-2 shadow-sm" : "rounded-xl border bg-white p-2 shadow-sm"}>
       <div className="flex items-center gap-2">
-        <AvatarImage src={typeof elf.avatar === "string" ? elf.avatar : null} alt={name} fallback={name} className="h-8 w-8 rounded-lg" />
+        <AvatarImage src={typeof avatar === "string" ? avatar : null} alt={name} fallback={name} className="h-8 w-8 rounded-lg" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">{name}</div>
-          <div className="truncate text-[11px] text-muted-foreground">{compactId(elf.elf_id)}</div>
+          <div className="truncate text-[11px] text-muted-foreground">{secondaryText}</div>
         </div>
+        {runtimeFormActive ? <Badge variant="outline">形态</Badge> : null}
         {active ? <Badge>上场</Badge> : null}
       </div>
       <div className="mt-2 grid grid-cols-2 gap-1 text-[11px]">

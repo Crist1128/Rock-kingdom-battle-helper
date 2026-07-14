@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { useAppStore } from "@/store/useAppStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
 import { HealthBar } from "@/components/HealthBar";
 import { cn, elementTypeName, phaseName, sideName, skillCategoryName } from "@/lib/utils";
-import type { BattleEffectInstanceDict, BattleElfStateDict, BattleEventOut, BattleSkillSlotDict, BattleSpeedPreview, DamageEventCreateResult, EndTurnResult, Side, SkillDefinitionOut, SpeedPreviewRow, SpeedPreviewTarget, StatBlock } from "@/types/api";
+import type { BattleEffectInstanceDict, BattleElfStateDict, BattleEventOut, BattleSkillSlotDict, BattleSpeedPreview, DamageEventCreateResult, ElfEvolutionStageOut, EndTurnResult, Side, SkillDefinitionOut, SpeedPreviewRow, SpeedPreviewTarget, StatBlock } from "@/types/api";
 
 type PlannedActionKind = "unknown" | "attack_skill" | "defense_skill" | "status_skill" | "switch";
 
@@ -149,6 +149,9 @@ export function BattleWorkbenchPage() {
       queryClient.invalidateQueries({ queryKey: ["timeline", currentBattleId] });
       queryClient.invalidateQueries({ queryKey: ["enemy-estimate"] });
       queryClient.invalidateQueries({ queryKey: ["enemy-estimate-evidence"] });
+    },
+    onError: (error) => {
+      window.alert(`切换有效形态失败：${apiErrorText(error)}`);
     },
   });
 
@@ -461,7 +464,7 @@ function ActionDraftEditor({
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="font-semibold">{title}</div>
-          <div className="text-xs text-muted-foreground">{activeElf?.elf_name ?? activeElfId ?? "未选择上场精灵"}</div>
+          <div className="text-xs text-muted-foreground">{battleElfDisplayName(activeElf) ?? activeElfId ?? "未选择上场精灵"}</div>
         </div>
         <Badge variant={action.kind === "unknown" ? "secondary" : "success"}>{plannedActionKindName(action.kind)}</Badge>
       </div>
@@ -1685,6 +1688,29 @@ function SkillSlotEffectBadges({ effects }: { effects: BattleEffectInstanceDict[
   );
 }
 
+function apiErrorText(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message || `请求失败（HTTP ${error.status}）`;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+function hasRuntimeFormDisplay(elf?: BattleElfStateDict | null): boolean {
+  return Boolean(
+    elf?.effective_form_source === "runtime_form"
+    && typeof elf.effective_elf_id === "string"
+    && elf.effective_elf_id !== elf.elf_id,
+  );
+}
+
+function battleElfDisplayName(elf?: BattleElfStateDict | null): string | null {
+  if (!elf) return null;
+  if (hasRuntimeFormDisplay(elf)) {
+    return elf.effective_elf_name ?? elf.effective_elf_id ?? elf.elf_name ?? elf.elf_id;
+  }
+  return elf.elf_name ?? elf.elf_id;
+}
+
 function RuntimeFormControl({
   elf,
   disabled,
@@ -1696,17 +1722,36 @@ function RuntimeFormControl({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [selectedElfId, setSelectedElfId] = useState<string | null>(
-    typeof elf.runtime_form_elf_id === "string" ? elf.runtime_form_elf_id : null,
+    typeof elf.runtime_form_elf_id === "string" ? elf.runtime_form_elf_id : elf.elf_id,
   );
+  const evolutionChainQuery = useQuery({
+    queryKey: ["elf", elf.elf_id, "evolution-chain"],
+    queryFn: () => api.elves.evolutionChain(elf.elf_id),
+    enabled: expanded && Boolean(elf.elf_id),
+    retry: false,
+  });
+
   useEffect(() => {
-    setSelectedElfId(typeof elf.runtime_form_elf_id === "string" ? elf.runtime_form_elf_id : null);
-  }, [elf.state_id, elf.runtime_form_elf_id]);
+    setSelectedElfId(typeof elf.runtime_form_elf_id === "string" ? elf.runtime_form_elf_id : elf.elf_id);
+  }, [elf.state_id, elf.runtime_form_elf_id, elf.elf_id]);
+
   if (!elf.state_id || !onRuntimeFormChange) return null;
 
   const isRuntimeForm = elf.effective_form_source === "runtime_form";
   const currentEffective = isRuntimeForm
     ? `${elf.effective_elf_name ?? elf.effective_elf_id}（原：${elf.elf_name ?? elf.elf_id}）`
     : "原始形态";
+  const chainStages = evolutionChainQuery.data?.stages ?? [];
+  const hasChainStages = chainStages.length > 0;
+  const selectedStage = chainStages.find((stage) => stage.elf_id === selectedElfId);
+  const applyRuntimeForm = (targetElfId: string | null) => {
+    const effectiveElfId = targetElfId && targetElfId !== elf.elf_id ? targetElfId : null;
+    const currentRuntimeElfId =
+      isRuntimeForm && typeof elf.runtime_form_elf_id === "string" ? elf.runtime_form_elf_id : null;
+    if (effectiveElfId === currentRuntimeElfId) return;
+    onRuntimeFormChange(elf.state_id!, effectiveElfId);
+  };
+  const applySelected = () => applyRuntimeForm(selectedElfId);
 
   return (
     <div className="text-xs">
@@ -1722,39 +1767,127 @@ function RuntimeFormControl({
       </Button>
       {expanded ? (
         <div className="mt-2 rounded-xl border bg-slate-50 p-2">
-          <ElfSearchSelect
-            label="选择有效形态"
-            value={selectedElfId}
-            onChange={(id) => setSelectedElfId(id)}
-            placeholder="搜索退化或临时结算形态"
-            resultsMode="focus"
-          />
+          {hasChainStages ? (
+            <RuntimeFormChainSelect
+              stages={chainStages}
+              originalElfId={elf.elf_id}
+              value={selectedElfId}
+              onChange={setSelectedElfId}
+              onApply={applyRuntimeForm}
+              disabled={disabled}
+            />
+          ) : (
+            <>
+              <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
+                {evolutionChainQuery.isLoading
+                  ? "正在加载进化链可选形态..."
+                  : "暂未录入该精灵的进化链数据，保留全局搜索作为兜底。"}
+              </div>
+              <ElfSearchSelect
+                label="选择有效形态"
+                value={selectedElfId}
+                onChange={(id) => setSelectedElfId(id)}
+                placeholder="搜索兜底形态"
+                resultsMode="focus"
+              />
+            </>
+          )}
+          {selectedStage ? (
+            <div className="mt-2 rounded-lg border border-primary/20 bg-white px-2 py-1 text-[11px] text-primary">
+              已选进化阶段 {selectedStage.stage_index}：{selectedStage.elf_name}
+            </div>
+          ) : null}
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
               size="sm"
               variant="outline"
+              type="button"
               disabled={disabled || !selectedElfId}
-              onClick={() => onRuntimeFormChange(elf.state_id!, selectedElfId)}
+              onClick={applySelected}
             >
-              应用
+              {disabled ? "切换中..." : "应用所选形态"}
             </Button>
             <Button
               size="sm"
               variant="ghost"
+              type="button"
               disabled={disabled || !isRuntimeForm}
               onClick={() => {
-                setSelectedElfId(null);
+                setSelectedElfId(elf.elf_id);
                 onRuntimeFormChange(elf.state_id!, null);
               }}
             >
-              恢复原始
+              恢复原始形态
             </Button>
           </div>
           <div className="mt-1 text-muted-foreground">
-            保留性格和六维培养，只重算有效形态面板；不触发切换或返场。
+            保留原有性格、资质与培养设置；只按有效形态重算面板，不触发切换、返场或入场副作用。
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function RuntimeFormChainSelect({
+  stages,
+  originalElfId,
+  value,
+  onChange,
+  onApply,
+  disabled,
+}: {
+  stages: ElfEvolutionStageOut[];
+  originalElfId: string;
+  value?: string | null;
+  onChange: (elfId: string) => void;
+  onApply?: (elfId: string) => void;
+  disabled?: boolean;
+}) {
+  const handleSelect = (elfId: string) => {
+    onChange(elfId);
+    onApply?.(elfId);
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">进化链形态</label>
+      <Select
+        value={value ?? originalElfId}
+        disabled={disabled}
+        onChange={(event) => handleSelect(event.target.value)}
+      >
+        {stages.map((stage) => (
+          <option key={`${stage.chain_id}:${stage.elf_id}`} value={stage.elf_id}>
+            {stage.stage_index}. {stage.elf_name}{stage.elf_id === originalElfId ? "（原始）" : ""}
+          </option>
+        ))}
+      </Select>
+      <div className="grid gap-1 rounded-xl border bg-white p-1">
+        {stages.map((stage) => {
+          const selected = stage.elf_id === value;
+          return (
+            <button
+              key={`${stage.chain_id}:button:${stage.elf_id}`}
+              type="button"
+              disabled={disabled}
+              className={cn(
+                "flex items-center justify-between rounded-lg px-2 py-1.5 text-left transition hover:bg-muted",
+                selected && "border border-primary bg-primary/10 text-primary",
+                disabled && "cursor-not-allowed opacity-60",
+              )}
+              onClick={() => handleSelect(stage.elf_id)}
+            >
+              <span className="min-w-0 flex-1 truncate">
+                {stage.stage_index}. {stage.elf_name}
+              </span>
+              <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">
+                速度种族 {stage.base_speed_talent}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1796,12 +1929,19 @@ function ActiveSide({
     typeof elf?.nature_name === "string" && elf.nature_name
       ? elf.nature_name
       : estimateNatureName;
+  const displayName = battleElfDisplayName(elf);
+  const originalName = elf?.elf_name ?? elf?.elf_id;
   return (
     <div className="rounded-2xl border bg-white p-4">
       <div className="mb-2 flex items-center justify-between"><div className="font-semibold">{title}</div><Badge variant="outline">{sideName(elf?.side)}</Badge></div>
       {elf ? (
         <div className="space-y-3">
-          <div className="text-lg font-semibold">{elf.elf_name ?? elf.elf_id}</div>
+          <div>
+            <div className="text-lg font-semibold">{displayName ?? elf.elf_id}</div>
+            {hasRuntimeFormDisplay(elf) ? (
+              <div className="text-xs text-muted-foreground">原始精灵：{originalName}</div>
+            ) : null}
+          </div>
           <div className="rounded-xl border bg-slate-50 p-2">
             <HealthBar
               currentHpValue={typeof elf.current_hp_value === "number" ? elf.current_hp_value : null}

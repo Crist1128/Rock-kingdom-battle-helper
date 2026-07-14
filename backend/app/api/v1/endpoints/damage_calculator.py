@@ -7,8 +7,8 @@ from app.db.session import get_db
 from app.schemas.damage_calculator import (
     DamageCalculatorBootstrapOut,
     DamageCalculatorCalculateInput,
-    DamageCalculatorInferDefenderBatchInput,
-    DamageCalculatorInferDefenderBatchOut,
+    DamageCalculatorInferAttackerInput,
+    DamageCalculatorInferAttackerOut,
     DamageCalculatorInferDefenderInput,
     DamageCalculatorInferDefenderOut,
     DamageCalculatorResultOut,
@@ -43,7 +43,7 @@ def infer_standalone_defender(
     payload: DamageCalculatorInferDefenderInput,
     db: Session = Depends(get_db),
 ) -> DamageCalculatorInferDefenderOut:
-    """根据真实伤害枚举防御方软候选，不写入实时估计。"""
+    """根据扣血百分比/真实伤害枚举防御方软候选，不写入实时估计。"""
     try:
         return StandaloneDamageService(db).infer_defender(payload)
     except LookupError as exc:
@@ -52,14 +52,14 @@ def infer_standalone_defender(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.post("/infer-defender-batch", response_model=DamageCalculatorInferDefenderBatchOut)
-def infer_standalone_defender_batch(
-    payload: DamageCalculatorInferDefenderBatchInput,
+@router.post("/infer-attacker", response_model=DamageCalculatorInferAttackerOut)
+def infer_standalone_attacker(
+    payload: DamageCalculatorInferAttackerInput,
     db: Session = Depends(get_db),
-) -> DamageCalculatorInferDefenderBatchOut:
-    """根据多条真实伤害累计枚举防御方软候选，不写入实时估计。"""
+) -> DamageCalculatorInferAttackerOut:
+    """根据已知防御方面板和真实伤害枚举攻击方软候选，不写入实时估计。"""
     try:
-        return StandaloneDamageService(db).infer_defender_batch(payload)
+        return StandaloneDamageService(db).infer_attacker(payload)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:

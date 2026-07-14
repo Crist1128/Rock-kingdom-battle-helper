@@ -416,7 +416,7 @@ class RuleResolver:
         if first == strong and second == strong:
             return Decimal("3")
         if first == weak and second == weak:
-            return Decimal("0.3333333333333333333333333333")
+            return Decimal("0.25")
         if {first, second} == {strong, weak}:
             return neutral
         if {first, second} == {strong, neutral}:

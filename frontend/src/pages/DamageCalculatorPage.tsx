@@ -13,16 +13,15 @@ import { ElfSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSel
 import type {
   DamageCalculatorBattleOptionOut,
   DamageCalculatorCalculateInput,
-  DamageCalculatorInferDefenderBatchInput,
-  DamageCalculatorInferDefenderBatchOut,
+  DamageCalculatorInferAttackerInput,
+  DamageCalculatorInferAttackerOut,
   DamageCalculatorInferDefenderInput,
   DamageCalculatorInferDefenderOut,
-  DamageCalculatorInferDefenderSampleInput,
   DamageCalculatorModifierInput,
   DamageCalculatorPanelInput,
   DamageCalculatorTalentInput,
   ElfDefinitionOut,
-  PlayerElfBuildOut,
+  NatureDefinitionOut,
   SkillDefinitionOut,
 } from "@/types/api";
 import { canonicalElementType, compactId, elementTypeMatches, elementTypeNames, parseElementTypes, skillCategoryName, statName } from "@/lib/utils";
@@ -30,8 +29,7 @@ import { canonicalElementType, compactId, elementTypeMatches, elementTypeNames, 
 const statKeys = ["hp", "physical_attack", "physical_defense", "magic_attack", "magic_defense", "speed"] as const;
 
 type StatKey = (typeof statKeys)[number];
-type CandidateMode = "focused" | "default_templates";
-type CalculatorMode = "calculate" | "infer";
+type CalculatorMode = "calculate" | "infer_defender" | "infer_attacker";
 
 interface ParticipantForm {
   elf_id: string;
@@ -39,10 +37,13 @@ interface ParticipantForm {
   talents: DamageCalculatorTalentInput;
   panel_stats: DamageCalculatorPanelInput | null;
   use_panel_stats: boolean;
+  imported_nature_id: string;
+  imported_talents: DamageCalculatorTalentInput | null;
 }
 
 interface ModifierForm {
   weather_multiplier: string;
+  base_power_override: string;
   power_multiplier: string;
   flat_power_bonus: string;
   stat_stage_multiplier: string;
@@ -51,8 +52,6 @@ interface ModifierForm {
   unstable_multiplier: string;
   damage_reductions: string;
   hit_count: string;
-  defender_hp_percent: string;
-  condition_flags_json: string;
   attacker_physical_attack_up_layers: string;
   attacker_physical_attack_down_layers: string;
   attacker_magic_attack_up_layers: string;
@@ -80,10 +79,13 @@ const emptyParticipant = (): ParticipantForm => ({
   talents: { ...emptyTalents },
   panel_stats: null,
   use_panel_stats: false,
+  imported_nature_id: "",
+  imported_talents: null,
 });
 
 const defaultModifiers: ModifierForm = {
   weather_multiplier: "",
+  base_power_override: "",
   power_multiplier: "",
   flat_power_bonus: "",
   stat_stage_multiplier: "",
@@ -92,8 +94,6 @@ const defaultModifiers: ModifierForm = {
   unstable_multiplier: "",
   damage_reductions: "",
   hit_count: "",
-  defender_hp_percent: "",
-  condition_flags_json: "",
   attacker_physical_attack_up_layers: "",
   attacker_physical_attack_down_layers: "",
   attacker_magic_attack_up_layers: "",
@@ -110,6 +110,16 @@ function optionalNumber(value: string): number | null {
   if (!value.trim()) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hasAnyPositiveTalent(talents: DamageCalculatorTalentInput): boolean {
+  return statKeys.some((key) => Number(talents[key] ?? 0) > 0);
+}
+
+function formatValidationErrors(errors: string[]): string | null {
+  if (errors.length === 0) return null;
+  if (errors.length === 1) return errors[0];
+  return `请先补齐以下信息：\n${errors.map((item) => `- ${item}`).join("\n")}`;
 }
 
 function parseReductionList(value: string): number[] {
@@ -162,17 +172,6 @@ function computedFlatPowerBonus(form: ModifierForm): number | null {
   return total;
 }
 
-function parseConditionFlags(value: string): Record<string, boolean> {
-  if (!value.trim()) return {};
-  const parsed = JSON.parse(value) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("条件标记必须是 JSON 对象，例如 {\"self_switched_this_turn\": true}");
-  }
-  return Object.fromEntries(
-    Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
-  );
-}
-
 function buildModifiers(
   form: ModifierForm,
   skillCategory?: string | null,
@@ -182,6 +181,7 @@ function buildModifiers(
   const statStageMultiplier = manualStatStage ?? computedStatStageMultiplier(form, skillCategory);
   return {
     weather_multiplier: optionalNumber(form.weather_multiplier),
+    base_power_override: optionalNumber(form.base_power_override),
     power_multiplier: optionalNumber(form.power_multiplier),
     flat_power_bonus: computedFlatPowerBonus(form),
     stat_stage_multiplier: statStageMultiplier,
@@ -190,8 +190,6 @@ function buildModifiers(
     unstable_multiplier: optionalNumber(form.unstable_multiplier),
     damage_reductions: parseReductionList(form.damage_reductions),
     hit_count: hitCount === null ? null : Math.max(1, Math.floor(hitCount)),
-    defender_hp_percent: optionalNumber(form.defender_hp_percent),
-    condition_flags: parseConditionFlags(form.condition_flags_json),
   };
 }
 
@@ -210,28 +208,17 @@ function participantPayload(form: ParticipantForm) {
 }
 
 function fillFromBattleOption(option: DamageCalculatorBattleOptionOut): ParticipantForm {
+  const importedNatureId = option.nature_id ?? "";
+  const importedTalents = { ...emptyTalents, ...(option.individual_talent_distribution ?? {}) };
   return {
     elf_id: option.elf_id,
-    nature_id: option.nature_id ?? "",
-    talents: { ...emptyTalents, ...(option.individual_talent_distribution ?? {}) },
+    nature_id: importedNatureId,
+    talents: { ...importedTalents },
     panel_stats: option.panel_stats ?? null,
     use_panel_stats: Boolean(option.panel_stats),
+    imported_nature_id: importedNatureId,
+    imported_talents: { ...importedTalents },
   };
-}
-
-function parseBuildTalents(build: PlayerElfBuildOut): DamageCalculatorTalentInput {
-  return { ...emptyTalents, ...safeParseRecord(build.individual_talent_distribution_json) };
-}
-
-function parseBuildPanel(build: PlayerElfBuildOut): DamageCalculatorPanelInput | null {
-  const raw = safeParseRecord(build.final_stats_json);
-  const panel: Partial<DamageCalculatorPanelInput> = {};
-  for (const key of statKeys) {
-    const value = raw[key];
-    if (typeof value !== "number") return null;
-    panel[key] = value;
-  }
-  return panel as DamageCalculatorPanelInput;
 }
 
 function safeParseRecord(value?: string | null): Record<string, unknown> {
@@ -242,17 +229,6 @@ function safeParseRecord(value?: string | null): Record<string, unknown> {
   } catch {
     return {};
   }
-}
-
-function fillFromPlayerBuild(build: PlayerElfBuildOut): ParticipantForm {
-  const panel = parseBuildPanel(build);
-  return {
-    elf_id: build.elf_id,
-    nature_id: build.nature_id,
-    talents: parseBuildTalents(build),
-    panel_stats: panel,
-    use_panel_stats: false,
-  };
 }
 
 function mainAttackStat(elf?: ElfDefinitionOut | null, negativeStat?: string | null): StatKey {
@@ -319,7 +295,7 @@ function combineTypeMultipliers(values: number[]): number {
   const [first, second] = values;
   const pair = new Set([first, second]);
   if (first === 2 && second === 2) return 3;
-  if (first === 0.5 && second === 0.5) return 0.3333333333333333;
+  if (first === 0.5 && second === 0.5) return 0.25;
   if (pair.has(2) && pair.has(0.5)) return 1;
   if (pair.has(2) && pair.has(1)) return 2;
   if (pair.has(0.5) && pair.has(1)) return 0.5;
@@ -333,9 +309,8 @@ export function DamageCalculatorPage() {
   const [selectedSkill, setSelectedSkill] = useState<SkillDefinitionOut | null>(null);
   const [modifiers, setModifiers] = useState<ModifierForm>(defaultModifiers);
   const [observedDamage, setObservedDamage] = useState("");
-  const [candidateMode, setCandidateMode] = useState<CandidateMode>("focused");
-  const [tolerance, setTolerance] = useState("0");
-  const [damageSamples, setDamageSamples] = useState<DamageCalculatorInferDefenderSampleInput[]>([]);
+  const [observedHpBefore, setObservedHpBefore] = useState("");
+  const [observedHpAfter, setObservedHpAfter] = useState("");
   const [mode, setMode] = useState<CalculatorMode>("calculate");
   const [manualModifierFields, setManualModifierFields] = useState<
     Partial<Record<keyof ModifierForm, boolean>>
@@ -367,10 +342,16 @@ export function DamageCalculatorPage() {
   const natureOptions = natures.data ?? [];
   const latestBattle = bootstrap.data?.latest_battle ?? null;
   const latestSkillIds = useMemo(
-    () => latestBattle?.self_lineup.find((item) => item.elf_id === attacker.elf_id)?.skill_ids ?? [],
-    [attacker.elf_id, latestBattle],
+    () => {
+      const lineup = mode === "infer_attacker"
+        ? latestBattle?.enemy_lineup
+        : latestBattle?.self_lineup;
+      return lineup?.find((item) => item.elf_id === attacker.elf_id)?.skill_ids ?? [];
+    },
+    [attacker.elf_id, latestBattle, mode],
   );
   const effectiveSkill = selectedSkill?.skill_id === skillId ? selectedSkill : selectedSkillDetail.data ?? null;
+  const isMagicSkill = effectiveSkill?.skill_category === "magic";
   const typeRuleMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const rule of bootstrap.data?.type_effectiveness_rules ?? []) {
@@ -388,8 +369,8 @@ export function DamageCalculatorPage() {
   const inferMutation = useMutation({
     mutationFn: (payload: DamageCalculatorInferDefenderInput) => api.damageCalculator.inferDefender(payload),
   });
-  const batchInferMutation = useMutation({
-    mutationFn: (payload: DamageCalculatorInferDefenderBatchInput) => api.damageCalculator.inferDefenderBatch(payload),
+  const inferAttackerMutation = useMutation({
+    mutationFn: (payload: DamageCalculatorInferAttackerInput) => api.damageCalculator.inferAttacker(payload),
   });
 
   useEffect(() => {
@@ -441,52 +422,94 @@ export function DamageCalculatorPage() {
     setModifiers((prev) => ({ ...prev, [key]: value }));
   };
 
-  const validate = () => {
-    if (!attacker.elf_id) return "请先选择攻击方精灵。";
-    if (!defender.elf_id) return "请先选择防御方精灵。";
-    if (!skillId) return "请先选择技能。";
-    if (!attacker.use_panel_stats && !attacker.nature_id) return "攻击方未使用战斗面板时，需要选择性格。";
-    if (!defender.use_panel_stats && !defender.nature_id) return "防御方未使用战斗面板时，需要选择性格。";
+  const resolvedObservedHpDelta = () => {
+    const before = optionalNumber(observedHpBefore);
+    const after = optionalNumber(observedHpAfter);
+    if (before !== null && after !== null) return before - after;
     return null;
+  };
+
+  const participantValidationErrors = (
+    participant: ParticipantForm,
+    label: string,
+    options: { requireNatureAndTalents: boolean },
+  ) => {
+    const errors: string[] = [];
+    if (!participant.elf_id) {
+      errors.push(`${label}：请选择精灵`);
+      return errors;
+    }
+    if (participant.use_panel_stats && !participant.panel_stats) {
+      errors.push(`${label}：导入面板缺失，请重新从最近战斗导入或取消使用导入面板`);
+    }
+    if (!participant.use_panel_stats && options.requireNatureAndTalents) {
+      if (!participant.nature_id) {
+        errors.push(`${label}：请选择性格`);
+      }
+      if (!hasAnyPositiveTalent(participant.talents)) {
+        errors.push(`${label}：请填写/确认资质，当前六维都是“不点/0”`);
+      }
+    }
+    return errors;
+  };
+
+  const validate = () => {
+    const errors = [
+      ...participantValidationErrors(attacker, "攻击方", { requireNatureAndTalents: true }),
+      ...participantValidationErrors(defender, "防御方", { requireNatureAndTalents: true }),
+    ];
+    if (!skillId) errors.push("请选择技能");
+    return formatValidationErrors(errors);
   };
 
   const validateInfer = () => {
-    if (!attacker.elf_id) return "请先选择攻击方精灵。";
-    if (!defender.elf_id) return "请先选择防御方精灵。";
-    if (!skillId) return "请先选择技能。";
-    if (!attacker.use_panel_stats && !attacker.nature_id) return "攻击方未使用战斗面板时，需要选择性格。";
-    if (!observedDamage.trim()) return "请先填写真实伤害，才能反推防御方候选。";
-    return null;
-  };
-
-  const buildCurrentSample = (): DamageCalculatorInferDefenderSampleInput | null => {
-    const error = validateInfer();
-    if (error) {
-      setFormError(error);
-      return null;
+    const errors = [
+      ...participantValidationErrors(attacker, "攻击方", { requireNatureAndTalents: true }),
+    ];
+    if (!defender.elf_id) errors.push("防御方：请选择精灵");
+    if (!skillId) errors.push("请选择技能");
+    const hpDelta = resolvedObservedHpDelta();
+    const hpBefore = optionalNumber(observedHpBefore);
+    const hpAfter = optionalNumber(observedHpAfter);
+    if (hpBefore === null) {
+      errors.push("请填写敌方受击前血量百分比");
+    }
+    if (hpAfter === null) {
+      errors.push("请填写敌方受击后血量百分比");
+    }
+    if (hpBefore !== null && hpAfter !== null && hpDelta !== null && hpDelta <= 0) {
+      errors.push("敌方受击前血量必须大于受击后血量");
     }
     const observed = optionalNumber(observedDamage);
     if (observed === null || observed <= 0) {
-      setFormError("真实伤害必须是大于 0 的数字。");
-      return null;
+      errors.push("请填写大于 0 的真实伤害");
     }
-    try {
-      return {
-        attacker: participantPayload(attacker),
-        skill_id: skillId,
-        formula_type: "attack",
-        modifiers: buildModifiers(modifiers, effectiveSkill?.skill_category),
-        observed_damage_value: observed,
-        label: `${effectiveSkill?.skill_name ?? compactId(skillId)} / 真实 ${observed}`,
-      };
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "反推参数解析失败");
-      return null;
+    return formatValidationErrors(errors);
+  };
+
+  const validateInferAttacker = () => {
+    const errors = [
+      ...participantValidationErrors(defender, "己方防御方", { requireNatureAndTalents: true }),
+    ];
+    if (!attacker.elf_id) errors.push("敌方攻击方：请选择精灵");
+    if (!skillId) errors.push("请选择敌方使用的技能");
+    const observed = optionalNumber(observedDamage);
+    if (observed === null || observed <= 0) {
+      errors.push("请填写大于 0 的真实伤害");
     }
+    return formatValidationErrors(errors);
   };
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (mode === "infer_defender") {
+      inferDefender();
+      return;
+    }
+    if (mode === "infer_attacker") {
+      inferAttacker();
+      return;
+    }
     const error = validate();
     if (error) {
       setFormError(error);
@@ -515,8 +538,15 @@ export function DamageCalculatorPage() {
     }
     try {
       const observed = optionalNumber(observedDamage);
+      const hpBefore = optionalNumber(observedHpBefore);
+      const hpAfter = optionalNumber(observedHpAfter);
+      const hpDelta = resolvedObservedHpDelta();
       if (observed === null || observed <= 0) {
-        setFormError("真实伤害必须是大于 0 的数字。");
+        setFormError("请填写真实伤害。");
+        return;
+      }
+      if (hpDelta === null || hpDelta <= 0) {
+        setFormError("受击前血量必须大于受击后血量。");
         return;
       }
       setFormError(null);
@@ -527,53 +557,40 @@ export function DamageCalculatorPage() {
         formula_type: "attack",
         modifiers: buildModifiers(modifiers, effectiveSkill?.skill_category),
         observed_damage_value: observed,
-        top_n: 20,
-        candidate_mode: candidateMode,
+        observed_hp_percent_before: hpBefore,
+        observed_hp_percent_after: hpAfter,
+        top_n: 100,
       });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "反推参数解析失败");
     }
   };
 
-  const addDamageSample = () => {
-    const sample = buildCurrentSample();
-    if (!sample) return;
-    setDamageSamples((prev) => [...prev, sample]);
-    setFormError(null);
-  };
-
-  const removeDamageSample = (index: number) => {
-    setDamageSamples((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
-    batchInferMutation.reset();
-  };
-
-  const clearDamageSamples = () => {
-    setDamageSamples([]);
-    batchInferMutation.reset();
-  };
-
-  const inferDefenderBatch = () => {
-    if (!defender.elf_id) {
-      setFormError("请先选择防御方精灵。");
+  const inferAttacker = () => {
+    const error = validateInferAttacker();
+    if (error) {
+      setFormError(error);
       return;
     }
-    if (damageSamples.length === 0) {
-      setFormError("请先至少加入一条真实伤害样本。");
-      return;
+    try {
+      const observed = optionalNumber(observedDamage);
+      if (observed === null || observed <= 0) {
+        setFormError("请填写真实伤害。");
+        return;
+      }
+      setFormError(null);
+      inferAttackerMutation.mutate({
+        attacker_elf_id: attacker.elf_id,
+        defender: participantPayload(defender),
+        skill_id: skillId,
+        formula_type: "attack",
+        modifiers: buildModifiers(modifiers, effectiveSkill?.skill_category),
+        observed_damage_value: observed,
+        top_n: 100,
+      });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "反推参数解析失败");
     }
-    const parsedTolerance = optionalNumber(tolerance);
-    if (parsedTolerance === null || parsedTolerance < 0) {
-      setFormError("容忍偏差必须是大于等于 0 的数字。");
-      return;
-    }
-    setFormError(null);
-    batchInferMutation.mutate({
-      defender_elf_id: defender.elf_id,
-      samples: damageSamples,
-      candidate_mode: candidateMode,
-      tolerance: Math.floor(parsedTolerance),
-      top_n: 20,
-    });
   };
 
   const reset = () => {
@@ -583,17 +600,21 @@ export function DamageCalculatorPage() {
     setSelectedSkill(null);
     setModifiers(defaultModifiers);
     setObservedDamage("");
+    setObservedHpBefore("");
+    setObservedHpAfter("");
     setFormError(null);
     calculateMutation.reset();
     inferMutation.reset();
-    batchInferMutation.reset();
-    setCandidateMode("focused");
-    setTolerance("0");
-    setDamageSamples([]);
+    inferAttackerMutation.reset();
     setMode("calculate");
     lastSuggestedModifiers.current = {};
     setManualModifierFields({});
   };
+
+  const attackerTitle = mode === "infer_attacker" ? "敌方攻击方" : "攻击方";
+  const defenderTitle = mode === "infer_attacker" ? "己方防御方" : "防御方";
+  const selfImportTitle = mode === "infer_attacker" ? "己方防御方配置" : "己方攻击方配置";
+  const enemyImportTitle = mode === "infer_attacker" ? "敌方攻击方配置" : "敌方防御方配置";
 
   return (
     <div className="space-y-6">
@@ -610,7 +631,41 @@ export function DamageCalculatorPage() {
         </Button>
       </div>
 
-      {formError ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{formError}</div> : null}
+      <Card>
+        <CardContent className="p-2">
+          <div className="grid gap-2 rounded-2xl bg-slate-100 p-1 md:grid-cols-3">
+            <ModeTabButton
+              active={mode === "calculate"}
+              title="单纯计算伤害"
+              description="双方配置已知时正向计算"
+              onClick={() => {
+                setMode("calculate");
+                setFormError(null);
+              }}
+            />
+            <ModeTabButton
+              active={mode === "infer_defender"}
+              title="反推防御方"
+              description="已知攻击方、伤害和血量变化"
+              onClick={() => {
+                setMode("infer_defender");
+                setFormError(null);
+              }}
+            />
+            <ModeTabButton
+              active={mode === "infer_attacker"}
+              title="反推攻击方"
+              description="已知己方防御配置和受击伤害"
+              onClick={() => {
+                setMode("infer_attacker");
+                setFormError(null);
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {formError ? <ValidationAlert message={formError} /> : null}
       {calculateMutation.error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           {calculateMutation.error instanceof Error ? calculateMutation.error.message : "计算失败"}
@@ -621,12 +676,11 @@ export function DamageCalculatorPage() {
           {inferMutation.error instanceof Error ? inferMutation.error.message : "反推失败"}
         </div>
       ) : null}
-      {batchInferMutation.error ? (
+      {inferAttackerMutation.error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-          {batchInferMutation.error instanceof Error ? batchInferMutation.error.message : "累计反推失败"}
+          {inferAttackerMutation.error instanceof Error ? inferAttackerMutation.error.message : "反推攻击方失败"}
         </div>
       ) : null}
-
       <Card>
         <CardHeader>
           <CardTitle>最近战斗快捷导入</CardTitle>
@@ -637,8 +691,24 @@ export function DamageCalculatorPage() {
         <CardContent>
           {latestBattle ? (
             <div className="grid gap-4 lg:grid-cols-2">
-              <BattleImportSelect title="己方阵容" items={latestBattle.self_lineup} onPick={(item) => setAttacker(fillFromBattleOption(item))} />
-              <BattleImportSelect title="敌方阵容" items={latestBattle.enemy_lineup} onPick={(item) => setDefender(fillFromBattleOption(item))} />
+              <BattleImportSelect
+                title={selfImportTitle}
+                items={latestBattle.self_lineup}
+                onPick={(item) =>
+                  mode === "infer_attacker"
+                    ? setDefender(fillFromBattleOption(item))
+                    : setAttacker(fillFromBattleOption(item))
+                }
+              />
+              <BattleImportSelect
+                title={enemyImportTitle}
+                items={latestBattle.enemy_lineup}
+                onPick={(item) =>
+                  mode === "infer_attacker"
+                    ? setAttacker(fillFromBattleOption(item))
+                    : setDefender(fillFromBattleOption(item))
+                }
+              />
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">
@@ -652,20 +722,14 @@ export function DamageCalculatorPage() {
         <div className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             <ParticipantCard
-              title="攻击方"
+              title={attackerTitle}
               form={attacker}
               setForm={setAttacker}
               natureOptions={natureOptions}
               onTalentChange={(key, value) => updateTalent("attacker", key, value)}
-              onBuildPicked={(build) => {
-                if (build.skill_ids.length > 0) {
-                  setSkillId(build.skill_ids[0]);
-                  setSelectedSkill(null);
-                }
-              }}
             />
             <ParticipantCard
-              title="防御方"
+              title={defenderTitle}
               form={defender}
               setForm={setDefender}
               natureOptions={natureOptions}
@@ -707,27 +771,34 @@ export function DamageCalculatorPage() {
               <div className="rounded-2xl border bg-slate-50 p-4">
                 <div className="text-sm font-semibold">状态类修正</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  每层属性增减按 10% 处理，技能威力每层 ±10；物理技能读取物攻/物防，魔法技能读取魔攻/魔防。这里会转换成后端已有公式字段，不写入战斗状态栏。
+                  会按当前技能类别只展示相关攻防修正；物理技能读取物攻/物防，魔法技能读取魔攻/魔防。技能威力层数、自填技能威力和连击数也放在这里统一处理。
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <NumberField label="攻击方物攻增加层数" value={modifiers.attacker_physical_attack_up_layers} onChange={(value) => updateModifier("attacker_physical_attack_up_layers", value)} placeholder="0" />
-                  <NumberField label="攻击方物攻降低层数" value={modifiers.attacker_physical_attack_down_layers} onChange={(value) => updateModifier("attacker_physical_attack_down_layers", value)} placeholder="0" />
-                  <NumberField label="攻击方魔攻增加层数" value={modifiers.attacker_magic_attack_up_layers} onChange={(value) => updateModifier("attacker_magic_attack_up_layers", value)} placeholder="0" />
-                  <NumberField label="攻击方魔攻降低层数" value={modifiers.attacker_magic_attack_down_layers} onChange={(value) => updateModifier("attacker_magic_attack_down_layers", value)} placeholder="0" />
-                  <NumberField label="防御方物防增加层数" value={modifiers.defender_physical_defense_up_layers} onChange={(value) => updateModifier("defender_physical_defense_up_layers", value)} placeholder="0" />
-                  <NumberField label="防御方物防降低层数" value={modifiers.defender_physical_defense_down_layers} onChange={(value) => updateModifier("defender_physical_defense_down_layers", value)} placeholder="0" />
-                  <NumberField label="防御方魔防增加层数" value={modifiers.defender_magic_defense_up_layers} onChange={(value) => updateModifier("defender_magic_defense_up_layers", value)} placeholder="0" />
-                  <NumberField label="防御方魔防降低层数" value={modifiers.defender_magic_defense_down_layers} onChange={(value) => updateModifier("defender_magic_defense_down_layers", value)} placeholder="0" />
+                  {isMagicSkill ? (
+                    <>
+                      <NumberField label="攻击方魔攻增加层数" value={modifiers.attacker_magic_attack_up_layers} onChange={(value) => updateModifier("attacker_magic_attack_up_layers", value)} placeholder="0" />
+                      <NumberField label="攻击方魔攻降低层数" value={modifiers.attacker_magic_attack_down_layers} onChange={(value) => updateModifier("attacker_magic_attack_down_layers", value)} placeholder="0" />
+                      <NumberField label="防御方魔防增加层数" value={modifiers.defender_magic_defense_up_layers} onChange={(value) => updateModifier("defender_magic_defense_up_layers", value)} placeholder="0" />
+                      <NumberField label="防御方魔防降低层数" value={modifiers.defender_magic_defense_down_layers} onChange={(value) => updateModifier("defender_magic_defense_down_layers", value)} placeholder="0" />
+                    </>
+                  ) : (
+                    <>
+                      <NumberField label="攻击方物攻增加层数" value={modifiers.attacker_physical_attack_up_layers} onChange={(value) => updateModifier("attacker_physical_attack_up_layers", value)} placeholder="0" />
+                      <NumberField label="攻击方物攻降低层数" value={modifiers.attacker_physical_attack_down_layers} onChange={(value) => updateModifier("attacker_physical_attack_down_layers", value)} placeholder="0" />
+                      <NumberField label="防御方物防增加层数" value={modifiers.defender_physical_defense_up_layers} onChange={(value) => updateModifier("defender_physical_defense_up_layers", value)} placeholder="0" />
+                      <NumberField label="防御方物防降低层数" value={modifiers.defender_physical_defense_down_layers} onChange={(value) => updateModifier("defender_physical_defense_down_layers", value)} placeholder="0" />
+                    </>
+                  )}
+                  <NumberField label="自填技能威力" value={modifiers.base_power_override} onChange={(value) => updateModifier("base_power_override", value)} placeholder="留空用技能原始威力" />
                   <NumberField label="技能威力增加层数" value={modifiers.skill_power_up_layers} onChange={(value) => updateModifier("skill_power_up_layers", value)} placeholder="例如 4 表示 +40" />
                   <NumberField label="技能威力降低层数" value={modifiers.skill_power_down_layers} onChange={(value) => updateModifier("skill_power_down_layers", value)} placeholder="0" />
+                  <NumberField label="连击次数" value={modifiers.hit_count} onChange={(value) => updateModifier("hit_count", value)} placeholder="留空按规则" />
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <NumberField label="天气倍率" value={modifiers.weather_multiplier} onChange={(value) => updateModifier("weather_multiplier", value)} placeholder="默认 1" />
                 <NumberField label="本系倍率覆盖" value={modifiers.stab_multiplier} onChange={(value) => updateModifier("stab_multiplier", value)} placeholder="按技能/精灵预填" />
                 <NumberField label="克制倍率覆盖" value={modifiers.type_multiplier} onChange={(value) => updateModifier("type_multiplier", value)} placeholder="按技能/目标预填" />
-                <NumberField label="连击次数" value={modifiers.hit_count} onChange={(value) => updateModifier("hit_count", value)} placeholder="留空按规则" />
-                <NumberField label="目标血量" value={modifiers.defender_hp_percent} onChange={(value) => updateModifier("defender_hp_percent", value)} placeholder="可选" />
               </div>
               <details className="rounded-xl border bg-white p-3 text-sm">
                 <summary className="cursor-pointer font-medium">高级公式覆盖</summary>
@@ -738,7 +809,7 @@ export function DamageCalculatorPage() {
                   <NumberField label="额外倍率覆盖" value={modifiers.unstable_multiplier} onChange={(value) => updateModifier("unstable_multiplier", value)} placeholder="不确定可留空" />
                 </div>
               </details>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-1">
                 <label className="space-y-1 text-sm">
                   <span className="font-medium">减伤比例</span>
                   <div className="flex overflow-hidden rounded-xl border bg-white focus-within:ring-2 focus-within:ring-ring">
@@ -746,10 +817,6 @@ export function DamageCalculatorPage() {
                     <span className="flex items-center px-3 text-sm text-muted-foreground">%</span>
                   </div>
                   <span className="text-xs text-muted-foreground">多个减伤用逗号或空格分隔；填 90 表示减伤 90%。</span>
-                </label>
-                <label className="space-y-1 text-sm">
-                  <span className="font-medium">条件标记 JSON</span>
-                  <Input value={modifiers.condition_flags_json} onChange={(event) => updateModifier("condition_flags_json", event.target.value)} placeholder='例如 {"self_switched_this_turn": true}' />
                 </label>
               </div>
             </CardContent>
@@ -766,36 +833,28 @@ export function DamageCalculatorPage() {
               <CardDescription>理论伤害来自当前后端公式链，未知因素会在结果中展示。</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
-                <button
-                  type="button"
-                  className={`rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${mode === "calculate" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:bg-white/70"}`}
-                  onClick={() => setMode("calculate")}
-                >
-                  单纯计算伤害
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${mode === "infer" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:bg-white/70"}`}
-                  onClick={() => setMode("infer")}
-                >
-                  反推防御方
-                </button>
-              </div>
-
-              <div className="transition-all duration-300 ease-out">
+              <div key={mode} className="transition-all duration-300 ease-out animate-in fade-in slide-in-from-bottom-2">
                 {mode === "calculate" ? (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="space-y-4">
                     <Button className="w-full" type="submit" disabled={calculateMutation.isPending}>
                       {calculateMutation.isPending ? "计算中..." : "计算伤害"}
                     </Button>
+                    {formError ? <ValidationAlert message={formError} compact /> : null}
                     {calculateMutation.data ? <ResultPanel result={calculateMutation.data} /> : <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">填写精灵、技能和修正项后点击计算。</div>}
                   </div>
-                ) : (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                ) : null}
+                {mode === "infer_defender" ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+                      反推防御方配置必须同时填写真实伤害和受击前后血量百分比；否则无法同时约束 HP 资质和防御资质。
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <NumberField label="受击前血量%" value={observedHpBefore} onChange={setObservedHpBefore} placeholder="例如 100" />
+                      <NumberField label="受击后血量%" value={observedHpAfter} onChange={setObservedHpAfter} placeholder="例如 72" />
+                    </div>
                     <label className="block space-y-1 text-sm">
                       <span className="font-medium">真实伤害</span>
-                      <Input value={observedDamage} onChange={(event) => setObservedDamage(event.target.value)} placeholder="填写实战看到的伤害，用于反推候选" />
+                      <Input value={observedDamage} onChange={(event) => setObservedDamage(event.target.value)} placeholder="例如 157" />
                     </label>
                     <Button
                       className="w-full"
@@ -804,61 +863,93 @@ export function DamageCalculatorPage() {
                       disabled={inferMutation.isPending}
                       onClick={inferDefender}
                     >
-                      {inferMutation.isPending ? "反推中..." : "根据真实伤害反推防御方"}
+                      {inferMutation.isPending ? "反推中..." : "根据伤害和血量反推防御方"}
                     </Button>
-                    <div className="space-y-3 rounded-xl border bg-slate-50 p-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="space-y-1 text-sm">
-                          <span className="font-medium">候选模式</span>
-                          <Select
-                            value={candidateMode}
-                            onChange={(event) => setCandidateMode(event.target.value as CandidateMode)}
-                          >
-                            <option value="focused">聚焦防御线</option>
-                            <option value="default_templates">默认资质模板</option>
-                          </Select>
-                        </label>
-                        <NumberField
-                          label="容忍偏差"
-                          value={tolerance}
-                          onChange={setTolerance}
-                          placeholder="例如 0 或 2"
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={addDamageSample}>
-                          加入累计样本
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={batchInferMutation.isPending || damageSamples.length === 0}
-                          onClick={inferDefenderBatch}
-                        >
-                          {batchInferMutation.isPending ? "累计反推中..." : "累计反推"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={damageSamples.length === 0}
-                          onClick={clearDamageSamples}
-                        >
-                          清空累计/新开计算
-                        </Button>
-                      </div>
-                      <DamageSampleList samples={damageSamples} onRemove={removeDamageSample} />
-                    </div>
-                    {inferMutation.data ? <InferencePanel result={inferMutation.data} /> : null}
-                    {batchInferMutation.data ? <BatchInferencePanel result={batchInferMutation.data} /> : null}
+                    {formError ? <ValidationAlert message={formError} compact /> : null}
+                    {inferMutation.data ? (
+                      <InferencePanel result={inferMutation.data} natureOptions={natureOptions} />
+                    ) : null}
                   </div>
-                )}
+                ) : null}
+                {mode === "infer_attacker" ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+                      反推攻击方时，左侧“敌方攻击方”只需要选择精灵；右侧“己方防御方”建议从最近战斗导入己方面板或填写性格资质。
+                    </div>
+                    <label className="block space-y-1 text-sm">
+                      <span className="font-medium">真实伤害</span>
+                      <Input value={observedDamage} onChange={(event) => setObservedDamage(event.target.value)} placeholder="例如 157" />
+                    </label>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      type="button"
+                      disabled={inferAttackerMutation.isPending}
+                      onClick={inferAttacker}
+                    >
+                      {inferAttackerMutation.isPending ? "反推中..." : "根据伤害反推攻击方"}
+                    </Button>
+                    {formError ? <ValidationAlert message={formError} compact /> : null}
+                    {inferAttackerMutation.data ? (
+                      <AttackerInferencePanel result={inferAttackerMutation.data} natureOptions={natureOptions} />
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
         </div>
       </form>
     </div>
+  );
+}
+
+function ValidationAlert({ message, compact = false }: { message: string; compact?: boolean }) {
+  const lines = message.split("\n").map((line) => line.trim()).filter(Boolean);
+  const title = lines[0] ?? "请检查表单";
+  const items = lines.slice(1).map((line) => line.replace(/^- /, ""));
+  return (
+    <div
+      className={`rounded-2xl border border-red-200 bg-red-50 text-sm text-red-900 ${
+        compact ? "px-3 py-2" : "px-4 py-3"
+      }`}
+    >
+      <div className="font-medium">{title}</div>
+      {items.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function ModeTabButton({
+  active,
+  title,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`rounded-xl px-4 py-3 text-left transition-all duration-300 ${
+        active
+          ? "bg-white text-primary shadow-sm ring-1 ring-primary/10"
+          : "text-muted-foreground hover:bg-white/70"
+      }`}
+      onClick={onClick}
+    >
+      <span className="block text-sm font-semibold">{title}</span>
+      <span className="mt-1 block text-xs">{description}</span>
+    </button>
   );
 }
 
@@ -916,23 +1007,17 @@ function ParticipantCard({
   setForm,
   natureOptions,
   onTalentChange,
-  onBuildPicked,
 }: {
   title: string;
   form: ParticipantForm;
   setForm: Dispatch<SetStateAction<ParticipantForm>>;
   natureOptions: Array<{ nature_id: string; nature_name: string; positive_stat: string; negative_stat: string }>;
   onTalentChange: (key: StatKey, value: number) => void;
-  onBuildPicked?: (build: PlayerElfBuildOut) => void;
 }) {
   const selectedElf = useQuery({
     queryKey: ["elf", form.elf_id, "damage-calculator"],
     queryFn: () => api.elves.get(form.elf_id),
     enabled: Boolean(form.elf_id),
-  });
-  const playerBuilds = useQuery({
-    queryKey: ["player-builds", form.elf_id || "all", "damage-calculator"],
-    queryFn: () => api.playerBuilds.list(form.elf_id || undefined),
   });
   const elements = parseElementTypes(selectedElf.data?.element_types_json);
   const applyNaturePreset = (natureId: string) => {
@@ -943,12 +1028,18 @@ function ParticipantCard({
       talents: nature ? defaultTalentsForNature(nature, selectedElf.data) : prev.talents,
     }));
   };
-  const applyBuild = (buildId: string) => {
-    const build = (playerBuilds.data ?? []).find((item) => item.build_id === buildId);
-    if (build) {
-      setForm(fillFromPlayerBuild(build));
-      onBuildPicked?.(build);
-    }
+  const toggleImportedPanel = (checked: boolean) => {
+    setForm((prev) => {
+      if (!checked) {
+        return { ...prev, use_panel_stats: false };
+      }
+      return {
+        ...prev,
+        use_panel_stats: true,
+        nature_id: prev.imported_nature_id || prev.nature_id,
+        talents: prev.imported_talents ? { ...emptyTalents, ...prev.imported_talents } : prev.talents,
+      };
+    });
   };
   return (
     <Card>
@@ -971,26 +1062,24 @@ function ParticipantCard({
           label={`${title}精灵`}
           value={form.elf_id}
           resultsMode="focus"
-          onChange={(id) => setForm((prev) => ({ ...prev, elf_id: id, panel_stats: null, use_panel_stats: false }))}
+          onChange={(id) =>
+            setForm((prev) => ({
+              ...prev,
+              elf_id: id,
+              panel_stats: null,
+              use_panel_stats: false,
+              imported_nature_id: "",
+              imported_talents: null,
+            }))
+          }
         />
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">导入已保存配置</span>
-          <Select value="" onChange={(event) => applyBuild(event.target.value)} disabled={(playerBuilds.data?.length ?? 0) === 0}>
-            <option value="">{(playerBuilds.data?.length ?? 0) > 0 ? "选择一个己方配置导入" : "暂无可导入配置"}</option>
-            {(playerBuilds.data ?? []).map((build) => (
-              <option key={build.build_id} value={build.build_id}>
-                {build.build_name ?? build.elf_name ?? compactId(build.build_id)}{build.is_default ? " · 默认" : ""}
-              </option>
-            ))}
-          </Select>
-        </label>
         {form.panel_stats ? (
           <label className="flex items-start gap-2 rounded-xl border bg-slate-50 p-3 text-sm">
             <input
               className="mt-1"
               type="checkbox"
               checked={form.use_panel_stats}
-              onChange={(event) => setForm((prev) => ({ ...prev, use_panel_stats: event.target.checked }))}
+              onChange={(event) => toggleImportedPanel(event.target.checked)}
             />
             <span>
               <span className="block font-medium">使用导入面板</span>
@@ -1079,40 +1168,6 @@ function TalentSelect({
   );
 }
 
-function DamageSampleList({
-  samples,
-  onRemove,
-}: {
-  samples: DamageCalculatorInferDefenderSampleInput[];
-  onRemove: (index: number) => void;
-}) {
-  if (samples.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed bg-white p-3 text-xs text-muted-foreground">
-        暂无累计样本。可以先填本次真实伤害，再加入累计样本；清空后即为新开一次计算。
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-2">
-      <div className="text-xs font-medium text-muted-foreground">已累计 {samples.length} 条样本</div>
-      {samples.map((sample, index) => (
-        <div
-          key={`${sample.skill_id}:${sample.observed_damage_value}:${index}`}
-          className="flex items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 text-xs"
-        >
-          <span className="min-w-0 truncate">
-            #{index + 1} {sample.label ?? compactId(sample.skill_id)}，真实 {sample.observed_damage_value}
-          </span>
-          <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(index)}>
-            移除
-          </Button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function ResultPanel({ result }: { result: Awaited<ReturnType<typeof api.damageCalculator.calculate>> }) {
   return (
     <div className="space-y-4">
@@ -1160,49 +1215,97 @@ function ResultPanel({ result }: { result: Awaited<ReturnType<typeof api.damageC
   );
 }
 
-function InferencePanel({ result }: { result: DamageCalculatorInferDefenderOut }) {
+function InferencePanel({
+  result,
+  natureOptions,
+}: {
+  result: DamageCalculatorInferDefenderOut;
+  natureOptions: NatureDefinitionOut[];
+}) {
+  const natureById = useMemo(
+    () => new Map(natureOptions.map((nature) => [nature.nature_id, nature])),
+    [natureOptions],
+  );
+  const groups = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        key: string;
+        title: string;
+        candidates: typeof result.candidates;
+      }
+    >();
+    for (const candidate of result.candidates) {
+      const nature = natureById.get(candidate.nature_id);
+      const positiveStat = nature?.positive_stat ?? null;
+      const key = positiveStat ?? `unknown:${candidate.nature_name}`;
+      const title = positiveStat
+        ? `${statName(positiveStat)}+ 性格`
+        : `${candidate.nature_name}（正面未知）`;
+      const current = grouped.get(key);
+      if (current) {
+        current.candidates.push(candidate);
+      } else {
+        grouped.set(key, { key, title, candidates: [candidate] });
+      }
+    }
+    return Array.from(grouped.values()).sort((left, right) => {
+      const leftBest = left.candidates[0]?.rank ?? 9999;
+      const rightBest = right.candidates[0]?.rank ?? 9999;
+      return leftBest - rightBest || left.title.localeCompare(right.title, "zh-CN");
+    });
+  }, [natureById, result.candidates]);
+
   return (
     <div className="space-y-3 rounded-2xl border bg-white p-4">
       <div>
         <div className="font-semibold">防御方配置候选</div>
         <div className="mt-1 text-xs text-muted-foreground">
-          已枚举 {result.searched_candidate_count} 个软候选，显示前 {result.returned_candidate_count} 个；不会写入战斗推算。
+          已枚举 {result.searched_candidate_count} 个候选，返回 {result.returned_candidate_count} 个命中候选；观察扣血 {result.observed_hp_percent_delta ?? "—"}%。
         </div>
+        {result.candidates.length > 0 ? (
+          <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            已按正面性格分成 {groups.length} 类，默认全部收起。请点开某一类查看具体性格和三维资质。
+          </div>
+        ) : null}
       </div>
-      <div className="space-y-2">
-        {result.candidates.map((candidate) => (
-          <div key={`${candidate.rank}:${candidate.nature_id}:${candidate.hp_talent}:${candidate.defense_talent}`} className="rounded-xl border bg-slate-50 p-3 text-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">
-                  #{candidate.rank} {candidate.nature_name}
-                  {candidate.template_name ? (
-                    <span className="ml-2 text-xs text-muted-foreground">{candidate.template_name}</span>
+      <CandidateTalentSummary candidates={result.candidates} />
+      {result.candidates.length === 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          没有找到同时满足伤害值和受击前后血量百分比的候选。请检查攻击方面板、技能威力/层数、克制、本系、天气、减伤和连击等修正项。
+        </div>
+      ) : null}
+      <div className="space-y-3">
+        {groups.map((group) => {
+          const best = group.candidates[0];
+          return (
+            <details key={group.key} className="overflow-hidden rounded-2xl border bg-slate-50">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b bg-white px-4 py-3 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-emerald-700">{group.title}</span>
+                    <Badge variant="outline">{group.candidates.length} 个候选</Badge>
+                    {best ? <Badge variant="success">最优 #{best.rank}</Badge> : null}
+                  </div>
+                  {best ? (
+                    <div className="mt-1 truncate text-xs text-muted-foreground">
+                      最优：{best.nature_name} · {talentSummaryText(best.individual_talent_distribution)}
+                    </div>
                   ) : null}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  HP资质 {candidate.hp_talent} / {statName(candidate.relevant_defense_stat)}资质 {candidate.defense_talent}
-                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">点击展开</span>
+              </summary>
+              <div className="space-y-2 p-3">
+                {group.candidates.map((candidate) => (
+                  <CandidateCard
+                    key={`${candidate.rank}:${candidate.nature_id}:${candidate.hp_talent}:${candidate.defense_talent}:${candidate.template_name ?? ""}`}
+                    candidate={candidate}
+                  />
+                ))}
               </div>
-              <Badge variant={candidate.absolute_delta === 0 ? "success" : "outline"}>
-                偏差 {candidate.delta_value ?? "—"}
-              </Badge>
-            </div>
-            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
-              <div>预测伤害：{candidate.predicted_damage_value ?? "无法计算"}{candidate.predicted_damage_percent !== null && candidate.predicted_damage_percent !== undefined ? `（${candidate.predicted_damage_percent}%）` : ""}</div>
-              <div>候选面板：{panelText(candidate.panel_stats)}</div>
-              <div>
-                候选资质：HP {candidate.individual_talent_distribution.hp ?? 0} / 物攻 {candidate.individual_talent_distribution.physical_attack ?? 0} / 物防 {candidate.individual_talent_distribution.physical_defense ?? 0} / 魔攻 {candidate.individual_talent_distribution.magic_attack ?? 0} / 魔防 {candidate.individual_talent_distribution.magic_defense ?? 0} / 速度 {candidate.individual_talent_distribution.speed ?? 0}
-              </div>
-              <div>匹配分：{candidate.score}</div>
-            </div>
-            {candidate.unknown_factors.length > 0 ? (
-              <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
-                未知因素：{candidate.unknown_factors.join("、")}
-              </div>
-            ) : null}
-          </div>
-        ))}
+            </details>
+          );
+        })}
       </div>
       <details className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
         <summary className="cursor-pointer font-medium text-foreground">反推假设</summary>
@@ -1216,70 +1319,244 @@ function InferencePanel({ result }: { result: DamageCalculatorInferDefenderOut }
   );
 }
 
-function BatchInferencePanel({ result }: { result: DamageCalculatorInferDefenderBatchOut }) {
+function AttackerInferencePanel({
+  result,
+  natureOptions,
+}: {
+  result: DamageCalculatorInferAttackerOut;
+  natureOptions: NatureDefinitionOut[];
+}) {
+  const natureById = useMemo(
+    () => new Map(natureOptions.map((nature) => [nature.nature_id, nature])),
+    [natureOptions],
+  );
+  const groups = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        key: string;
+        title: string;
+        candidates: typeof result.candidates;
+      }
+    >();
+    for (const candidate of result.candidates) {
+      const nature = natureById.get(candidate.nature_id);
+      const positiveStat = nature?.positive_stat ?? null;
+      const key = positiveStat ?? `unknown:${candidate.nature_name}`;
+      const title = positiveStat
+        ? `${statName(positiveStat)}+ 性格`
+        : `${candidate.nature_name}（正面未知）`;
+      const current = grouped.get(key);
+      if (current) {
+        current.candidates.push(candidate);
+      } else {
+        grouped.set(key, { key, title, candidates: [candidate] });
+      }
+    }
+    return Array.from(grouped.values()).sort((left, right) => {
+      const leftBest = left.candidates[0]?.rank ?? 9999;
+      const rightBest = right.candidates[0]?.rank ?? 9999;
+      return leftBest - rightBest || left.title.localeCompare(right.title, "zh-CN");
+    });
+  }, [natureById, result.candidates]);
+
   return (
     <div className="space-y-3 rounded-2xl border bg-white p-4">
       <div>
-        <div className="font-semibold">累计伤害反推</div>
+        <div className="font-semibold">攻击方配置候选</div>
         <div className="mt-1 text-xs text-muted-foreground">
-          已枚举 {result.searched_candidate_count} 个软候选，显示前 {result.returned_candidate_count} 个；容忍偏差 {result.tolerance}。
-          本结果只在独立计算器内展示，不写入战斗推算。
+          已枚举 {result.searched_candidate_count} 个候选，返回 {result.returned_candidate_count} 个命中候选；本技能读取 {statName(result.relevant_attack_stat)}。
         </div>
+        {result.candidates.length > 0 ? (
+          <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            候选会标记“是否为 {statName(result.relevant_attack_stat)}+ 性格”和“是否点了 {statName(result.relevant_attack_stat)} 资质”。
+          </div>
+        ) : null}
       </div>
-      <div className="space-y-2">
-        {result.candidates.map((candidate) => (
-          <div
-            key={`${candidate.rank}:${candidate.nature_id}:${candidate.template_name ?? "focused"}:${candidate.hp_talent}:${candidate.physical_defense_talent}:${candidate.magic_defense_talent}`}
-            className="rounded-xl border bg-slate-50 p-3 text-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium">
-                  #{candidate.rank} {candidate.nature_name}
-                  {candidate.template_name ? (
-                    <span className="ml-2 text-xs text-muted-foreground">{candidate.template_name}</span>
+      <CandidateTalentSummary candidates={result.candidates} />
+      {result.candidates.length === 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          没有找到与真实伤害完全一致的攻击方候选。请检查己方防御面板、敌方技能、技能威力、克制、本系、天气、减伤和连击等修正项。
+        </div>
+      ) : null}
+      <div className="space-y-3">
+        {groups.map((group) => {
+          const best = group.candidates[0];
+          return (
+            <details key={group.key} className="overflow-hidden rounded-2xl border bg-slate-50">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b bg-white px-4 py-3 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-emerald-700">{group.title}</span>
+                    <Badge variant="outline">{group.candidates.length} 个候选</Badge>
+                    {best ? <Badge variant="success">最优 #{best.rank}</Badge> : null}
+                  </div>
+                  {best ? (
+                    <div className="mt-1 truncate text-xs text-muted-foreground">
+                      最优：{best.nature_name} · {talentSummaryText(best.individual_talent_distribution)}
+                    </div>
                   ) : null}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  HP {candidate.hp_talent} / 物防 {candidate.physical_defense_talent} / 魔防 {candidate.magic_defense_talent}
-                </div>
-              </div>
-              <Badge variant={candidate.total_absolute_delta === 0 ? "success" : "outline"}>
-                总偏差 {candidate.total_absolute_delta}
-              </Badge>
-            </div>
-            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
-              <div>
-                命中 {candidate.matched_sample_count}/{candidate.sample_count}，平均偏差 {candidate.average_absolute_delta}，匹配分 {candidate.score}
-              </div>
-              <div>候选面板：{panelText(candidate.panel_stats)}</div>
-              <div>
-                相关防御线：{candidate.relevant_defense_stats.map((item) => statName(item)).join("、")}
-              </div>
-            </div>
-            <details className="mt-2 rounded-lg border bg-white p-2 text-xs">
-              <summary className="cursor-pointer font-medium">逐条样本偏差</summary>
-              <div className="mt-2 space-y-1 text-muted-foreground">
-                {candidate.sample_results.map((sample) => (
-                  <div key={`${sample.sample_index}:${sample.skill_id}`} className="rounded bg-slate-50 px-2 py-1">
-                    #{sample.sample_index + 1} {sample.sample_label ?? sample.skill_name ?? compactId(sample.skill_id)}：
-                    真实 {sample.observed_damage_value} / 预测 {sample.predicted_damage_value ?? "无法计算"} / 偏差 {sample.delta_value ?? "—"}
-                    {sample.matched_within_tolerance ? " / 命中容忍" : ""}
-                  </div>
+                <span className="shrink-0 text-xs text-muted-foreground">点击展开</span>
+              </summary>
+              <div className="space-y-2 p-3">
+                {group.candidates.map((candidate) => (
+                  <AttackerCandidateCard
+                    key={`${candidate.rank}:${candidate.nature_id}:${candidate.attack_talent}:${candidate.template_name ?? ""}`}
+                    candidate={candidate}
+                  />
                 ))}
               </div>
             </details>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <details className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
-        <summary className="cursor-pointer font-medium text-foreground">累计反推假设</summary>
+        <summary className="cursor-pointer font-medium text-foreground">反推假设</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           {result.assumptions.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
       </details>
+    </div>
+  );
+}
+
+function talentSummaryText(talents: DamageCalculatorTalentInput): string {
+  const cultivated = statKeys
+    .map((key) => ({ key, value: Number(talents[key] ?? 0) }))
+    .filter((item) => item.value > 0);
+  if (cultivated.length === 0) return "无资质";
+  return cultivated.map((item) => `${statName(item.key)} ${item.value}`).join(" / ");
+}
+
+type TalentCandidateLike = {
+  individual_talent_distribution: DamageCalculatorTalentInput;
+};
+
+function buildTalentStats(candidates: TalentCandidateLike[]) {
+  const total = candidates.length;
+  const counts = statKeys.map((key) => ({
+    key,
+    count: candidates.filter(
+      (candidate) => Number(candidate.individual_talent_distribution[key] ?? 0) > 0,
+    ).length,
+  }));
+  return {
+    total,
+    allPositive: counts.filter((item) => item.count === total && total > 0),
+    counts: counts.sort(
+      (left, right) =>
+        right.count - left.count || statName(left.key).localeCompare(statName(right.key), "zh-CN"),
+    ),
+  };
+}
+
+function CandidateTalentSummary({ candidates }: { candidates: TalentCandidateLike[] }) {
+  if (candidates.length === 0) return null;
+  const stats = buildTalentStats(candidates);
+  const allPositiveText =
+    stats.allPositive.length > 0
+      ? stats.allPositive.map((item) => statName(item.key)).join("、")
+      : "暂无所有候选共同点的资质";
+
+  return (
+    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-950">
+      <div className="font-semibold">候选资质统计</div>
+      <div className="mt-1">所有候选都点了：{allPositiveText}</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {stats.counts.map((item) => (
+          <Badge key={item.key} variant={item.count === stats.total ? "success" : "outline"}>
+            {statName(item.key)} {item.count}/{stats.total}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CandidateCard({
+  candidate,
+}: {
+  candidate: DamageCalculatorInferDefenderOut["candidates"][number];
+}) {
+  return (
+    <div className="rounded-xl border bg-white p-3 text-sm shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">#{candidate.rank} {candidate.nature_name}</span>
+            {candidate.template_name ? <Badge variant="outline">{candidate.template_name}</Badge> : null}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {statKeys
+              .map((key) => ({ key, value: Number(candidate.individual_talent_distribution[key] ?? 0) }))
+              .filter((item) => item.value > 0)
+              .map((item) => (
+                <Badge key={item.key} variant="secondary" className="bg-slate-100 text-slate-700">
+                  {statName(item.key)} {item.value}
+                </Badge>
+              ))}
+          </div>
+        </div>
+        <Badge variant={candidate.matched_within_tolerance ? "success" : "outline"}>命中</Badge>
+      </div>
+      <div className="mt-2 text-xs text-muted-foreground">
+        预测伤害 {candidate.predicted_damage_value ?? "无法计算"}
+        {candidate.predicted_damage_percent !== null && candidate.predicted_damage_percent !== undefined
+          ? `（${candidate.predicted_damage_percent}%）`
+          : ""}
+      </div>
+      {candidate.unknown_factors.length > 0 ? (
+        <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+          未知因素：{candidate.unknown_factors.join("、")}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AttackerCandidateCard({
+  candidate,
+}: {
+  candidate: DamageCalculatorInferAttackerOut["candidates"][number];
+}) {
+  return (
+    <div className="rounded-xl border bg-white p-3 text-sm shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">#{candidate.rank} {candidate.nature_name}</span>
+            {candidate.template_name ? <Badge variant="outline">{candidate.template_name}</Badge> : null}
+            {candidate.is_relevant_attack_positive_nature ? (
+              <Badge variant="success">{statName(candidate.relevant_attack_stat)}+ 性格</Badge>
+            ) : null}
+            {candidate.has_relevant_attack_talent ? (
+              <Badge variant="secondary">点了{statName(candidate.relevant_attack_stat)}资质</Badge>
+            ) : null}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {statKeys
+              .map((key) => ({ key, value: Number(candidate.individual_talent_distribution[key] ?? 0) }))
+              .filter((item) => item.value > 0)
+              .map((item) => (
+                <Badge key={item.key} variant="secondary" className="bg-slate-100 text-slate-700">
+                  {statName(item.key)} {item.value}
+                </Badge>
+              ))}
+          </div>
+        </div>
+        <Badge variant={candidate.matched_within_tolerance ? "success" : "outline"}>命中</Badge>
+      </div>
+      <div className="mt-2 text-xs text-muted-foreground">
+        预测伤害 {candidate.predicted_damage_value ?? "无法计算"}
+      </div>
+      {candidate.unknown_factors.length > 0 ? (
+        <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+          未知因素：{candidate.unknown_factors.join("、")}
+        </div>
+      ) : null}
     </div>
   );
 }

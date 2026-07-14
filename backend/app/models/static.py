@@ -60,6 +60,59 @@ class ElfDefinition(TimestampMixin, Base):
     data_version: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
+class ElfEvolutionChain(TimestampMixin, Base):
+    """精灵进化链主表。
+
+    进化链作为独立静态规则数据维护，避免把跨精灵关系强耦合在
+    ``elf_definition.forms_json`` 中。导入器可以按来源刷新本表及阶段表。
+    """
+
+    __tablename__ = "elf_evolution_chain"
+    __table_args__ = (
+        UniqueConstraint("chain_key", name="uq_elf_evolution_chain_chain_key"),
+        Index("idx_elf_evolution_chain_source", "source"),
+    )
+
+    chain_id: Mapped[str] = mapped_column(String, primary_key=True)
+    chain_key: Mapped[str] = mapped_column(String, nullable=False)
+    chain_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str | None] = mapped_column(String, nullable=True)
+    data_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ElfEvolutionStage(Base):
+    """精灵进化链阶段表。
+
+    同一阶段允许存在多个形态（例如同一 pet_id 的不同外观/首领形态），因此
+    ``stage_index`` 不是唯一值；查询时按链、阶段序号和精灵名稳定排序。
+    """
+
+    __tablename__ = "elf_evolution_stage"
+    __table_args__ = (
+        UniqueConstraint("chain_id", "elf_id", name="uq_elf_evolution_stage_chain_elf"),
+        Index("idx_elf_evolution_stage_chain", "chain_id", "stage_index"),
+        Index("idx_elf_evolution_stage_elf", "elf_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chain_id: Mapped[str] = mapped_column(
+        ForeignKey("elf_evolution_chain.chain_id"),
+        nullable=False,
+    )
+    elf_id: Mapped[str] = mapped_column(ForeignKey("elf_definition.elf_id"), nullable=False)
+    stage_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    stage_name: Mapped[str] = mapped_column(String, nullable=False)
+    form_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    evolves_from_elf_id: Mapped[str | None] = mapped_column(
+        ForeignKey("elf_definition.elf_id"),
+        nullable=True,
+    )
+    condition_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_stage_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_version: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class ElfLearnableSkill(Base):
     """
     精灵可学习技能关联模型。

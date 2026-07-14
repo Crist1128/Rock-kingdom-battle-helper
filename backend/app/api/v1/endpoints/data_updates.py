@@ -10,12 +10,15 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.data_pipeline.evolution_chains.importer import import_evolution_chain_seed
 from app.data_pipeline.static_rule_sync import (
     check_structured_skill_rule_sync,
     sync_structured_skill_rules,
 )
 from app.db.session import get_db
 from app.schemas.data_update import (
+    EvolutionChainSyncRequest,
+    EvolutionChainSyncResponse,
     ProjectBootstrapLocalRequest,
     ProjectDataBootstrapStatus,
     RocomCheckRequest,
@@ -227,3 +230,28 @@ def sync_static_skill_rules(
         q=request.q,
     )
     return StaticSkillRuleSyncResponse(**result)
+
+
+@router.post(
+    "/static-rules/evolution-chains/sync",
+    response_model=EvolutionChainSyncResponse,
+    summary="同步精灵进化链 seed 到数据库",
+)
+def sync_evolution_chains(
+    request: EvolutionChainSyncRequest,
+    _: None = Depends(verify_admin_token),
+    db: Session = Depends(get_db),
+) -> EvolutionChainSyncResponse:
+    """单独同步进化链 seed；commit=false 时仍为 dry-run。"""
+    try:
+        result = import_evolution_chain_seed(db)
+        if request.commit:
+            db.commit()
+            result["transaction"] = "committed"
+        else:
+            db.rollback()
+            result["transaction"] = "rolled_back_dry_run"
+    except Exception:
+        db.rollback()
+        raise
+    return EvolutionChainSyncResponse(**result)

@@ -4,6 +4,7 @@ import { API_BASE_URL, ApiError, api } from "@/lib/api";
 import type {
   BattleOut,
   BattlePurgeResultOut,
+  EvolutionChainSyncResponse,
   ProjectDataBootstrapStatus,
   RocomCheckResponse,
   RocomDataUpdateAccepted,
@@ -59,6 +60,8 @@ export function SettingsPage() {
   const [lastStaticRuleResult, setLastStaticRuleResult] =
     useState<StaticSkillRuleSyncResponse | null>(null);
   const [selectedStaticRuleSkillIds, setSelectedStaticRuleSkillIds] = useState<string[]>([]);
+  const [lastEvolutionChainResult, setLastEvolutionChainResult] =
+    useState<EvolutionChainSyncResponse | null>(null);
 
   // 归档战斗清理表单状态。
   const [olderThanDays, setOlderThanDays] = useState("");
@@ -223,6 +226,15 @@ export function SettingsPage() {
     },
   });
 
+  const evolutionChainSyncMutation = useMutation({
+    mutationFn: (commit: boolean) =>
+      api.adminDataUpdates.syncEvolutionChains({ commit }, adminToken || undefined),
+    onSuccess: async (result) => {
+      setLastEvolutionChainResult(result);
+      await refreshRuleQueries();
+    },
+  });
+
   const bulkPurgeMutation = useMutation({
     mutationFn: (dryRun: boolean) =>
       api.adminBattles.purgeArchived(
@@ -270,6 +282,7 @@ export function SettingsPage() {
   const importLocalError = getApiErrorText(importLocalMutation.error);
   const staticRuleCheckError = getApiErrorText(staticRuleCheckMutation.error);
   const staticRuleSyncError = getApiErrorText(staticRuleSyncMutation.error);
+  const evolutionChainSyncError = getApiErrorText(evolutionChainSyncMutation.error);
   const dataJobsError = getApiErrorText(dataUpdateJobs.error);
   const bulkError = getApiErrorText(bulkPurgeMutation.error);
   const singleError = getApiErrorText(singlePurgeMutation.error);
@@ -407,9 +420,46 @@ export function SettingsPage() {
           </section>
 
           <section className="space-y-3 rounded-2xl border bg-white p-4">
+            <div>
+              <h3 className="font-semibold">1. 单独录入精灵进化链规则</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                如果数据库已经有精灵基础数据，只缺进化/退化形态链，可以直接把仓库内
+                <span className="mx-1 font-mono">backend/app/seed/elf_evolution_chains.json</span>
+                写入进化链表。建议先 dry-run，再确认提交。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => evolutionChainSyncMutation.mutate(false)}
+                disabled={evolutionChainSyncMutation.isPending}
+              >
+                预检查进化链（dry-run）
+              </Button>
+              <Button
+                onClick={() => {
+                  if (window.confirm("确认写入精灵进化链规则？建议先 dry-run 检查结果。")) {
+                    evolutionChainSyncMutation.mutate(true);
+                  }
+                }}
+                disabled={evolutionChainSyncMutation.isPending}
+              >
+                录入进化链规则
+              </Button>
+            </div>
+            {evolutionChainSyncMutation.isPending ? (
+              <InlineProgressBar label="正在同步进化链规则..." />
+            ) : null}
+            {lastEvolutionChainResult ? (
+              <EvolutionChainSyncResultPanel result={lastEvolutionChainResult} />
+            ) : null}
+            {evolutionChainSyncError ? <ErrorBox text={evolutionChainSyncError} /> : null}
+          </section>
+
+          <section className="space-y-3 rounded-2xl border bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="font-semibold">1. 检查远程是否可能有新增精灵</h3>
+                <h3 className="font-semibold">2. 检查远程是否可能有新增精灵</h3>
                 <p className="mt-1 text-sm text-muted-foreground">只解析图鉴列表，不抓取详情、不写库；适合快速判断是否需要同步。</p>
               </div>
               <Button onClick={() => checkMutation.mutate()} disabled={checkMutation.isPending}>
@@ -832,11 +882,13 @@ function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }
         </Badge>
       </div>
       <div className="mt-2 text-sm text-muted-foreground">{status.recommended_action}</div>
-      <div className="mt-3 grid gap-2 text-sm md:grid-cols-4">
+      <div className="mt-3 grid gap-2 text-sm md:grid-cols-6">
         <InfoMini label="精灵" value={String(status.counts.elves ?? 0)} />
         <InfoMini label="技能" value={String(status.counts.skills ?? 0)} />
         <InfoMini label="可学习技能" value={String(status.counts.learnable_skills ?? 0)} />
         <InfoMini label="状态定义" value={String(status.counts.effects ?? 0)} />
+        <InfoMini label="进化链" value={String(status.counts.evolution_chains ?? 0)} />
+        <InfoMini label="链内形态" value={String(status.counts.evolution_stages ?? 0)} />
       </div>
       {status.missing_required.length ? (
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -895,6 +947,28 @@ function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }
           </div>
         </div>
       </details>
+    </div>
+  );
+}
+
+function EvolutionChainSyncResultPanel({ result }: { result: EvolutionChainSyncResponse }) {
+  return (
+    <div className="rounded-2xl border bg-slate-50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-semibold">进化链同步结果</div>
+        <Badge variant={result.transaction === "committed" ? "success" : "secondary"}>
+          {result.transaction === "committed" ? "已写入" : "dry-run 未写入"}
+        </Badge>
+      </div>
+      <div className="mt-3 grid gap-2 text-sm md:grid-cols-4">
+        <InfoMini label="新增链" value={String(result.chains_created)} />
+        <InfoMini label="刷新旧链" value={String(result.chains_refreshed)} />
+        <InfoMini label="阶段写入" value={String(result.stages_created)} />
+        <InfoMini label="缺失精灵跳过" value={String(result.stages_skipped_missing_elf)} />
+      </div>
+      <div className="mt-2 text-xs text-muted-foreground">
+        来源：{result.source}；重复阶段跳过：{result.stages_skipped_duplicate_chain_elf}
+      </div>
     </div>
   );
 }

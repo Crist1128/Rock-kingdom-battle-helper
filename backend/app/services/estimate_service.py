@@ -151,6 +151,9 @@ class EstimateService:
             "nature_id": payload.nature_id,
             "individual_talent_distribution": individual.model_dump(),
         }
+        recommended_bloodlines = self._recommended_bloodlines_for_elf(elf)
+        if recommended_bloodlines:
+            default_config["recommended_bloodlines"] = recommended_bloodlines
         estimate.default_config_json = dumps_json(default_config)
         estimate.default_panel_json = dumps_json(panel)
         estimate.estimated_panel_json = dumps_json(panel)
@@ -586,9 +589,17 @@ class EstimateService:
         )
         return (
             {
-                "preset": "auto_by_documented_default_rules",
+                "preset": (
+                    "auto_by_pet_detail_recommendation"
+                    if rule.get("recommended_personality")
+                    or rule.get("recommended_bloodlines")
+                    or dict(rule.get("heuristic") or {}).get("recommended_talent_pattern_only")
+                    else "auto_by_documented_default_rules"
+                ),
                 "nature_id": nature.nature_id,
                 "individual_talent_distribution": individual.model_dump(),
+                "recommended_personality": rule.get("recommended_personality"),
+                "recommended_bloodlines": rule.get("recommended_bloodlines", []),
                 "heuristic": {
                     **rule["heuristic"],
                     "speed_threshold": HIGH_SPEED_THRESHOLD,
@@ -611,6 +622,11 @@ class EstimateService:
         )
 
     def _default_config_rule_for_elf(self, elf: ElfDefinition) -> dict[str, Any]:
+        base_rule = self._heuristic_default_config_rule_for_elf(elf)
+        recommended_rule = self._recommended_default_config_rule_for_elf(elf, base_rule)
+        return recommended_rule or base_rule
+
+    def _heuristic_default_config_rule_for_elf(self, elf: ElfDefinition) -> dict[str, Any]:
         """根据种族值分类生成默认性格方向和三项 10 资质。"""
         dominant_attack = self._dominant_attack_stat(elf)
         main_attack_value = self._stat_talent(elf, dominant_attack)
@@ -693,6 +709,147 @@ class EstimateService:
                 "is_tank_candidate": is_tank_candidate,
             },
         }
+
+    def _recommended_default_config_rule_for_elf(
+        self,
+        elf: ElfDefinition,
+        base_rule: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        nature_entries = self._recommended_nature_entries(elf)
+        talents = self._recommended_talents_for_elf(elf) or base_rule["talents"]
+        bloodlines = self._recommended_bloodlines_for_elf(elf)
+        base_heuristic = dict(base_rule.get("heuristic") or {})
+        for entry in nature_entries:
+            nature_id = entry.get("nature_id")
+            nature = self.db.get(NatureDefinition, nature_id) if nature_id else None
+            if nature is None or nature.deleted_at is not None:
+                continue
+            return {
+                "positive_stat": StatKey(nature.positive_stat),
+                "negative_stat": StatKey(nature.negative_stat),
+                "talents": talents,
+                "recommended_personality": entry.get("value"),
+                "recommended_bloodlines": bloodlines,
+                "heuristic": {
+                    **base_heuristic,
+                    "archetype": "pet_detail_recommendation",
+                    "recommendation_source": entry.get("source") or "elf_definition",
+                    "fallback_archetype": base_heuristic.get("archetype"),
+                },
+            }
+        if talents != base_rule["talents"] or bloodlines:
+            return {
+                **base_rule,
+                "talents": talents,
+                "recommended_bloodlines": bloodlines,
+                "heuristic": {
+                    **base_heuristic,
+                    "recommendation_source": "elf_definition",
+                    "recommended_talent_pattern_only": talents != base_rule["talents"],
+                },
+            }
+        return None
+
+    def _build_recommended_default_config_for_constraints(
+        self,
+        elf: ElfDefinition,
+        stat_constraints: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        base_rule = self._heuristic_default_config_rule_for_elf(elf)
+        talents = self._recommended_talents_for_elf(elf) or base_rule["talents"]
+        bloodlines = self._recommended_bloodlines_for_elf(elf)
+        for entry in self._recommended_nature_entries(elf):
+            nature_id = entry.get("nature_id")
+            nature = self.db.get(NatureDefinition, nature_id) if nature_id else None
+            if nature is None or nature.deleted_at is not None:
+                continue
+            individual = IndividualTalentDistribution(**talents)
+            panel = StatCalculator.calculate_panel_stats(
+                base=self._elf_to_base_talent_block(elf),
+                individual=individual,
+                nature=self._nature_to_rule(nature),
+            )
+            if self._panel_constraint_violations(panel.model_dump(), stat_constraints):
+                continue
+            return (
+                {
+                    "preset": "auto_repaired_by_pet_detail_recommendation",
+                    "nature_id": nature.nature_id,
+                    "individual_talent_distribution": individual.model_dump(),
+                    "recommended_personality": entry.get("value"),
+                    "recommended_bloodlines": bloodlines,
+                    "repair": {
+                        "reason": "popular_nature_satisfied_realtime_constraints",
+                        "recommendation_source": entry.get("source") or "elf_definition",
+                    },
+                },
+                {**panel.model_dump(), "source": "realtime_constraint_repair"},
+            )
+        return None
+
+    def _recommended_nature_entries(self, elf: ElfDefinition) -> list[dict[str, Any]]:
+        payload = loads_json(elf.common_natures_json, []) or []
+        if not isinstance(payload, list):
+            return []
+        entries = [item for item in payload if isinstance(item, dict)]
+        return sorted(entries, key=lambda item: int(item.get("rank") or 999))
+
+    @staticmethod
+    def _stat_key_from_recommendation(value: Any) -> str | None:
+        stat_aliases = {
+            "hp": StatKey.HP.value,
+            "生命": StatKey.HP.value,
+            "physical_attack": StatKey.PHYSICAL_ATTACK.value,
+            "物攻": StatKey.PHYSICAL_ATTACK.value,
+            "physical_defense": StatKey.PHYSICAL_DEFENSE.value,
+            "物防": StatKey.PHYSICAL_DEFENSE.value,
+            "magic_attack": StatKey.MAGIC_ATTACK.value,
+            "魔攻": StatKey.MAGIC_ATTACK.value,
+            "magic_defense": StatKey.MAGIC_DEFENSE.value,
+            "魔防": StatKey.MAGIC_DEFENSE.value,
+            "speed": StatKey.SPEED.value,
+            "速度": StatKey.SPEED.value,
+        }
+        text = str(value).strip()
+        return stat_aliases.get(text)
+
+    def _recommended_talents_for_elf(self, elf: ElfDefinition) -> dict[str, int] | None:
+        payload = loads_json(elf.common_individual_talent_patterns_json, {}) or {}
+        if not isinstance(payload, dict):
+            return None
+        patterns = payload.get("talent_patterns")
+        if not isinstance(patterns, list) or not patterns:
+            return None
+        first = patterns[0]
+        values = first.get("value") if isinstance(first, dict) else None
+        if not isinstance(values, list):
+            return None
+        talents = {stat.value: 0 for stat in StatKey}
+        selected_count = 0
+        for value in values:
+            stat_key = self._stat_key_from_recommendation(value)
+            if stat_key is None:
+                continue
+            talents[stat_key] = 10
+            selected_count += 1
+        return talents if selected_count else None
+
+    def _recommended_bloodlines_for_elf(self, elf: ElfDefinition) -> list[str]:
+        payload = loads_json(elf.common_individual_talent_patterns_json, {}) or {}
+        if not isinstance(payload, dict):
+            return []
+        direct = payload.get("recommended_bloodlines")
+        if isinstance(direct, list):
+            return [str(item) for item in direct if str(item).strip()]
+        bloodlines = payload.get("bloodlines")
+        if not isinstance(bloodlines, list):
+            return []
+        result: list[str] = []
+        for item in bloodlines:
+            value = item.get("value") if isinstance(item, dict) else item
+            if value is not None and str(value).strip():
+                result.append(str(value))
+        return result
 
     @staticmethod
     def _talents_for_stats(*stats: StatKey) -> dict[str, int]:
@@ -2014,11 +2171,18 @@ class EstimateService:
             return
 
         preferred_stat = self._preferred_repair_stat(inferred_stats)
+        elf = self.db.get(ElfDefinition, estimate.elf_id)
         replacement = (
-            self._build_repair_default_config(estimate.elf_id, preferred_stat)
-            if preferred_stat is not None
-            else self._build_auto_default_config(estimate.elf_id)
+            self._build_recommended_default_config_for_constraints(elf, stat_constraints)
+            if elf is not None and elf.deleted_at is None
+            else None
         )
+        if replacement is None:
+            replacement = (
+                self._build_repair_default_config(estimate.elf_id, preferred_stat)
+                if preferred_stat is not None
+                else self._build_auto_default_config(estimate.elf_id)
+            )
         if replacement is None:
             existing_unknowns = loads_json(estimate.unknown_factors_json, []) or []
             estimate.unknown_factors_json = dumps_json(
@@ -2119,6 +2283,7 @@ class EstimateService:
                 "preset": "auto_repaired_by_realtime_constraints",
                 "nature_id": nature.nature_id,
                 "individual_talent_distribution": individual.model_dump(),
+                "recommended_bloodlines": self._recommended_bloodlines_for_elf(elf),
                 "repair": {
                     "reason": "previous_default_config_violated_realtime_constraints",
                     "preferred_stat": preferred_stat,

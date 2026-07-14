@@ -15,20 +15,23 @@ import type {
   DamageEventCreateResult,
   DamageCalculatorBootstrapOut,
   DamageCalculatorCalculateInput,
-  DamageCalculatorInferDefenderBatchInput,
-  DamageCalculatorInferDefenderBatchOut,
+  DamageCalculatorInferAttackerInput,
+  DamageCalculatorInferAttackerOut,
   DamageCalculatorInferDefenderInput,
   DamageCalculatorInferDefenderOut,
   DamageCalculatorResultOut,
   EffectApplyInput,
   EffectDefinitionOut,
   EnemyLineupRecognitionOut,
+  EvolutionChainSyncRequest,
+  EvolutionChainSyncResponse,
   EnemyDefaultConfigInput,
   EnemyPanelEstimateEvidenceOut,
   EnemyPanelEstimateOut,
   EndTurnInput,
   EndTurnResult,
   ElfDefinitionOut,
+  ElfEvolutionChainOut,
   LineupInput,
   LineupOut,
   NatureDefinitionOut,
@@ -162,6 +165,8 @@ export const api = {
     list: (params: { q?: string; limit?: number; offset?: number } = {}) =>
       request<ElfDefinitionOut[]>(`/elves${qs({ limit: 50, ...params })}`),
     get: (elfId: string) => request<ElfDefinitionOut>(`/elves/${elfId}`),
+    evolutionChain: (elfId: string) =>
+      request<ElfEvolutionChainOut>(`/elves/${elfId}/evolution-chain`),
     skills: (elfId: string, params: { q?: string; limit?: number; offset?: number } = {}) =>
       request<SkillDefinitionOut[]>(`/elves/${elfId}/skills${qs({ limit: 500, ...params })}`),
   },
@@ -200,8 +205,8 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    inferDefenderBatch: (payload: DamageCalculatorInferDefenderBatchInput) =>
-      request<DamageCalculatorInferDefenderBatchOut>("/damage-calculator/infer-defender-batch", {
+    inferAttacker: (payload: DamageCalculatorInferAttackerInput) =>
+      request<DamageCalculatorInferAttackerOut>("/damage-calculator/infer-attacker", {
         method: "POST",
         body: JSON.stringify(payload),
       }),
@@ -420,6 +425,12 @@ export const api = {
       ),
     syncStaticSkillRules: (payload: StaticSkillRuleSyncRequest, adminToken?: string) =>
       request<StaticSkillRuleSyncResponse>("/admin/data-updates/static-rules/skill-reviews/sync", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+        body: JSON.stringify(payload),
+      }),
+    syncEvolutionChains: (payload: EvolutionChainSyncRequest, adminToken?: string) =>
+      request<EvolutionChainSyncResponse>("/admin/data-updates/static-rules/evolution-chains/sync", {
         method: "POST",
         headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
         body: JSON.stringify(payload),

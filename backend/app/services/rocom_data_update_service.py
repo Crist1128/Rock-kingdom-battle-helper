@@ -26,6 +26,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import BACKEND_DIR, settings
 from app.data_pipeline.effects.importer import import_effect_definitions, read_effect_rows
+from app.data_pipeline.evolution_chains.importer import (
+    DEFAULT_SEED_PATH as EVOLUTION_CHAIN_SEED_FILE,
+)
+from app.data_pipeline.evolution_chains.importer import (
+    import_evolution_chain_seed,
+)
 from app.data_pipeline.rocom.cleaner import clean_from_raw_sprites, write_cleaned_dataset
 from app.data_pipeline.rocom.importer import import_dataset, load_cleaned_dataset
 from app.data_pipeline.rocom.scraper import parse_list_page, scrape_rocom_sprites
@@ -39,6 +45,8 @@ from app.db.session import SessionLocal
 from app.models.static import (
     EffectDefinition,
     ElfDefinition,
+    ElfEvolutionChain,
+    ElfEvolutionStage,
     ElfLearnableSkill,
     NatureDefinition,
     SkillDefinition,
@@ -581,7 +589,11 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
             "exists": path.exists(),
             "size_bytes": path.stat().st_size if path.exists() else 0,
         }
-        for path in [*PROJECT_EFFECT_SEED_FILES, *PROJECT_SKILL_REVIEW_SEED_FILES]
+        for path in [
+            *PROJECT_EFFECT_SEED_FILES,
+            *PROJECT_SKILL_REVIEW_SEED_FILES,
+            EVOLUTION_CHAIN_SEED_FILE,
+        ]
     ]
 
     init_db()
@@ -595,6 +607,8 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
             "learnable_skills": _table_count(db, ElfLearnableSkill),
             "type_effectiveness_rules": _table_count(db, TypeEffectivenessRule),
             "effects": _table_count(db, EffectDefinition),
+            "evolution_chains": _table_count(db, ElfEvolutionChain),
+            "evolution_stages": _table_count(db, ElfEvolutionStage),
         }
         seed_rule_status = check_effect_definition_seed_sync(db, limit=20)
     finally:
@@ -610,9 +624,10 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
         counts["effects"] > 0
         and int(seed_rule_status.get("pending_count") or 0) == 0
     )
+    has_evolution_chains = counts["evolution_chains"] > 0 and counts["evolution_stages"] > 0
     local_package_ready = all(item["exists"] for item in cleaned_files)
     seed_files_ready = all(item["exists"] for item in seed_files)
-    ready = has_static_data and has_project_rules
+    ready = has_static_data and has_project_rules and has_evolution_chains
     missing_required = []
     if counts["natures"] == 0:
         missing_required.append("核心性格")
@@ -622,6 +637,8 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
         missing_required.append("BWIKI 静态数据：精灵、技能、可学习技能、属性克制")
     if not has_project_rules:
         missing_required.append("项目规则 seed：状态定义与人工技能分支")
+    if not has_evolution_chains:
+        missing_required.append("精灵进化链 seed：工作台形态切换候选")
     if not seed_files_ready:
         missing_required.append("仓库内项目 seed 文件")
 
@@ -680,6 +697,13 @@ def get_project_bootstrap_status(cleaned_dir: str | None = None) -> dict[str, An
                 "name": "项目规则 seed",
                 "source": "backend/app/seed/*.json",
                 "import_path": "一键初始化、本地 cleaned 导入和远程同步都会并入导入事务",
+                "auto_on_startup": False,
+            },
+            {
+                "key": "evolution_chains",
+                "name": "精灵进化链 seed",
+                "source": "backend/app/seed/elf_evolution_chains.json",
+                "import_path": "一键初始化、本地 cleaned 导入和远程同步会并入导入事务",
                 "auto_on_startup": False,
             },
         ],
@@ -955,9 +979,12 @@ def import_project_seed_rules(db: Session) -> dict[str, Any]:
         summary = import_skill_rule_reviews(db, rows)
         review_summaries.append({"path": str(path), **summary})
 
+    evolution_chain_summary = import_evolution_chain_seed(db)
+
     return {
         "effect_seed_files": effect_summaries,
         "skill_review_seed_files": review_summaries,
+        "evolution_chains": evolution_chain_summary,
     }
 
 

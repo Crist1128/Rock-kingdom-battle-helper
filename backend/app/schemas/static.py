@@ -51,6 +51,48 @@ class ElfDefinitionOut(ORMBase):
     data_version: str | None = None
 
 
+class ElfEvolutionStageOut(BaseModel):
+    """进化链阶段输出。"""
+
+    chain_id: str = Field(..., description="进化链 ID")
+    elf_id: str = Field(..., description="阶段对应的精灵 ID")
+    elf_name: str = Field(..., description="阶段对应的精灵名称")
+    avatar: str = Field(..., description="阶段精灵头像")
+    element_types_json: str = Field(..., description="阶段精灵属性 JSON")
+    stage_index: int = Field(..., description="进化链阶段序号")
+    stage_name: str = Field(..., description="来源进化链中的阶段名称")
+    form_name: str | None = Field(default=None, description="来源进化链中的形态名称")
+    evolves_from_elf_id: str | None = Field(default=None, description="上一阶段精灵 ID")
+    condition_json: str | None = Field(default=None, description="进化条件 JSON")
+    base_hp_talent: int = Field(..., description="生命种族资质")
+    base_physical_attack_talent: int = Field(..., description="物攻种族资质")
+    base_physical_defense_talent: int = Field(..., description="物防种族资质")
+    base_magic_attack_talent: int = Field(..., description="魔攻种族资质")
+    base_magic_defense_talent: int = Field(..., description="魔防种族资质")
+    base_speed_talent: int = Field(..., description="速度种族资质")
+
+
+class ElfEvolutionChainGroupOut(BaseModel):
+    """单条进化链输出。"""
+
+    chain_id: str = Field(..., description="进化链 ID")
+    chain_name: str | None = Field(default=None, description="进化链显示名称")
+    source: str | None = Field(default=None, description="数据来源")
+    data_version: str | None = Field(default=None, description="数据版本")
+    stages: list[ElfEvolutionStageOut] = Field(default_factory=list, description="链内阶段")
+
+
+class ElfEvolutionChainOut(BaseModel):
+    """某只精灵关联的进化链输出。"""
+
+    current_elf_id: str = Field(..., description="当前查询的精灵 ID")
+    chains: list[ElfEvolutionChainGroupOut] = Field(default_factory=list, description="关联进化链")
+    stages: list[ElfEvolutionStageOut] = Field(
+        default_factory=list,
+        description="所有关联链阶段的去重扁平列表，供前端形态选择使用",
+    )
+
+
 class NatureDefinitionOut(ORMBase):
     """
     性格定义输出 Schema。

@@ -109,16 +109,29 @@ export function EstimatePanel({
       ? "base_talent"
       : "unknown";
   const evidenceItems = (estimateEvidenceQuery.data ?? []).slice(0, 6);
-  const disallowedPositiveStats = useMemo(
+const disallowedPositiveStats = useMemo(
     () => disallowedPositiveStatsForSelection(estimate?.stat_constraints),
+    [estimate?.stat_constraints],
+  );
+  const relevantAttackStat = useMemo(
+    () => relevantAttackStatForSelection(estimate?.stat_constraints),
     [estimate?.stat_constraints],
   );
   const availableNatures = useMemo(
     () =>
       (natures.data ?? []).filter((nature) =>
-        natureIsAllowedByConstraints(nature, preferredDefaultStat, disallowedPositiveStats),
+        natureIsAllowedByConstraints(
+          nature,
+          preferredDefaultStat,
+          disallowedPositiveStats,
+          relevantAttackStat,
+        ),
       ),
-    [disallowedPositiveStats, natures.data, preferredDefaultStat],
+    [disallowedPositiveStats, natures.data, preferredDefaultStat, relevantAttackStat],
+  );
+  const natureGroups = useMemo(
+    () => groupNaturesByPositiveStat(availableNatures, relevantAttackStat),
+    [availableNatures, relevantAttackStat],
   );
   const defaultNature = availableNatures.find((nature) => nature.nature_id === defaultNatureId);
   const defaultNatureAllowed =
@@ -134,6 +147,10 @@ export function EstimatePanel({
   const defaultPanelItems = useMemo(
     () => buildPanelItems(estimate?.default_panel),
     [estimate?.default_panel],
+  );
+  const recommendedBloodlines = useMemo(
+    () => stringListFromUnknown(estimate?.default_config?.recommended_bloodlines),
+    [estimate?.default_config],
   );
   const canSaveDefaultConfig = Boolean(
     defaultNatureId
@@ -228,6 +245,16 @@ export function EstimatePanel({
     );
   }
 
+  const handleDefaultNatureSelect = (nextNatureId: string) => {
+    const nextNature = availableNatures.find((nature) => nature.nature_id === nextNatureId);
+    setDefaultNatureId(nextNatureId);
+    setDefaultTalents((current) => {
+      if (talentMode !== "auto") return current;
+      return buildDefaultTalentsForNature(nextNature, current, relevantAttackStat);
+    });
+    setDefaultFormTouched(true);
+  };
+
   return (
     <Card>
       <CardHeader className="space-y-1 p-3">
@@ -246,29 +273,74 @@ export function EstimatePanel({
           <div className="grid gap-3">
             <div>
               <label className="text-sm font-medium">默认性格</label>
-              <Select
-                className="mt-2"
-                value={defaultNatureId}
-                onChange={(event) => {
-                  const nextNatureId = event.target.value;
-                  const nextNature = availableNatures.find(
-                    (nature) => nature.nature_id === nextNatureId,
-                  );
-                  setDefaultNatureId(nextNatureId);
-                  setDefaultTalents((current) => {
-                    if (talentMode !== "auto") return current;
-                    return buildDefaultTalentsForNature(nextNature, current);
-                  });
-                  setDefaultFormTouched(true);
-                }}
-              >
-                <option value="">请选择默认性格</option>
-                {availableNatures.map((nature) => (
-                  <option key={nature.nature_id} value={nature.nature_id}>
-                    {nature.nature_name}
-                  </option>
-                ))}
-              </Select>
+              <div className="mt-2 space-y-2">
+                {defaultNature ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                    当前：{defaultNature.nature_name}（+{statName(defaultNature.positive_stat)}
+                    {" / -"}
+                    {statName(defaultNature.negative_stat)}）
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
+                    请选择默认性格。
+                  </div>
+                )}
+                {natureGroups.length > 0 ? (
+                  <div className="space-y-2">
+                    {natureGroups.map((group) => {
+                      const selectedInGroup = group.natures.some(
+                        (nature) => nature.nature_id === defaultNatureId,
+                      );
+                      return (
+                        <details
+                          key={group.key}
+                          className="overflow-hidden rounded-xl border bg-slate-50"
+                        >
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-white px-3 py-2 text-sm transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                            <span className="font-semibold text-emerald-700">
+                              {group.title}
+                            </span>
+                            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                              {selectedInGroup ? (
+                                <Badge variant="success">已选</Badge>
+                              ) : null}
+                              <Badge variant="outline">{group.natures.length} 个</Badge>
+                            </span>
+                          </summary>
+                          <div className="grid gap-2 p-2">
+                            {group.natures.map((nature) => {
+                              const selected = nature.nature_id === defaultNatureId;
+                              return (
+                                <button
+                                  key={nature.nature_id}
+                                  type="button"
+                                  className={[
+                                    "rounded-lg border px-3 py-2 text-left text-sm transition",
+                                    selected
+                                      ? "border-emerald-400 bg-emerald-50 text-emerald-950"
+                                      : "bg-white hover:border-emerald-200 hover:bg-emerald-50/50",
+                                  ].join(" ")}
+                                  onClick={() => handleDefaultNatureSelect(nature.nature_id)}
+                                >
+                                  <span className="font-medium">{nature.nature_name}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    +{statName(nature.positive_stat)} / -
+                                    {statName(nature.negative_stat)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                    当前约束下没有可选性格。
+                  </div>
+                )}
+              </div>
               {disallowedPositiveStats.size > 0 ? (
                 <div className="mt-1 text-xs text-muted-foreground">
                   已隐藏明显冲突性格；保存时后端会校验。
@@ -289,7 +361,7 @@ export function EstimatePanel({
                     type="button"
                     onClick={() => {
                       setDefaultTalents((current) =>
-                        buildDefaultTalentsForNature(defaultNature, current),
+                        buildDefaultTalentsForNature(defaultNature, current, relevantAttackStat),
                       );
                       setTalentMode("auto");
                       setDefaultFormTouched(true);
@@ -339,6 +411,27 @@ export function EstimatePanel({
                 保存后显示默认六维面板，仅用于展示。
               </div>
             )}
+            <div className="rounded-xl border bg-slate-50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">热门血脉</span>
+                <Badge variant={recommendedBloodlines.length ? "success" : "outline"}>
+                  {recommendedBloodlines.length ? `${recommendedBloodlines.length} 项` : "未记录"}
+                </Badge>
+              </div>
+              {recommendedBloodlines.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {recommendedBloodlines.map((bloodline) => (
+                    <Badge key={bloodline} variant="outline">
+                      {bloodline}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  当前精灵暂无已导入的热门血脉培养。
+                </div>
+              )}
+            </div>
             <Button
               variant="secondary"
               disabled={!canSaveDefaultConfig || !defaultNatureAllowed}
@@ -635,6 +728,11 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
+function stringListFromUnknown(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item).trim()).filter(Boolean);
+}
+
 interface ConstraintDisplayItem {
   statKey: string;
   rangeText: string;
@@ -761,9 +859,63 @@ function talentOptionsFor(
     : TALENT_OPTIONS;
 }
 
+interface NatureGroup {
+  key: string;
+  title: string;
+  natures: NatureDefinitionOut[];
+}
+
+const NATURE_GROUP_ORDER = [
+  "physical_attack",
+  "magic_attack",
+  "speed",
+  "hp",
+  "physical_defense",
+  "magic_defense",
+] as const;
+
+type AttackStat = "physical_attack" | "magic_attack";
+
+function groupNaturesByPositiveStat(
+  natures: NatureDefinitionOut[],
+  relevantAttackStat: AttackStat | null,
+): NatureGroup[] {
+  const grouped = new Map<string, NatureDefinitionOut[]>();
+  for (const nature of natures) {
+    const key = nature.positive_stat || "unknown";
+    const current = grouped.get(key);
+    if (current) {
+      current.push(nature);
+    } else {
+      grouped.set(key, [nature]);
+    }
+  }
+  const order = new Map<string, number>(
+    NATURE_GROUP_ORDER.map((statKey, index) => [statKey, index]),
+  );
+  return Array.from(grouped.entries())
+    .map(([key, groupNatures]) => ({
+      key,
+      title: key === "unknown" ? "正面未知性格" : `${statName(key)}+ 性格`,
+      natures: [...groupNatures].sort((left, right) =>
+        left.nature_name.localeCompare(right.nature_name, "zh-CN"),
+      ),
+    }))
+    .sort((left, right) => {
+      const leftOrder =
+        naturePositiveStatPenalty(left.key, relevantAttackStat) * 100
+        + (order.get(left.key) ?? 999);
+      const rightOrder =
+        naturePositiveStatPenalty(right.key, relevantAttackStat) * 100
+        + (order.get(right.key) ?? 999);
+      return leftOrder - rightOrder || left.title.localeCompare(right.title, "zh-CN");
+    });
+}
+
 function buildDefaultTalentsForNature(
   nature: NatureDefinitionOut | undefined,
   current: IndividualTalentInput,
+  relevantAttackStat: AttackStat | null = null,
 ): IndividualTalentInput {
   const talents = { ...EMPTY_TALENTS, hp: 10 };
   if (!nature) return talents;
@@ -773,7 +925,7 @@ function buildDefaultTalentsForNature(
   const add = (stat: keyof IndividualTalentInput) => {
     if (stat !== negative) talents[stat] = 10;
   };
-  const safeAttack = preferredAttackStat(current, negative);
+  const safeAttack = preferredAttackStat(current, negative, relevantAttackStat);
   const safeResistance = preferredResistanceStat(current, negative);
 
   if (positive === "hp") {
@@ -794,15 +946,33 @@ function buildDefaultTalentsForNature(
   if (positive === "speed") {
     add(safeAttack);
   } else if (positive === "physical_attack" || positive === "magic_attack") {
-    if (negative !== "speed") {
+    if (
+      relevantAttackStat
+      && relevantAttackStat !== positive
+      && relevantAttackStat !== negative
+    ) {
+      add(relevantAttackStat);
+    } else if (negative !== "speed") {
       add("speed");
     } else {
       add(safeResistance);
     }
   } else if (positive === "physical_defense") {
-    add(negative === "magic_defense" ? safeAttack : "magic_defense");
+    add(
+      relevantAttackStat && relevantAttackStat !== negative
+        ? relevantAttackStat
+        : negative === "magic_defense"
+          ? safeAttack
+          : "magic_defense",
+    );
   } else if (positive === "magic_defense") {
-    add(negative === "physical_defense" ? safeAttack : "physical_defense");
+    add(
+      relevantAttackStat && relevantAttackStat !== negative
+        ? relevantAttackStat
+        : negative === "physical_defense"
+          ? safeAttack
+          : "physical_defense",
+    );
   }
   return talents;
 }
@@ -810,7 +980,9 @@ function buildDefaultTalentsForNature(
 function preferredAttackStat(
   current: IndividualTalentInput,
   negative: keyof IndividualTalentInput,
+  relevantAttackStat: AttackStat | null = null,
 ): "physical_attack" | "magic_attack" {
+  if (relevantAttackStat && relevantAttackStat !== negative) return relevantAttackStat;
   if (negative === "physical_attack") return "magic_attack";
   if (negative === "magic_attack") return "physical_attack";
   if (current.magic_attack > current.physical_attack) return "magic_attack";
@@ -832,6 +1004,32 @@ function preferredPositiveStatForSelection(
 ): keyof IndividualTalentInput | null {
   if (!statConstraints) return null;
   for (const statKey of ["physical_attack", "magic_attack", "speed"] as const) {
+    const entry = statConstraints[statKey];
+    if (!isRecord(entry)) continue;
+    const status = asString(entry.status);
+    const min = asFiniteNumber(entry.integer_min);
+    const max = asFiniteNumber(entry.integer_max);
+    if (status === "formula_constraint_derived" && min !== null && max !== null) {
+      return statKey;
+    }
+  }
+  return null;
+}
+
+function relevantAttackStatForSelection(
+  statConstraints: Record<string, unknown> | undefined,
+): AttackStat | null {
+  if (!statConstraints) return null;
+  const history = Array.isArray(statConstraints.observation_history)
+    ? statConstraints.observation_history.filter(isRecord)
+    : [];
+  for (const item of [...history].reverse()) {
+    if (asString(item.enemy_role) !== "attacker") continue;
+    const skillCategory = asString(item.skill_category);
+    if (skillCategory === "physical") return "physical_attack";
+    if (skillCategory === "magic") return "magic_attack";
+  }
+  for (const statKey of ["physical_attack", "magic_attack"] as const) {
     const entry = statConstraints[statKey];
     if (!isRecord(entry)) continue;
     const status = asString(entry.status);
@@ -866,10 +1064,33 @@ function natureIsAllowedByConstraints(
   nature: NatureDefinitionOut | undefined,
   preferredStat: keyof IndividualTalentInput | null,
   disallowedPositiveStats: Set<string>,
+  relevantAttackStat: AttackStat | null,
 ) {
   if (!nature) return true;
-  if (preferredStat) return nature.positive_stat === preferredStat;
+  if (
+    preferredStat
+    && preferredStat !== relevantAttackStat
+    && preferredStat !== "physical_attack"
+    && preferredStat !== "magic_attack"
+  ) {
+    return nature.positive_stat === preferredStat;
+  }
   return !disallowedPositiveStats.has(nature.positive_stat);
+}
+
+function naturePositiveStatPenalty(
+  positiveStat: string,
+  relevantAttackStat: AttackStat | null,
+): number {
+  if (positiveStat === "physical_defense" || positiveStat === "magic_defense") {
+    return 1;
+  }
+  if (!relevantAttackStat) return 0;
+  const irrelevantAttackStat =
+    relevantAttackStat === "physical_attack" ? "magic_attack" : "physical_attack";
+  if (positiveStat === relevantAttackStat) return -1;
+  if (positiveStat === irrelevantAttackStat) return 1;
+  return 0;
 }
 
 function formatEvidenceValue(value: unknown) {

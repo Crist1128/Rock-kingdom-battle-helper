@@ -25,6 +25,39 @@ export interface ElfDefinitionOut {
   data_version?: string | null;
 }
 
+export interface ElfEvolutionStageOut {
+  chain_id: string;
+  elf_id: string;
+  elf_name: string;
+  avatar: string;
+  element_types_json: string;
+  stage_index: number;
+  stage_name: string;
+  form_name?: string | null;
+  evolves_from_elf_id?: string | null;
+  condition_json?: string | null;
+  base_hp_talent: number;
+  base_physical_attack_talent: number;
+  base_physical_defense_talent: number;
+  base_magic_attack_talent: number;
+  base_magic_defense_talent: number;
+  base_speed_talent: number;
+}
+
+export interface ElfEvolutionChainGroupOut {
+  chain_id: string;
+  chain_name?: string | null;
+  source?: string | null;
+  data_version?: string | null;
+  stages: ElfEvolutionStageOut[];
+}
+
+export interface ElfEvolutionChainOut {
+  current_elf_id: string;
+  chains: ElfEvolutionChainGroupOut[];
+  stages: ElfEvolutionStageOut[];
+}
+
 export interface RecognitionBoxOut {
   x1: number;
   y1: number;
@@ -169,6 +202,7 @@ export interface DamageCalculatorParticipantInput {
 
 export interface DamageCalculatorModifierInput {
   weather_multiplier?: number | null;
+  base_power_override?: number | null;
   power_multiplier?: number | null;
   flat_power_bonus?: number | null;
   stat_stage_multiplier?: number | null;
@@ -275,9 +309,11 @@ export interface DamageCalculatorInferDefenderInput {
   formula_type?: "attack";
   modifiers?: DamageCalculatorModifierInput;
   observed_damage_value: number;
+  observed_hp_percent_before?: number | null;
+  observed_hp_percent_after?: number | null;
+  observed_hp_percent_delta?: number | null;
   top_n?: number;
   notes?: string | null;
-  candidate_mode?: "focused" | "default_templates";
 }
 
 export interface DamageCalculatorDefenderCandidateOut {
@@ -294,6 +330,9 @@ export interface DamageCalculatorDefenderCandidateOut {
   predicted_damage_percent?: number | null;
   delta_value?: number | null;
   absolute_delta?: number | null;
+  delta_damage_percent?: number | null;
+  absolute_delta_damage_percent?: number | null;
+  combined_error?: number | null;
   score: number;
   matched_within_tolerance: boolean;
   unknown_factors: string[];
@@ -302,7 +341,10 @@ export interface DamageCalculatorDefenderCandidateOut {
 
 export interface DamageCalculatorInferDefenderOut {
   status: string;
-  observed_damage_value: number;
+  observed_damage_value?: number | null;
+  observed_hp_percent_delta?: number | null;
+  observed_hp_percent_before?: number | null;
+  observed_hp_percent_after?: number | null;
   skill_id: string;
   skill_name?: string | null;
   searched_candidate_count: number;
@@ -312,65 +354,46 @@ export interface DamageCalculatorInferDefenderOut {
   side_effect_policy: string;
 }
 
-export interface DamageCalculatorInferDefenderSampleInput {
-  attacker: DamageCalculatorParticipantInput;
+export interface DamageCalculatorInferAttackerInput {
+  attacker_elf_id: string;
+  defender: DamageCalculatorParticipantInput;
   skill_id: string;
   formula_type?: "attack";
   modifiers?: DamageCalculatorModifierInput;
   observed_damage_value: number;
-  label?: string | null;
+  top_n?: number;
   notes?: string | null;
 }
 
-export interface DamageCalculatorInferDefenderBatchInput {
-  defender_elf_id: string;
-  samples: DamageCalculatorInferDefenderSampleInput[];
-  candidate_mode?: "focused" | "default_templates";
-  tolerance?: number;
-  top_n?: number;
-}
-
-export interface DamageCalculatorInferDefenderSampleResultOut {
-  sample_index: number;
-  sample_label?: string | null;
-  skill_id: string;
-  skill_name?: string | null;
-  observed_damage_value: number;
-  predicted_damage_value?: number | null;
-  delta_value?: number | null;
-  absolute_delta?: number | null;
-  matched_within_tolerance: boolean;
-  unknown_factors: string[];
-  missing_parts: string[];
-}
-
-export interface DamageCalculatorBatchDefenderCandidateOut {
+export interface DamageCalculatorAttackerCandidateOut {
   rank: number;
   template_name?: string | null;
   nature_id: string;
   nature_name: string;
   individual_talent_distribution: DamageCalculatorTalentInput;
-  relevant_defense_stats: string[];
-  hp_talent: number;
-  physical_defense_talent: number;
-  magic_defense_talent: number;
+  relevant_attack_stat: string;
+  attack_talent: number;
   panel_stats: DamageCalculatorPanelInput;
-  total_absolute_delta: number;
-  average_absolute_delta: number;
-  matched_sample_count: number;
-  sample_count: number;
+  predicted_damage_value?: number | null;
+  delta_value?: number | null;
+  absolute_delta?: number | null;
   score: number;
-  sample_results: DamageCalculatorInferDefenderSampleResultOut[];
+  matched_within_tolerance: boolean;
+  is_relevant_attack_positive_nature: boolean;
+  has_relevant_attack_talent: boolean;
+  unknown_factors: string[];
+  missing_parts: string[];
 }
 
-export interface DamageCalculatorInferDefenderBatchOut {
+export interface DamageCalculatorInferAttackerOut {
   status: string;
-  defender_elf_id: string;
+  observed_damage_value: number;
+  skill_id: string;
+  skill_name?: string | null;
   searched_candidate_count: number;
   returned_candidate_count: number;
-  tolerance: number;
-  candidate_mode: string;
-  candidates: DamageCalculatorBatchDefenderCandidateOut[];
+  relevant_attack_stat: string;
+  candidates: DamageCalculatorAttackerCandidateOut[];
   assumptions: string[];
   side_effect_policy: string;
 }
@@ -464,12 +487,21 @@ export interface EnemyDefaultConfigInput {
   individual_talent_distribution: IndividualTalentInput;
 }
 
+export interface EnemyDefaultConfigOut {
+  preset?: string;
+  nature_id?: string;
+  individual_talent_distribution?: IndividualTalentInput;
+  recommended_personality?: string | null;
+  recommended_bloodlines?: string[];
+  [key: string]: unknown;
+}
+
 export interface EnemyPanelEstimateOut {
   estimate_id: string;
   battle_id: string;
   battle_elf_state_id: string;
   elf_id: string;
-  default_config?: Record<string, unknown> | null;
+  default_config?: EnemyDefaultConfigOut | null;
   default_panel?: Record<string, unknown> | null;
   estimated_panel?: Record<string, unknown> | null;
   stat_constraints: Record<string, unknown>;
@@ -1297,6 +1329,22 @@ export interface StaticSkillRuleSyncResponse {
   applied_count: number;
   applied_skill_count?: number;
   applied_effect_count?: number;
+  transaction: string;
+}
+
+export interface EvolutionChainSyncRequest {
+  commit?: boolean;
+}
+
+export interface EvolutionChainSyncResponse {
+  source: string;
+  chains_created: number;
+  chains_updated: number;
+  chains_refreshed: number;
+  stages_created: number;
+  stages_skipped_missing_elf: number;
+  stages_skipped_duplicate_chain_elf: number;
+  refresh_source: boolean;
   transaction: string;
 }
 

@@ -70,6 +70,30 @@ def db_session() -> Iterator[Session]:
                 base_magic_defense_talent=100,
                 base_speed_talent=100,
             ),
+            ElfDefinition(
+                elf_id="grass_ice_elf",
+                elf_name="双重克制测试精灵",
+                avatar="",
+                element_types_json=dumps_json(["grass", "ice"]),
+                base_hp_talent=100,
+                base_physical_attack_talent=100,
+                base_physical_defense_talent=100,
+                base_magic_attack_talent=100,
+                base_magic_defense_talent=100,
+                base_speed_talent=100,
+            ),
+            ElfDefinition(
+                elf_id="water_earth_elf",
+                elf_name="双重抵抗测试精灵",
+                avatar="",
+                element_types_json=dumps_json(["water", "earth"]),
+                base_hp_talent=100,
+                base_physical_attack_talent=100,
+                base_physical_defense_talent=100,
+                base_magic_attack_talent=100,
+                base_magic_defense_talent=100,
+                base_speed_talent=100,
+            ),
             SkillDefinition(
                 skill_id="fire_skill",
                 skill_name="火系测试技能",
@@ -127,6 +151,16 @@ def db_session() -> Iterator[Session]:
             TypeEffectivenessRule(
                 attack_element_type="fire",
                 defense_element_type="water",
+                multiplier=0.5,
+            ),
+            TypeEffectivenessRule(
+                attack_element_type="fire",
+                defense_element_type="ice",
+                multiplier=2.0,
+            ),
+            TypeEffectivenessRule(
+                attack_element_type="fire",
+                defense_element_type="earth",
                 multiplier=0.5,
             ),
             TypeEffectivenessRule(
@@ -278,6 +312,36 @@ def test_rule_resolver_combines_dual_type_by_project_rule(db_session: Session) -
 
     assert context.defender_element_types == ["grass", "water"]
     assert context.type_multiplier == Decimal("1")
+
+
+def test_rule_resolver_combines_double_strong_as_triple_damage(db_session: Session) -> None:
+    """双重克制仍按三倍伤害处理。"""
+    context = RuleResolver(db_session).resolve_damage_context(
+        _context("grass_ice_elf"),
+        {"resolve_rules": True},
+    )
+
+    assert context.defender_element_types == ["grass", "ice"]
+    assert context.rule_resolution_details["type_multiplier"]["single_multipliers"] == [
+        "2.0",
+        "2.0",
+    ]
+    assert context.type_multiplier == Decimal("3")
+
+
+def test_rule_resolver_combines_double_resist_as_quarter_damage(db_session: Session) -> None:
+    """双重抵抗应为四倍免伤，即只受到四分之一伤害。"""
+    context = RuleResolver(db_session).resolve_damage_context(
+        _context("water_earth_elf"),
+        {"resolve_rules": True},
+    )
+
+    assert context.defender_element_types == ["water", "earth"]
+    assert context.rule_resolution_details["type_multiplier"]["single_multipliers"] == [
+        "0.5",
+        "0.5",
+    ]
+    assert context.type_multiplier == Decimal("0.25")
 
 
 def test_rule_resolver_marks_unknown_when_response_branch_is_unknown(

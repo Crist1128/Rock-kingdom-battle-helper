@@ -110,6 +110,50 @@ def test_create_for_enemy_state_uses_auto_default_config(db_session: Session) ->
     assert out.unknown_factors
 
 
+def test_auto_default_config_prefers_imported_hot_recommendations(db_session: Session) -> None:
+    elf = db_session.get(ElfDefinition, "enemy_elf")
+    assert elf is not None
+    elf.common_natures_json = dumps_json(
+        [
+            {
+                "value": "hot_speed",
+                "nature_id": "speed_plus_magic_attack_minus",
+                "positive_stat": "speed",
+                "negative_stat": "magic_attack",
+                "rank": 1,
+            }
+        ]
+    )
+    elf.common_individual_talent_patterns_json = dumps_json(
+        {
+            "talent_patterns": [
+                {"value": ["speed", "magic_attack", "hp"], "rank": 1}
+            ],
+            "recommended_bloodlines": ["leader", "electric"],
+        }
+    )
+    state = _enemy_state()
+    db_session.add(state)
+
+    EstimateService(db_session).create_for_enemy_state(
+        "battle_estimate",
+        state,
+        commit=True,
+    )
+    out = EstimateService(db_session).get_estimate("battle_estimate", "enemy_elf")
+
+    assert out.default_config is not None
+    assert out.default_config["preset"] == "auto_by_pet_detail_recommendation"
+    assert out.default_config["nature_id"] == "speed_plus_magic_attack_minus"
+    assert out.default_config["recommended_personality"] == "hot_speed"
+    assert out.default_config["recommended_bloodlines"] == ["leader", "electric"]
+    talents = out.default_config["individual_talent_distribution"]
+    assert talents["hp"] == 10
+    assert talents["magic_attack"] == 10
+    assert talents["speed"] == 10
+    assert talents["physical_defense"] == 0
+
+
 def test_auto_default_config_uses_speed_nature_for_fast_physical_elf(
     db_session: Session,
 ) -> None:

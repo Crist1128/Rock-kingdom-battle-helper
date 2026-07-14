@@ -23,6 +23,8 @@ from app.models.event import BattleEvent, DamageEvent, EffectChangeEvent, Resour
 from app.models.static import (
     EffectDefinition,
     ElfDefinition,
+    ElfEvolutionChain,
+    ElfEvolutionStage,
     ElfLearnableSkill,
     NatureDefinition,
     PlayerElfBuild,
@@ -57,6 +59,8 @@ __all__ = [
     # 静态规则相关模型
     "EffectDefinition",
     "ElfDefinition",
+    "ElfEvolutionChain",
+    "ElfEvolutionStage",
     "ElfLearnableSkill",
     "NatureDefinition",
     "PlayerElfBuild",

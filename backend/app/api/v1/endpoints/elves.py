@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from app.core.default_skills import DEFAULT_COMMON_SKILL_ID
 from app.db.session import get_db
 from app.models.static import ElfDefinition, ElfLearnableSkill, SkillDefinition
-from app.schemas.static import ElfDefinitionOut, SkillDefinitionOut
+from app.schemas.static import ElfDefinitionOut, ElfEvolutionChainOut, SkillDefinitionOut
+from app.services.evolution_chain_service import EvolutionChainService
 
 # 创建路由实例
 router = APIRouter()
@@ -84,6 +85,15 @@ def list_elf_learnable_skills(
         stmt = stmt.where(SkillDefinition.skill_name.contains(q))
     stmt = stmt.order_by(SkillDefinition.skill_name).limit(limit).offset(offset)
     return list(db.scalars(stmt).all())
+
+
+@router.get("/{elf_id}/evolution-chain", response_model=ElfEvolutionChainOut)
+def get_elf_evolution_chain(elf_id: str, db: Session = Depends(get_db)) -> ElfEvolutionChainOut:
+    """查询某只精灵所在进化链，用于工作台运行时有效形态选择。"""
+    result = EvolutionChainService(db).get_chain_for_elf(elf_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Elf not found")
+    return result
 
 
 @router.get("/{elf_id}", response_model=ElfDefinitionOut)

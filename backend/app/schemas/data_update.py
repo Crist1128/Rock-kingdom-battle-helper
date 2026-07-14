@@ -235,3 +235,23 @@ class StaticSkillRuleSyncResponse(BaseModel):
     applied_skill_count: int = 0
     applied_effect_count: int = 0
     transaction: str
+
+
+class EvolutionChainSyncRequest(BaseModel):
+    """精灵进化链 seed 同步请求。"""
+
+    commit: bool = Field(default=False, description="是否实际提交数据库事务；False 为 dry-run")
+
+
+class EvolutionChainSyncResponse(BaseModel):
+    """精灵进化链 seed 同步响应。"""
+
+    source: str
+    chains_created: int = 0
+    chains_updated: int = 0
+    chains_refreshed: int = 0
+    stages_created: int = 0
+    stages_skipped_missing_elf: int = 0
+    stages_skipped_duplicate_chain_elf: int = 0
+    refresh_source: bool = True
+    transaction: str

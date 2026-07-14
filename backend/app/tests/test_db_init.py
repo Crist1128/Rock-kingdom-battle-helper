@@ -30,7 +30,9 @@ def test_ensure_database_schema_current_creates_empty_sqlite_db(tmp_path) -> Non
 
     assert "nature_definition" in tables
     assert "skill_definition" in tables
-    assert version == "0008_skill_raw_description"
+    assert "elf_evolution_chain" in tables
+    assert "elf_evolution_stage" in tables
+    assert version == "0009_elf_evolution_chains"
 
 
 def test_ensure_database_schema_current_rejects_unversioned_non_empty_db(tmp_path) -> None:

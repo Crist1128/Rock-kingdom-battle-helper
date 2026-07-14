@@ -51,6 +51,13 @@ ENV/
 *.log
 logs/
 
+# Local packet/proxy captures may contain Authorization, Cookie, uniIdToken, etc.
+*_Full.txt
+*_full.txt
+新建文本文档.txt
+*.saz
+*.har
+
 # IDE / OS
 .vscode/
 .idea/

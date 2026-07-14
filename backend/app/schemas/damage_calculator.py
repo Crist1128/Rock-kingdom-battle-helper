@@ -5,7 +5,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DamageCalculatorTalentInput(BaseModel):
@@ -49,6 +49,11 @@ class DamageCalculatorModifierInput(BaseModel):
     """公式修正项输入。"""
 
     weather_multiplier: float | None = Field(default=None, gt=0, description="天气倍率")
+    base_power_override: int | None = Field(
+        default=None,
+        gt=0,
+        description="自填技能威力；用于特殊情况下覆盖技能定义的基础威力",
+    )
     power_multiplier: float | None = Field(default=None, gt=0, description="威力倍率")
     flat_power_bonus: float | None = Field(default=None, description="固定威力修正")
     stat_stage_multiplier: float | None = Field(default=None, gt=0, description="能力倍率")
@@ -64,11 +69,11 @@ class DamageCalculatorModifierInput(BaseModel):
         default=None,
         ge=0,
         le=100,
-        description="目标当前生命百分比，仅用于上下文展示",
+        description="已弃用：目标当前生命百分比；独立计算器前端不再展示",
     )
     condition_flags: dict[str, bool] = Field(
         default_factory=dict,
-        description="技能条件分支标记",
+        description="已弃用：技能条件分支标记；独立计算器前端不再展示",
     )
     response_attack_success: bool | None = Field(default=None, description="攻击应对是否成功")
     response_defense_success: bool | None = Field(default=None, description="防御应对是否成功")
@@ -200,7 +205,7 @@ class DamageCalculatorResultOut(BaseModel):
 
 
 class DamageCalculatorInferDefenderInput(BaseModel):
-    """根据真实伤害反推防御方配置候选的请求。"""
+    """根据扣血百分比/真实伤害反推防御方配置候选的请求。"""
 
     attacker: DamageCalculatorParticipantInput = Field(..., description="攻击方")
     defender_elf_id: str = Field(..., description="防御方精灵 ID")
@@ -210,16 +215,46 @@ class DamageCalculatorInferDefenderInput(BaseModel):
         default_factory=DamageCalculatorModifierInput,
         description="与正向计算一致的修正项",
     )
-    observed_damage_value: int = Field(..., gt=0, description="实战观察到的真实伤害")
+    observed_damage_value: int | None = Field(
+        default=None,
+        gt=0,
+        description="实战观察到的真实伤害；反推防御方配置时必填",
+    )
+    observed_hp_percent_before: float | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="敌方受击前生命百分比；用于计算扣血百分比",
+    )
+    observed_hp_percent_after: float | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="敌方受击后生命百分比；与 before 相减得到扣血百分比",
+    )
+    observed_hp_percent_delta: float | None = Field(
+        default=None,
+        gt=0,
+        le=100,
+        description="本次敌方扣血百分比；若提供则优先使用",
+    )
     top_n: int = Field(default=20, ge=1, le=100, description="返回候选数量")
     notes: str | None = Field(default=None, description="备注")
-    candidate_mode: Literal["focused", "default_templates"] = Field(
-        default="focused",
-        description=(
-            "候选枚举模式：focused 只枚举 HP 和相关防御；"
-            "default_templates 使用常见三维资质模板"
-        ),
-    )
+
+    @model_validator(mode="after")
+    def validate_observation(self) -> "DamageCalculatorInferDefenderInput":
+        """防御方反推需要真实伤害和血量百分比共同约束。"""
+        has_delta = self.observed_hp_percent_delta is not None
+        has_before_after = (
+            self.observed_hp_percent_before is not None
+            and self.observed_hp_percent_after is not None
+            and self.observed_hp_percent_before > self.observed_hp_percent_after
+        )
+        if self.observed_damage_value is None:
+            raise ValueError("反推防御方配置必须填写真实伤害")
+        if not (has_delta or has_before_after):
+            raise ValueError("反推防御方配置必须填写敌方受击前后生命百分比")
+        return self
 
 
 class DamageCalculatorDefenderCandidateOut(BaseModel):
@@ -238,6 +273,9 @@ class DamageCalculatorDefenderCandidateOut(BaseModel):
     predicted_damage_percent: float | None = None
     delta_value: int | None = None
     absolute_delta: int | None = None
+    delta_damage_percent: float | None = None
+    absolute_delta_damage_percent: float | None = None
+    combined_error: float | None = None
     score: float
     matched_within_tolerance: bool = False
     unknown_factors: list[str] = Field(default_factory=list)
@@ -248,7 +286,10 @@ class DamageCalculatorInferDefenderOut(BaseModel):
     """防御方配置候选反推结果。"""
 
     status: str
-    observed_damage_value: int
+    observed_damage_value: int | None = None
+    observed_hp_percent_delta: float | None = None
+    observed_hp_percent_before: float | None = None
+    observed_hp_percent_after: float | None = None
     skill_id: str
     skill_name: str | None = None
     searched_candidate_count: int
@@ -258,87 +299,54 @@ class DamageCalculatorInferDefenderOut(BaseModel):
     side_effect_policy: str = "read_only_no_battle_mutation"
 
 
-class DamageCalculatorInferDefenderSampleInput(BaseModel):
-    """批量反推中的单条真实伤害样本。"""
+class DamageCalculatorInferAttackerInput(BaseModel):
+    """根据已知防御方面板和真实伤害反推攻击方配置候选的请求。"""
 
-    attacker: DamageCalculatorParticipantInput = Field(..., description="攻击方")
-    skill_id: str = Field(..., description="技能 ID")
-    formula_type: Literal["attack"] = Field(default="attack", description="当前仅支持攻击伤害")
+    attacker_elf_id: str = Field(..., description="攻击方精灵 ID；通常是敌方精灵")
+    defender: DamageCalculatorParticipantInput = Field(..., description="防御方；通常是己方配置")
+    skill_id: str = Field(..., description="攻击方使用的技能 ID")
+    formula_type: Literal["attack"] = Field(default="attack", description="P2 最小版仅支持攻击伤害")
     modifiers: DamageCalculatorModifierInput = Field(
         default_factory=DamageCalculatorModifierInput,
-        description="本条伤害样本的修正项",
+        description="与正向计算一致的修正项",
     )
-    observed_damage_value: int = Field(..., gt=0, description="本条真实伤害")
-    label: str | None = Field(default=None, description="前端显示用标签")
+    observed_damage_value: int = Field(..., gt=0, description="实战观察到的真实伤害")
+    top_n: int = Field(default=50, ge=1, le=100, description="返回候选数量")
     notes: str | None = Field(default=None, description="备注")
 
 
-class DamageCalculatorInferDefenderBatchInput(BaseModel):
-    """多条真实伤害样本联合反推请求。"""
-
-    defender_elf_id: str = Field(..., description="防御方精灵 ID")
-    samples: list[DamageCalculatorInferDefenderSampleInput] = Field(
-        ...,
-        min_length=1,
-        max_length=10,
-        description="伤害样本列表；同一个防御方配置会累计所有样本偏差",
-    )
-    candidate_mode: Literal["focused", "default_templates"] = Field(
-        default="focused",
-        description="候选枚举模式",
-    )
-    tolerance: int = Field(default=0, ge=0, le=50, description="认为命中的单条伤害容忍偏差")
-    top_n: int = Field(default=20, ge=1, le=100, description="返回候选数量")
-
-
-class DamageCalculatorInferDefenderSampleResultOut(BaseModel):
-    """批量反推中某个候选对单条样本的命中情况。"""
-
-    sample_index: int
-    sample_label: str | None = None
-    skill_id: str
-    skill_name: str | None = None
-    observed_damage_value: int
-    predicted_damage_value: int | None = None
-    delta_value: int | None = None
-    absolute_delta: int | None = None
-    matched_within_tolerance: bool = False
-    unknown_factors: list[str] = Field(default_factory=list)
-    missing_parts: list[str] = Field(default_factory=list)
-
-
-class DamageCalculatorBatchDefenderCandidateOut(BaseModel):
-    """多样本累计后的防御方候选。"""
+class DamageCalculatorAttackerCandidateOut(BaseModel):
+    """攻击方配置候选。"""
 
     rank: int
     template_name: str | None = None
     nature_id: str
     nature_name: str
     individual_talent_distribution: DamageCalculatorTalentInput
-    relevant_defense_stats: list[str] = Field(default_factory=list)
-    hp_talent: int
-    physical_defense_talent: int
-    magic_defense_talent: int
+    relevant_attack_stat: str
+    attack_talent: int
     panel_stats: DamageCalculatorPanelOut
-    total_absolute_delta: int
-    average_absolute_delta: float
-    matched_sample_count: int
-    sample_count: int
+    predicted_damage_value: int | None = None
+    delta_value: int | None = None
+    absolute_delta: int | None = None
     score: float
-    sample_results: list[DamageCalculatorInferDefenderSampleResultOut] = Field(
-        default_factory=list
-    )
+    matched_within_tolerance: bool = False
+    is_relevant_attack_positive_nature: bool = False
+    has_relevant_attack_talent: bool = False
+    unknown_factors: list[str] = Field(default_factory=list)
+    missing_parts: list[str] = Field(default_factory=list)
 
 
-class DamageCalculatorInferDefenderBatchOut(BaseModel):
-    """多条伤害样本联合反推结果。"""
+class DamageCalculatorInferAttackerOut(BaseModel):
+    """攻击方配置候选反推结果。"""
 
     status: str
-    defender_elf_id: str
+    observed_damage_value: int
+    skill_id: str
+    skill_name: str | None = None
     searched_candidate_count: int
     returned_candidate_count: int
-    tolerance: int
-    candidate_mode: str
-    candidates: list[DamageCalculatorBatchDefenderCandidateOut] = Field(default_factory=list)
+    relevant_attack_stat: str
+    candidates: list[DamageCalculatorAttackerCandidateOut] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     side_effect_policy: str = "read_only_no_battle_mutation"

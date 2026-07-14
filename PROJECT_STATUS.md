@@ -171,3 +171,7 @@ docs/03_系统设计/后端MVP完成路线_v0.1.md
 - 2026-06-12 完成技能逐条审阅第六批和收尾批后，全量 cleaned 技能 496 条审阅完成，历史分批结果已整合进正式总文件并从工作树移除。累计 `structured` 231 条、`partial` 194 条、`needs_review` 70 条、`ambiguous` 1 条；后续进入机制缺口统筹与逐类落地阶段。
 
 - 2026-06-12 新增运行时有效形态/退化手动处理：前后端提供 `runtime-form` 调整入口，原始精灵身份保持不变，保留性格与六维培养并按所选有效形态种族值重算面板；伤害预览、本系与属性读取已改为使用有效形态。该操作不会触发普通切换、返场、入场结算或首回合机制。
+
+- 2026-07-13 新增独立进化链静态表与 seed 导入：`elf_evolution_chain` / `elf_evolution_stage` 将每只精灵绑定到对应进化链，工作台运行时有效形态选择优先加载当前精灵可进化/退化的链内形态；切换时继续沿用既有 `runtime-form` 逻辑，保留性格与六维培养。
+
+- 2026-07-14 设置页补充“单独录入精灵进化链规则”入口：已有精灵基础数据的旧库可先 dry-run，再将 `backend/app/seed/elf_evolution_chains.json` 写入 `elf_evolution_chain` / `elf_evolution_stage`，无需重新导入 BWIKI cleaned 数据。

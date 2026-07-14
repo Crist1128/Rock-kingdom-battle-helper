@@ -1919,3 +1919,28 @@ ON enemy_panel_estimate_evidence(source_event_id);
 | `individual_talent_distribution_json` | text nullable | 战斗中保留的六维个体培养快照。 |
 
 设计原则：原始 `elf_id` 表示这只战斗精灵的身份，不随退化变化；伤害预览、本系、属性和展示面板在存在 `runtime_form_elf_id` 时使用有效形态。
+
+## elf_evolution_chain / elf_evolution_stage 进化链表（2026-07-13）
+
+为降低静态精灵定义与跨精灵形态关系的耦合度，进化/退化链不再只依赖
+`elf_definition.forms_json` 中的嵌套字段，而是独立维护两张静态表：
+
+- `elf_evolution_chain`：进化链主表，保存 `chain_id`、稳定 `chain_key`、显示名、来源、
+  数据版本和备注。
+- `elf_evolution_stage`：进化链阶段表，保存 `chain_id`、`elf_id`、`stage_index`、阶段名、
+  形态名、上一阶段引用和来源阶段 JSON。
+
+约束与索引：
+
+- `elf_evolution_chain.chain_key` 唯一，用于同一来源重复导入时识别逻辑链。
+- `elf_evolution_stage (chain_id, elf_id)` 唯一，避免同一条链重复挂载同一精灵。
+- `elf_evolution_stage.elf_id` 建索引，支持工作台按当前精灵快速查找所在进化链。
+- 同一 `stage_index` 允许多个 `elf_id`，用于同一阶段存在多个形态或首领形态的情况。
+
+导入策略：
+
+- 默认 seed：`backend/app/seed/elf_evolution_chains.json`。
+- 导入器：`python -m app.data_pipeline.evolution_chains.importer`，默认 dry-run 回滚，
+  加 `--commit` 才会写库。
+- 本地 cleaned 导入、远程同步和一键初始化会在同一事务内并入进化链 seed；
+  该 seed 明确不信任当前 `forms_json.evolution_chain` 中的大面积重复链。
