@@ -1,0 +1,6225 @@
+{
+  "metadata": {
+    "generated_at": "2026-07-09",
+    "source": {
+      "database": "data/app.db",
+      "cleaned_detail_json": "data/rocom/cleaned_full_details/pet_detail_recommendations.json",
+      "capture": "629_Full.txt"
+    },
+    "match_rule": "形态级：raw_no/pet_id + 基础精灵名 + 形态名",
+    "instructions": [
+      "优先填写 fill.manual_action。",
+      "如果选择 copy_from_same_pet_id，请在 fill.copy_from 写明来源。",
+      "每个 sections.*.status 从 section_status_options 中选择。",
+      "没有数据时不要删除字段，把 status 改为 not_available 或 not_applicable。"
+    ]
+  },
+  "summary": {
+    "db_form_total": 509,
+    "db_species_total": 375,
+    "matched_form_total": 371,
+    "missing_form_total": 138,
+    "missing_status": {
+      "629_Full 未抓到该精灵/形态": 73,
+      "同 pet_id 已纳入，当前形态未纳入": 64,
+      "抓包有该形态详情但五项目标信息均为空": 1
+    },
+    "extra_cleaned_form_total": 4
+  },
+  "fill_options": {
+    "manual_action_options": [
+      {
+        "value": "todo",
+        "label": "待填写",
+        "description": "还没有人工判断，默认值。"
+      },
+      {
+        "value": "fill_this_form",
+        "label": "填写该形态独立数据",
+        "description": "该形态与同 pet_id 其他形态推荐不同，需要单独填写。"
+      },
+      {
+        "value": "copy_from_same_pet_id",
+        "label": "沿用同 pet_id 已有数据",
+        "description": "该形态推荐与已纳入形态一致，在 copy_from 中填写来源。"
+      },
+      {
+        "value": "not_available",
+        "label": "暂无数据",
+        "description": "确认该形态没有进化链或热门推荐数据。"
+      },
+      {
+        "value": "ignore_or_merge",
+        "label": "忽略或合并",
+        "description": "命名差异、重复形态或不需要单独维护，需在 note 写原因。"
+      }
+    ],
+    "section_status_options": [
+      "unknown",
+      "manual_filled",
+      "same_as_base",
+      "not_available",
+      "not_applicable"
+    ],
+    "effort_position_options": [
+      {
+        "position": 0,
+        "stat_name": "生命"
+      },
+      {
+        "position": 1,
+        "stat_name": "物攻"
+      },
+      {
+        "position": 2,
+        "stat_name": "魔攻"
+      },
+      {
+        "position": 3,
+        "stat_name": "物防"
+      },
+      {
+        "position": 4,
+        "stat_name": "魔防"
+      },
+      {
+        "position": 5,
+        "stat_name": "速度"
+      }
+    ],
+    "top_level_fill_fields": {
+      "manual_action": "从 manual_action_options 中选择一个 value。",
+      "copy_from": "如果沿用已有数据，填写来源，如 pet_id=34/real_pet_id=114-1。",
+      "checked": "人工检查完成后改为 true。",
+      "note": "写判断依据、来源链接、为什么沿用/忽略等。"
+    }
+  },
+  "items": [
+    {
+      "identity": {
+        "raw_no": 1,
+        "elf_id": "rocom_elf_0001_8cceb6",
+        "db_name": "迪莫",
+        "base_name": "迪莫",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 2,
+        "elf_id": "rocom_elf_0002_f7dfb4",
+        "db_name": "喵喵",
+        "base_name": "喵喵",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 3,
+        "elf_id": "rocom_elf_0003_4bea0f",
+        "db_name": "喵呜",
+        "base_name": "喵呜",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 4,
+        "elf_id": "rocom_elf_0004_4580cf",
+        "db_name": "叶冕魔力猫",
+        "base_name": "叶冕魔力猫",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 4,
+        "elf_id": "rocom_elf_0004_43540d",
+        "db_name": "魔力猫",
+        "base_name": "魔力猫",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 5,
+        "elf_id": "rocom_elf_0005_d97e16",
+        "db_name": "火花",
+        "base_name": "火花",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 6,
+        "elf_id": "rocom_elf_0006_4d4454",
+        "db_name": "焰火",
+        "base_name": "焰火",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 7,
+        "elf_id": "rocom_elf_0007_b0a0cb",
+        "db_name": "火神",
+        "base_name": "火神",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 7,
+        "elf_id": "rocom_elf_0007_102c35",
+        "db_name": "烈火战神",
+        "base_name": "烈火战神",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 8,
+        "elf_id": "rocom_elf_0008_700c90",
+        "db_name": "水蓝蓝",
+        "base_name": "水蓝蓝",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 9,
+        "elf_id": "rocom_elf_0009_c8352b",
+        "db_name": "波波拉",
+        "base_name": "波波拉",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 10,
+        "elf_id": "rocom_elf_0010_c340a0",
+        "db_name": "圣水守护",
+        "base_name": "圣水守护",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 10,
+        "elf_id": "rocom_elf_0010_7a2a41",
+        "db_name": "水灵",
+        "base_name": "水灵",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_dfae16",
+        "db_name": "鸭吉吉（急急急鸭）（急急急鸭）",
+        "base_name": "鸭吉吉",
+        "form_name": "急急急鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_18bd0d",
+        "db_name": "鸭吉吉（燃了鸭）（燃了鸭）",
+        "base_name": "鸭吉吉",
+        "form_name": "燃了鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_506f03",
+        "db_name": "鸭吉吉（等一等鸭）（等一等鸭）",
+        "base_name": "鸭吉吉",
+        "form_name": "等一等鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_fcf0c3",
+        "db_name": "鸭吉吉（紧实的样子）（紧实的样子）",
+        "base_name": "鸭吉吉",
+        "form_name": "紧实的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_ee8dec",
+        "db_name": "鸭吉吉（蓬松的样子）（蓬松的样子）",
+        "base_name": "鸭吉吉",
+        "form_name": "蓬松的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_e7a7f5",
+        "db_name": "鸭吉吉（起来鸭）（起来鸭）",
+        "base_name": "鸭吉吉",
+        "form_name": "起来鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_08494a",
+        "db_name": "鸭吉吉国王（急急急鸭）（急急急鸭）",
+        "base_name": "鸭吉吉国王",
+        "form_name": "急急急鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_7b602f",
+        "db_name": "鸭吉吉国王（燃了鸭）（燃了鸭）",
+        "base_name": "鸭吉吉国王",
+        "form_name": "燃了鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_235e2c",
+        "db_name": "鸭吉吉国王（等一等鸭）（等一等鸭）",
+        "base_name": "鸭吉吉国王",
+        "form_name": "等一等鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_1ff765",
+        "db_name": "鸭吉吉国王（紧实的样子）（紧实的样子）",
+        "base_name": "鸭吉吉国王",
+        "form_name": "紧实的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_73483e",
+        "db_name": "鸭吉吉国王（蓬松的样子）（蓬松的样子）",
+        "base_name": "鸭吉吉国王",
+        "form_name": "蓬松的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_bdf463",
+        "db_name": "鸭吉吉国王（起来鸭）（起来鸭）",
+        "base_name": "鸭吉吉国王",
+        "form_name": "起来鸭",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 11,
+        "elf_id": "rocom_elf_0011_dc4feb",
+        "db_name": "鸭吉吉国王（首领形态）（首领形态）",
+        "base_name": "鸭吉吉国王",
+        "form_name": "首领形态",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 12,
+        "elf_id": "rocom_elf_0012_7d6b6c",
+        "db_name": "板板壳",
+        "base_name": "板板壳",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 12,
+        "elf_id": "rocom_elf_0012_efbf3d",
+        "db_name": "板板壳（蜕皮时的样子）（蜕皮时的样子）",
+        "base_name": "板板壳",
+        "form_name": "蜕皮时的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 13,
+        "elf_id": "rocom_elf_0013_4f852c",
+        "db_name": "咔咔壳",
+        "base_name": "咔咔壳",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 13,
+        "elf_id": "rocom_elf_0013_101d9c",
+        "db_name": "咔咔壳（蜕皮时的样子）（蜕皮时的样子）",
+        "base_name": "咔咔壳",
+        "form_name": "蜕皮时的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 14,
+        "elf_id": "rocom_elf_0014_a8a426",
+        "db_name": "水泡壳",
+        "base_name": "水泡壳",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 14,
+        "elf_id": "rocom_elf_0014_c712dd",
+        "db_name": "水泡壳（蜕皮时的样子）（蜕皮时的样子）",
+        "base_name": "水泡壳",
+        "form_name": "蜕皮时的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 15,
+        "elf_id": "rocom_elf_0015_545ed4",
+        "db_name": "锥尾羊",
+        "base_name": "锥尾羊",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 16,
+        "elf_id": "rocom_elf_0016_e3bb72",
+        "db_name": "铃兰羊",
+        "base_name": "铃兰羊",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 17,
+        "elf_id": "rocom_elf_0017_52c782",
+        "db_name": "花影羚羊",
+        "base_name": "花影羚羊",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 18,
+        "elf_id": "rocom_elf_0018_ba86df",
+        "db_name": "雪绒鸟",
+        "base_name": "雪绒鸟",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 18,
+        "elf_id": "rocom_elf_0018_50e3d2",
+        "db_name": "雪绒鸟（夏天的样子）（夏天的样子）",
+        "base_name": "雪绒鸟",
+        "form_name": "夏天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 18,
+        "elf_id": "rocom_elf_0018_0459dc",
+        "db_name": "雪绒鸟（春天的样子）（春天的样子）",
+        "base_name": "雪绒鸟",
+        "form_name": "春天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 18,
+        "elf_id": "rocom_elf_0018_58cef9",
+        "db_name": "雪绒鸟（秋天的样子）（秋天的样子）",
+        "base_name": "雪绒鸟",
+        "form_name": "秋天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 19,
+        "elf_id": "rocom_elf_0019_32844e",
+        "db_name": "冬羽雀",
+        "base_name": "冬羽雀",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 19,
+        "elf_id": "rocom_elf_0019_295b38",
+        "db_name": "冬羽雀（夏天的样子）（夏天的样子）",
+        "base_name": "冬羽雀",
+        "form_name": "夏天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 19,
+        "elf_id": "rocom_elf_0019_977932",
+        "db_name": "冬羽雀（春天的样子）（春天的样子）",
+        "base_name": "冬羽雀",
+        "form_name": "春天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 19,
+        "elf_id": "rocom_elf_0019_59a53d",
+        "db_name": "冬羽雀（秋天的样子）（秋天的样子）",
+        "base_name": "冬羽雀",
+        "form_name": "秋天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_52b34b",
+        "db_name": "岚鸟",
+        "base_name": "岚鸟",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_d72667",
+        "db_name": "岚鸟（夏天的样子）（夏天的样子）",
+        "base_name": "岚鸟",
+        "form_name": "夏天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_9097c8",
+        "db_name": "岚鸟（春天的样子）（春天的样子）",
+        "base_name": "岚鸟",
+        "form_name": "春天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_84c4e9",
+        "db_name": "岚鸟（秋天的样子）（秋天的样子）",
+        "base_name": "岚鸟",
+        "form_name": "秋天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_48607a",
+        "db_name": "霜翼领主",
+        "base_name": "霜翼领主",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_674b3f",
+        "db_name": "霜翼领主（夏天的样子）（夏天的样子）",
+        "base_name": "霜翼领主",
+        "form_name": "夏天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_2db7d9",
+        "db_name": "霜翼领主（春天的样子）（春天的样子）",
+        "base_name": "霜翼领主",
+        "form_name": "春天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 20,
+        "elf_id": "rocom_elf_0020_8eba1e",
+        "db_name": "霜翼领主（秋天的样子）（秋天的样子）",
+        "base_name": "霜翼领主",
+        "form_name": "秋天的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 21,
+        "elf_id": "rocom_elf_0021_11eec6",
+        "db_name": "小灵菇",
+        "base_name": "小灵菇",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 22,
+        "elf_id": "rocom_elf_0022_b978b7",
+        "db_name": "幻灵菇",
+        "base_name": "幻灵菇",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 23,
+        "elf_id": "rocom_elf_0023_bd5e17",
+        "db_name": "幻影灵菇",
+        "base_name": "幻影灵菇",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 24,
+        "elf_id": "rocom_elf_0024_958ca7",
+        "db_name": "石肤蜥",
+        "base_name": "石肤蜥",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 24,
+        "elf_id": "rocom_elf_0024_4f2936",
+        "db_name": "石肤蜥（球球尾巴的样子）（球球尾巴的样子）",
+        "base_name": "石肤蜥",
+        "form_name": "球球尾巴的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 25,
+        "elf_id": "rocom_elf_0025_a39422",
+        "db_name": "石刺蜥",
+        "base_name": "石刺蜥",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 25,
+        "elf_id": "rocom_elf_0025_350b03",
+        "db_name": "石刺蜥（球球尾巴的样子）（球球尾巴的样子）",
+        "base_name": "石刺蜥",
+        "form_name": "球球尾巴的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 26,
+        "elf_id": "rocom_elf_0026_a8c82b",
+        "db_name": "石冠王蜥",
+        "base_name": "石冠王蜥",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 26,
+        "elf_id": "rocom_elf_0026_2dd109",
+        "db_name": "石冠王蜥（球球尾巴的样子）（球球尾巴的样子）",
+        "base_name": "石冠王蜥",
+        "form_name": "球球尾巴的样子",
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 27,
+        "elf_id": "rocom_elf_0027_1f61b0",
+        "db_name": "布是石",
+        "base_name": "布是石",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 28,
+        "elf_id": "rocom_elf_0028_0e5d63",
+        "db_name": "布是岩",
+        "base_name": "布是岩",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 29,
+        "elf_id": "rocom_elf_0029_f08a0f",
+        "db_name": "布克棱岩",
+        "base_name": "布克棱岩",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 29,
+        "elf_id": "rocom_elf_0029_ef32a0",
+        "db_name": "迷嶂布莱克",
+        "base_name": "迷嶂布莱克",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 30,
+        "elf_id": "rocom_elf_0030_7c01ac",
+        "db_name": "恶魔叮",
+        "base_name": "恶魔叮",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 31,
+        "elf_id": "rocom_elf_0031_4b0d28",
+        "db_name": "叮叮恶魔",
+        "base_name": "叮叮恶魔",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 32,
+        "elf_id": "rocom_elf_0032_d41c1c",
+        "db_name": "毛毛",
+        "base_name": "毛毛",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 33,
+        "elf_id": "rocom_elf_0033_b1f6ee",
+        "db_name": "爬爬",
+        "base_name": "爬爬",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 34,
+        "elf_id": "rocom_elf_0034_ae89f8",
+        "db_name": "化蝶（喵喵的样子）（喵喵的样子）",
+        "base_name": "化蝶",
+        "form_name": "喵喵的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 34,
+        "elf_id": "rocom_elf_0034_917c58",
+        "db_name": "化蝶（奇丽花的样子）（奇丽花的样子）",
+        "base_name": "化蝶",
+        "form_name": "奇丽花的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 34,
+        "elf_id": "rocom_elf_0034_a65657",
+        "db_name": "化蝶（幽冥眼的样子）（幽冥眼的样子）",
+        "base_name": "化蝶",
+        "form_name": "幽冥眼的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 35,
+        "elf_id": "rocom_elf_0035_8e921a",
+        "db_name": "幻影荆棘",
+        "base_name": "幻影荆棘",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 35,
+        "elf_id": "rocom_elf_0035_e9cde0",
+        "db_name": "幽影树",
+        "base_name": "幽影树",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 36,
+        "elf_id": "rocom_elf_0036_32bb1c",
+        "db_name": "小鼠獭",
+        "base_name": "小鼠獭",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 37,
+        "elf_id": "rocom_elf_0037_78e057",
+        "db_name": "燕尾獭",
+        "base_name": "燕尾獭",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 38,
+        "elf_id": "rocom_elf_0038_21d17a",
+        "db_name": "卷胡巨獭",
+        "base_name": "卷胡巨獭",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 40,
+        "elf_id": "rocom_elf_0040_563b35",
+        "db_name": "晶石蜗（西瓜碧玺的样子）（西瓜碧玺的样子）",
+        "base_name": "晶石蜗",
+        "form_name": "西瓜碧玺的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 40,
+        "elf_id": "rocom_elf_0040_623198",
+        "db_name": "钻石蜗（星彩榴石的样子）（星彩榴石的样子）",
+        "base_name": "钻石蜗",
+        "form_name": "星彩榴石的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 40,
+        "elf_id": "rocom_elf_0040_48574d",
+        "db_name": "钻石蜗（火山琉璃的样子）（火山琉璃的样子）",
+        "base_name": "钻石蜗",
+        "form_name": "火山琉璃的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 40,
+        "elf_id": "rocom_elf_0040_257ddc",
+        "db_name": "钻石蜗（烧蓝黄金的样子）（烧蓝黄金的样子）",
+        "base_name": "钻石蜗",
+        "form_name": "烧蓝黄金的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 40,
+        "elf_id": "rocom_elf_0040_4d4521",
+        "db_name": "钻石蜗（莲花刚玉的样子）（莲花刚玉的样子）",
+        "base_name": "钻石蜗",
+        "form_name": "莲花刚玉的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 40,
+        "elf_id": "rocom_elf_0040_4cbe5c",
+        "db_name": "钻石蜗（蓝锥矿的样子）（蓝锥矿的样子）",
+        "base_name": "钻石蜗",
+        "form_name": "蓝锥矿的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 40,
+        "elf_id": "rocom_elf_0040_f85647",
+        "db_name": "钻石蜗（西瓜碧玺的样子）（西瓜碧玺的样子）",
+        "base_name": "钻石蜗",
+        "form_name": "西瓜碧玺的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 41,
+        "elf_id": "rocom_elf_0041_4e6b3b",
+        "db_name": "奇丽草",
+        "base_name": "奇丽草",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 42,
+        "elf_id": "rocom_elf_0042_0ee0df",
+        "db_name": "奇丽叶",
+        "base_name": "奇丽叶",
+        "form_name": null,
+        "current_status": "629_Full 未抓到该精灵/形态",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 43,
+        "elf_id": "rocom_elf_0043_2dfc43",
+        "db_name": "奇丽果",
+        "base_name": "奇丽果",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 43,
+        "elf_id": "rocom_elf_0043_c1d94b",
+        "db_name": "奇丽花",
+        "base_name": "奇丽花",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 44,
+        "elf_id": "rocom_elf_0044_34f9f1",
+        "db_name": "丢丢（沙地附近的样子）（沙地附近的样子）",
+        "base_name": "丢丢",
+        "form_name": "沙地附近的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 44,
+        "elf_id": "rocom_elf_0044_8916ef",
+        "db_name": "丢丢（雪山附近的样子）（雪山附近的样子）",
+        "base_name": "丢丢",
+        "form_name": "雪山附近的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 45,
+        "elf_id": "rocom_elf_0045_31627f",
+        "db_name": "卡卡虫（沙地附近的样子）（沙地附近的样子）",
+        "base_name": "卡卡虫",
+        "form_name": "沙地附近的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 45,
+        "elf_id": "rocom_elf_0045_5b0f87",
+        "db_name": "卡卡虫（雪山附近的样子）（雪山附近的样子）",
+        "base_name": "卡卡虫",
+        "form_name": "雪山附近的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 46,
+        "elf_id": "rocom_elf_0046_b5ac0c",
+        "db_name": "卡瓦重（沙地附近的样子）（沙地附近的样子）",
+        "base_name": "卡瓦重",
+        "form_name": "沙地附近的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 46,
+        "elf_id": "rocom_elf_0046_53043e",
+        "db_name": "卡瓦重（雪山附近的样子）（雪山附近的样子）",
+        "base_name": "卡瓦重",
+        "form_name": "雪山附近的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 48,
+        "elf_id": "rocom_elf_0048_c3f4d1",
+        "db_name": "风暴战犬",
+        "base_name": "风暴战犬",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 55,
+        "elf_id": "rocom_elf_0055_fed669",
+        "db_name": "暗影灵面（闭眼的样子）（闭眼的样子）",
+        "base_name": "暗影灵面",
+        "form_name": "闭眼的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 56,
+        "elf_id": "rocom_elf_0056_240f07",
+        "db_name": "幽冥眼（闭眼的样子）（闭眼的样子）",
+        "base_name": "幽冥眼",
+        "form_name": "闭眼的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 63,
+        "elf_id": "rocom_elf_0063_159f44",
+        "db_name": "蹦蹦种子（彩玉球形态）（彩玉球形态）",
+        "base_name": "蹦蹦种子",
+        "form_name": "彩玉球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 63,
+        "elf_id": "rocom_elf_0063_b8fc4f",
+        "db_name": "蹦蹦种子（短毛球形态）（短毛球形态）",
+        "base_name": "蹦蹦种子",
+        "form_name": "短毛球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 63,
+        "elf_id": "rocom_elf_0063_bd96a8",
+        "db_name": "蹦蹦种子（象牙球形态）（象牙球形态）",
+        "base_name": "蹦蹦种子",
+        "form_name": "象牙球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 64,
+        "elf_id": "rocom_elf_0064_72d5c6",
+        "db_name": "蹦蹦草（彩玉球形态）（彩玉球形态）",
+        "base_name": "蹦蹦草",
+        "form_name": "彩玉球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 64,
+        "elf_id": "rocom_elf_0064_0a6bbe",
+        "db_name": "蹦蹦草（短毛球形态）（短毛球形态）",
+        "base_name": "蹦蹦草",
+        "form_name": "短毛球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 64,
+        "elf_id": "rocom_elf_0064_2d50fb",
+        "db_name": "蹦蹦草（象牙球形态）（象牙球形态）",
+        "base_name": "蹦蹦草",
+        "form_name": "象牙球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 65,
+        "elf_id": "rocom_elf_0065_9a485e",
+        "db_name": "蹦蹦果（彩玉球形态）（彩玉球形态）",
+        "base_name": "蹦蹦果",
+        "form_name": "彩玉球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 65,
+        "elf_id": "rocom_elf_0065_850194",
+        "db_name": "蹦蹦果（海神球形态）（海神球形态）",
+        "base_name": "蹦蹦果",
+        "form_name": "海神球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 65,
+        "elf_id": "rocom_elf_0065_13d07f",
+        "db_name": "蹦蹦果（短毛球形态）（短毛球形态）",
+        "base_name": "蹦蹦果",
+        "form_name": "短毛球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 65,
+        "elf_id": "rocom_elf_0065_0783e4",
+        "db_name": "蹦蹦果（象牙球形态）（象牙球形态）",
+        "base_name": "蹦蹦果",
+        "form_name": "象牙球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 65,
+        "elf_id": "rocom_elf_0065_e162d3",
+        "db_name": "蹦蹦花（彩玉球形态）（彩玉球形态）",
+        "base_name": "蹦蹦花",
+        "form_name": "彩玉球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 65,
+        "elf_id": "rocom_elf_0065_a61a6c",
+        "db_name": "蹦蹦花（短毛球形态）（短毛球形态）",
+        "base_name": "蹦蹦花",
+        "form_name": "短毛球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 65,
+        "elf_id": "rocom_elf_0065_505e4a",
+        "db_name": "蹦蹦花（象牙球形态）（象牙球形态）",
+        "base_name": "蹦蹦花",
+        "form_name": "象牙球形态",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 76,
+        "elf_id": "rocom_elf_0076_f8daef",
+        "db_name": "海盔虫（磨损的样子）（磨损的样子）",
+        "base_name": "海盔虫",
+        "form_name": "磨损的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 77,
+        "elf_id": "rocom_elf_0077_a17f7e",
+        "db_name": "刺盔虫（磨损的样子）（磨损的样子）",
+        "base_name": "刺盔虫",
+        "form_name": "磨损的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 78,
+        "elf_id": "rocom_elf_0078_0ada77",
+        "db_name": "千棘海针",
+        "base_name": "千棘海针",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 78,
+        "elf_id": "rocom_elf_0078_cf91c6",
+        "db_name": "千棘海针（磨损的样子）（磨损的样子）",
+        "base_name": "千棘海针",
+        "form_name": "磨损的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 78,
+        "elf_id": "rocom_elf_0078_92e26a",
+        "db_name": "千棘盔（磨损的样子）（磨损的样子）",
+        "base_name": "千棘盔",
+        "form_name": "磨损的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 80,
+        "elf_id": "rocom_elf_0080_00c3e4",
+        "db_name": "小星光（月光能量的样子）（月光能量的样子）",
+        "base_name": "小星光",
+        "form_name": "月光能量的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 81,
+        "elf_id": "rocom_elf_0081_293897",
+        "db_name": "星光狮（月光能量的样子）（月光能量的样子）",
+        "base_name": "星光狮",
+        "form_name": "月光能量的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 84,
+        "elf_id": "rocom_elf_0084_f11cbb",
+        "db_name": "女王蜂",
+        "base_name": "女王蜂",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 107,
+        "elf_id": "rocom_elf_0107_20ab00",
+        "db_name": "深渊罗隐",
+        "base_name": "深渊罗隐",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 110,
+        "elf_id": "rocom_elf_0110_0e6d6e",
+        "db_name": "神谕鲨（首领形态·第3阶段）（首领形态·第3阶段）",
+        "base_name": "神谕鲨",
+        "form_name": "首领形态·第3阶段",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 115,
+        "elf_id": "rocom_elf_0115_0133a7",
+        "db_name": "祭礼巨像",
+        "base_name": "祭礼巨像",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 117,
+        "elf_id": "rocom_elf_0117_cab6c3",
+        "db_name": "彩虹独角兽",
+        "base_name": "彩虹独角兽",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 122,
+        "elf_id": "rocom_elf_0122_709cc9",
+        "db_name": "黑猫密探",
+        "base_name": "黑猫密探",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 131,
+        "elf_id": "rocom_elf_0131_616991",
+        "db_name": "恶魔狼王",
+        "base_name": "恶魔狼王",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 144,
+        "elf_id": "rocom_elf_0144_13b58e",
+        "db_name": "雪影冰灵",
+        "base_name": "雪影冰灵",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 189,
+        "elf_id": "rocom_elf_0189_9706dd",
+        "db_name": "棋契陛下（第1条）（第1条）",
+        "base_name": "棋契陛下",
+        "form_name": "第1条",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 189,
+        "elf_id": "rocom_elf_0189_cba0ad",
+        "db_name": "棋契陛下（黑子）（黑子）",
+        "base_name": "棋契陛下",
+        "form_name": "黑子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 190,
+        "elf_id": "rocom_elf_0190_efbd3c",
+        "db_name": "棋契陛下（第2条）（第2条）",
+        "base_name": "棋契陛下",
+        "form_name": "第2条",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 191,
+        "elf_id": "rocom_elf_0191_c8e3b1",
+        "db_name": "棋契陛下（第3条）（第3条）",
+        "base_name": "棋契陛下",
+        "form_name": "第3条",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 192,
+        "elf_id": "rocom_elf_0192_0927b5",
+        "db_name": "棋契陛下（第4条）（第4条）",
+        "base_name": "棋契陛下",
+        "form_name": "第4条",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 200,
+        "elf_id": "rocom_elf_0200_9a96ae",
+        "db_name": "奇梦咪",
+        "base_name": "奇梦咪",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 204,
+        "elf_id": "rocom_elf_0204_de57be",
+        "db_name": "伊兰龙",
+        "base_name": "伊兰龙",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 220,
+        "elf_id": "rocom_elf_0220_209f6d",
+        "db_name": "海枝枝（洋红沙丁）（洋红沙丁）",
+        "base_name": "海枝枝",
+        "form_name": "洋红沙丁",
+        "current_status": "抓包有该形态详情但五项目标信息均为空",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 228,
+        "elf_id": "rocom_elf_0228_f52fbb",
+        "db_name": "波普鹿",
+        "base_name": "波普鹿",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 233,
+        "elf_id": "rocom_elf_0233_ac64ef",
+        "db_name": "高帽鹬者",
+        "base_name": "高帽鹬者",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 237,
+        "elf_id": "rocom_elf_0237_1e3fce",
+        "db_name": "刺轮砣（下弦的样子）（下弦的样子）",
+        "base_name": "刺轮砣",
+        "form_name": "下弦的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 238,
+        "elf_id": "rocom_elf_0238_c72716",
+        "db_name": "月亮砣（下弦的样子）（下弦的样子）",
+        "base_name": "月亮砣",
+        "form_name": "下弦的样子",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 286,
+        "elf_id": "rocom_elf_0286_ad9116",
+        "db_name": "圣剑骑士",
+        "base_name": "圣剑骑士",
+        "form_name": null,
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    },
+    {
+      "identity": {
+        "raw_no": 337,
+        "elf_id": "rocom_elf_0337_fdc404",
+        "db_name": "落陨星兔（信使精灵）（信使精灵）",
+        "base_name": "落陨星兔",
+        "form_name": "信使精灵",
+        "current_status": "同 pet_id 已纳入，当前形态未纳入",
+        "db_has_evolution_chain": true
+      },
+      "fill": {
+        "checked": false,
+        "manual_action": "todo",
+        "copy_from": "",
+        "note": "",
+        "sections": {
+          "evolution_chains": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_personalities": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_skills": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_effort_stat_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          },
+          "hot_bloodline_tendencies": {
+            "status": "unknown",
+            "value": [],
+            "note": ""
+          }
+        }
+      }
+    }
+  ],
+  "extra_cleaned_records_need_review": [
+    {
+      "raw_no": 333,
+      "name": "贝加尔",
+      "form_name": "异色突变",
+      "real_pet_id": "1761717968899",
+      "available_sections": {
+        "has_evolution_chain": true,
+        "has_hot_personalities": false,
+        "has_hot_skills": false,
+        "has_hot_effort_stat_tendencies": false,
+        "has_hot_bloodline_tendencies": false
+      }
+    },
+    {
+      "raw_no": 337,
+      "name": "落陨星兔",
+      "form_name": "",
+      "real_pet_id": "1743496462574",
+      "available_sections": {
+        "has_evolution_chain": true,
+        "has_hot_personalities": true,
+        "has_hot_skills": true,
+        "has_hot_effort_stat_tendencies": true,
+        "has_hot_bloodline_tendencies": true
+      }
+    },
+    {
+      "raw_no": 35,
+      "name": "幽影树",
+      "form_name": "异色突变",
+      "real_pet_id": "1779340705254",
+      "available_sections": {
+        "has_evolution_chain": true,
+        "has_hot_personalities": true,
+        "has_hot_skills": true,
+        "has_hot_effort_stat_tendencies": true,
+        "has_hot_bloodline_tendencies": true
+      }
+    },
+    {
+      "raw_no": 43,
+      "name": "奇丽花",
+      "form_name": "异色突变",
+      "real_pet_id": "1761644254890",
+      "available_sections": {
+        "has_evolution_chain": true,
+        "has_hot_personalities": true,
+        "has_hot_skills": true,
+        "has_hot_effort_stat_tendencies": true,
+        "has_hot_bloodline_tendencies": true
+      }
+    }
+  ]
+}
