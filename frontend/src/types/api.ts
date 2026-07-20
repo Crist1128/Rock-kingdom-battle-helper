@@ -96,11 +96,27 @@ export interface EnemyAvatarSlotRecognitionOut {
   candidates: EnemyAvatarCandidateOut[];
 }
 
+export interface EnemyAvatarSlotDebugOut {
+  slot_index: number;
+  crop_url: string;
+  detail_url: string;
+  top5_url: string;
+}
+
+export interface EnemyLineupRecognitionDebugOut {
+  run_id: string;
+  expires_after_seconds: number;
+  annotated_image_url: string;
+  contact_sheet_url: string;
+  slots: EnemyAvatarSlotDebugOut[];
+}
+
 export interface EnemyLineupRecognitionOut {
   source_image_size: [number, number];
   icon_template_count: number;
   slots: EnemyAvatarSlotRecognitionOut[];
   warnings: string[];
+  debug_artifacts?: EnemyLineupRecognitionDebugOut | null;
 }
 
 export interface SkillDefinitionOut {

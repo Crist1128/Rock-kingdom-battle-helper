@@ -146,3 +146,14 @@ def test_recognition_api_rejects_invalid_image(api_client: TestClient) -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_recognition_api_can_skip_debug_artifacts(api_client: TestClient) -> None:
+    """调用方可关闭调试图片落盘，避免不需要时产生本地文件。"""
+    response = api_client.post(
+        "/api/v1/recognition/enemy-lineup?top_k=2&include_debug=false",
+        files={"file": ("screenshot.png", _build_default_size_screenshot(), "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["debug_artifacts"] is None

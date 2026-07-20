@@ -58,6 +58,28 @@ class EnemyAvatarSlotRecognitionOut(BaseModel):
     )
 
 
+class EnemyAvatarSlotDebugOut(BaseModel):
+    """单个槽位的头像识别调试图片。"""
+
+    slot_index: int = Field(..., description="槽位序号，1-6")
+    crop_url: str = Field(..., description="该槽位实际裁剪图 URL")
+    detail_url: str = Field(..., description="原图、抄像、对齐和差异热力图综合对比 URL")
+    top5_url: str = Field(..., description="该槽位 Top5 透明抄像候选对比 URL")
+
+
+class EnemyLineupRecognitionDebugOut(BaseModel):
+    """敌方阵容头像识别调试产物。"""
+
+    run_id: str = Field(..., description="本次调试产物运行 ID")
+    expires_after_seconds: int = Field(..., description="调试产物保留秒数，超过后会被后续请求清理")
+    annotated_image_url: str = Field(..., description="整张截图框选识别结果 URL")
+    contact_sheet_url: str = Field(..., description="全槽位候选总览图 URL")
+    slots: list[EnemyAvatarSlotDebugOut] = Field(
+        default_factory=list,
+        description="每个槽位的裁剪图、详细对比图和 Top5 图 URL",
+    )
+
+
 class EnemyLineupRecognitionOut(BaseModel):
     """敌方阵容截图识别响应。"""
 
@@ -67,4 +89,8 @@ class EnemyLineupRecognitionOut(BaseModel):
     warnings: list[str] = Field(
         default_factory=list,
         description="识别过程中的提示；本接口只给候选，不自动写入阵容",
+    )
+    debug_artifacts: EnemyLineupRecognitionDebugOut | None = Field(
+        default=None,
+        description="可选调试图片产物；用于前端查看截图框选和抄像实际效果",
     )

@@ -18,6 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 DEFAULT_REFERENCE_SIZE = (1150, 643)
@@ -539,20 +540,25 @@ def _mask_indices(mask: tuple[int, ...]) -> tuple[int, ...]:
 def _foreground_mask_from_crop(image: Image.Image) -> tuple[int, ...]:
     """从截图头像裁片中估计非黑底头像主体 mask，主要用于颜色变化场景。"""
     background_mask = _foreground_mask_by_background(image)
-    old_mask: list[int] = []
     rgb = image.convert("RGB")
     circle = _circle_mask(rgb.size[0])
-    circle_values = list(circle.getdata())
-    for index, (r, g, b) in enumerate(rgb.getdata()):
-        if not circle_values[index]:
-            old_mask.append(0)
-            continue
-        brightness = (r + g + b) / 3
-        chroma = max(r, g, b) - min(r, g, b)
-        # 排除黑色圆底；保留高亮白色、粉色、蓝色、紫色等头像主体。
-        old_mask.append(1 if brightness >= 82 or (brightness >= 55 and chroma >= 22) else 0)
-    # 截图中有橙色描边、血条暗纹等 UI 背景，单一策略容易漏掉浅色主体或误收背景；
-    # 合并背景差分与亮度/色度启发式，再由形状特征吸收少量噪声。
+    rgb_array = np.asarray(rgb, dtype=np.int16)
+    circle_array = np.asarray(circle, dtype=np.bool_)
+    brightness = rgb_array.mean(axis=2)
+    chroma = rgb_array.max(axis=2) - rgb_array.min(axis=2)
+    # 排除黑色圆底；保留高亮白色、粉色、蓝色、紫色等头像主体。
+    old_array = circle_array & ((brightness >= 82) | ((brightness >= 55) & (chroma >= 22)))
+    old_mask = tuple(int(value) for value in old_array.reshape(-1).tolist())
+    circle_values = tuple(int(value) for value in circle_array.reshape(-1).tolist())
+    circle_area = max(1, sum(1 for value in circle_values if value))
+    background_area = sum(background_mask)
+    old_area = sum(old_mask)
+    # 新头像模板为透明高清主体，截图裁片若带有大面积橙色描边/黑底，
+    # 旧亮度/色度启发式会把 UI 背景也纳入前景，导致轮廓特征退化成“大圆”。
+    # 当亮色启发式明显比背景差分更膨胀时，优先信任背景差分得到的主体轮廓。
+    if old_area / circle_area > 0.70 and background_area / circle_area < 0.58:
+        return background_mask
+    # 其他场景仍合并两种策略，避免白色/浅色主体被背景差分漏掉。
     return tuple(
         1 if left or right else 0
         for left, right in zip(background_mask, old_mask, strict=True)
@@ -596,35 +602,37 @@ def _foreground_mask_by_background(image: Image.Image) -> tuple[int, ...]:
     """
     rgb = image.convert("RGB")
     width, height = rgb.size
-    pixels = rgb.load()
+    rgb_array = np.asarray(rgb, dtype=np.float32)
     border = max(2, round(min(width, height) * 0.08))
-    border_colors: list[tuple[int, int, int]] = []
-    for y in range(height):
-        for x in range(width):
-            if x < border or x >= width - border or y < border or y >= height - border:
-                border_colors.append(pixels[x, y])
+    border_mask = np.zeros((height, width), dtype=np.bool_)
+    border_mask[:border, :] = True
+    border_mask[height - border :, :] = True
+    border_mask[:, :border] = True
+    border_mask[:, width - border :] = True
+    border_colors = [
+        tuple(int(channel) for channel in color)
+        for color in rgb_array[border_mask].astype(np.uint8).tolist()
+    ]
     background_candidates = _background_palette(border_colors)
     circle = _circle_mask(width)
-    circle_values = list(circle.getdata())
+    circle_array = np.asarray(circle, dtype=np.bool_)
+    circle_values = tuple(int(value) for value in circle_array.reshape(-1).tolist())
+    background_array = np.asarray(background_candidates, dtype=np.float32)
+    chroma_array = rgb_array.max(axis=2) - rgb_array.min(axis=2)
+    # height x width x 背景色数量
+    distances = np.sqrt(
+        ((rgb_array[:, :, None, :] - background_array[None, None, :, :]) ** 2).sum(axis=3)
+    )
+    min_distances = distances.min(axis=2)
 
     def build_mask(distance_threshold: float) -> list[int]:
-        raw_mask: list[int] = []
-        for index, (r, g, b) in enumerate(rgb.getdata()):
-            if not circle_values[index]:
-                raw_mask.append(0)
-                continue
-            distance = min(
-                math.sqrt((r - bg[0]) ** 2 + (g - bg[1]) ** 2 + (b - bg[2]) ** 2)
-                for bg in background_candidates
-            )
-            chroma = max(r, g, b) - min(r, g, b)
-            # 背景可能是黑色、米色或深橙 UI 边框；先排除所有常见边缘背景色，
-            # 再允许高色度像素以较低阈值进入，避免漏掉发色/皮肤换色后的主体。
-            enabled = distance >= distance_threshold or (
-                distance >= distance_threshold * 0.72 and chroma >= 46
-            )
-            raw_mask.append(1 if enabled else 0)
-        return raw_mask
+        # 背景可能是黑色、米色或深橙 UI 边框；先排除所有常见边缘背景色，
+        # 再允许高色度像素以较低阈值进入，避免漏掉发色/皮肤换色后的主体。
+        enabled = circle_array & (
+            (min_distances >= distance_threshold)
+            | ((min_distances >= distance_threshold * 0.72) & (chroma_array >= 46))
+        )
+        return [int(value) for value in enabled.reshape(-1).tolist()]
 
     raw = build_mask(42.0)
     circle_area = max(1, sum(1 for value in circle_values if value))
@@ -943,6 +951,60 @@ def _crop_ratio(image: Image.Image, box: tuple[float, float, float, float]) -> I
     )
 
 
+def _foreground_bbox_from_mask(
+    mask: tuple[int, ...],
+    *,
+    size: int = 64,
+) -> tuple[int, int, int, int] | None:
+    """根据前景 mask 返回最小外接框，坐标为 Pillow crop 的左上右下。"""
+    points = [index for index, enabled in enumerate(mask) if enabled]
+    if not points:
+        return None
+    xs = [index % size for index in points]
+    ys = [index // size for index in points]
+    return (min(xs), min(ys), max(xs) + 1, max(ys) + 1)
+
+
+def _foreground_focused_variant(image: Image.Image) -> Image.Image | None:
+    """把裁片中的疑似头像主体重新居中放大，减少黑底/橙边占比。"""
+    prepared = _prepare_image(image)
+    mask = _foreground_mask_by_background(prepared)
+    bbox = _foreground_bbox_from_mask(mask, size=prepared.size[0])
+    if bbox is None:
+        return None
+    left, top, right, bottom = bbox
+    width = right - left
+    height = bottom - top
+    area_ratio = sum(mask) / max(1, prepared.size[0] * prepared.size[1])
+    # 前景过大说明本来就贴近模板；过小则多半是噪点，均不额外生成聚焦变体。
+    if area_ratio < 0.06 or area_ratio > 0.55:
+        return None
+    if max(width, height) > prepared.size[0] * 0.86:
+        return None
+
+    padding = round(max(width, height) * 0.18)
+    side = max(width, height) + padding * 2
+    center_x = (left + right) / 2
+    center_y = (top + bottom) / 2
+    crop_left = round(center_x - side / 2)
+    crop_top = round(center_y - side / 2)
+    crop_right = round(center_x + side / 2)
+    crop_bottom = round(center_y + side / 2)
+    crop_left = max(0, crop_left)
+    crop_top = max(0, crop_top)
+    crop_right = min(prepared.size[0], crop_right)
+    crop_bottom = min(prepared.size[1], crop_bottom)
+    if crop_right - crop_left < 12 or crop_bottom - crop_top < 12:
+        return None
+    focused = prepared.crop((crop_left, crop_top, crop_right, crop_bottom))
+    return ImageOps.pad(
+        focused,
+        prepared.size,
+        method=Image.Resampling.LANCZOS,
+        color=(28, 28, 28),
+    )
+
+
 def _prepare_crop_variants(crop: Image.Image) -> list[Image.Image]:
     """生成多种轻微缩放/偏移的头像裁切变体，提高对定位误差的容忍度。"""
     # 敌方头像框有时会多带左侧黑底或右侧边缘，轻微中心裁切和横向偏移可提升鲁棒性。
@@ -951,7 +1013,12 @@ def _prepare_crop_variants(crop: Image.Image) -> list[Image.Image]:
         (0.04, 0.04, 0.96, 0.96),
         (0.08, 0.04, 1.00, 0.96),
     )
-    return [_prepare_image(_crop_ratio(crop, box)) for box in ratio_boxes]
+    variants = [_prepare_image(_crop_ratio(crop, box)) for box in ratio_boxes]
+    focused = _foreground_focused_variant(crop)
+    if focused is not None:
+        variants.append(focused)
+    return variants
+
 
 
 def _parse_template_file(path: Path) -> tuple[str, str] | None:
@@ -1092,14 +1159,16 @@ def match_avatar_crop(
                 features.shape_features,
                 template.shape_features,
             )
+            # 识别模板已切换为更清晰、透明背景更干净的头像素材；
+            # 粗排阶段更重视前景轮廓/形状与边缘分布，降低整圆颜色直方图对 UI 背景的敏感度。
             coarse_score = (
-                spatial_score * 0.32
-                + histogram_score * 0.13
-                + hash_score * 0.07
-                + edge_score * 0.10
-                + edge_spatial_score * 0.21
-                + silhouette_score * 0.12
-                + shape_score * 0.05
+                spatial_score * 0.22
+                + histogram_score * 0.08
+                + hash_score * 0.05
+                + edge_score * 0.12
+                + edge_spatial_score * 0.20
+                + silhouette_score * 0.20
+                + shape_score * 0.13
             )
             best_coarse_score = max(best_coarse_score, coarse_score)
         coarse_rows.append((best_coarse_score, template))
@@ -1157,17 +1226,18 @@ def match_avatar_crop(
                 _masked_color_histogram(features.image, template.foreground_indices),
                 template.foreground_histogram,
             )
+            # 精排阶段继续偏向模板透明前景区域，避免准备页黑底/描边/血条纹理压过头像主体。
             score = (
-                spatial_score * 0.22
-                + histogram_score * 0.07
-                + pixel_score * 0.09
-                + hash_score * 0.05
-                + edge_score * 0.09
-                + edge_spatial_score * 0.23
-                + silhouette_score * 0.12
-                + shape_score * 0.06
-                + foreground_pixel_score * 0.05
-                + foreground_hist_score * 0.02
+                spatial_score * 0.16
+                + histogram_score * 0.04
+                + pixel_score * 0.06
+                + hash_score * 0.04
+                + edge_score * 0.10
+                + edge_spatial_score * 0.18
+                + silhouette_score * 0.18
+                + shape_score * 0.12
+                + foreground_pixel_score * 0.08
+                + foreground_hist_score * 0.04
             )
             if score > best_score:
                 best_score = score

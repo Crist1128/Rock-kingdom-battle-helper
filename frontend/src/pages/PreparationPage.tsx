@@ -669,6 +669,49 @@ export function PreparationPage() {
                       {warning}
                     </div>
                   ))}
+                  {recognitionResult.debug_artifacts ? (
+                    <div className="rounded-xl border bg-white p-2">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-xs font-semibold">识别调试图</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            运行 ID {recognitionResult.debug_artifacts.run_id.slice(0, 8)}；约 {Math.round(recognitionResult.debug_artifacts.expires_after_seconds / 3600)} 小时后由后续请求清理。
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-[11px]">
+                          <a className="text-sky-700 underline" href={recognitionResult.debug_artifacts.annotated_image_url} target="_blank" rel="noreferrer">打开框选图</a>
+                          <a className="text-sky-700 underline" href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer">打开总览图</a>
+                        </div>
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <a href={recognitionResult.debug_artifacts.annotated_image_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-slate-50 p-2">
+                          <div className="mb-1 text-[11px] font-medium">整图框选</div>
+                          <img src={recognitionResult.debug_artifacts.annotated_image_url} alt="识别框选图" className="max-h-56 w-full rounded object-contain" />
+                        </a>
+                        <a href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-slate-50 p-2">
+                          <div className="mb-1 text-[11px] font-medium">Top5 总览</div>
+                          <img src={recognitionResult.debug_artifacts.contact_sheet_url} alt="识别候选总览图" className="max-h-56 w-full rounded object-contain" />
+                        </a>
+                      </div>
+                      <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                        {recognitionResult.debug_artifacts.slots.map((debugSlot) => (
+                          <div key={debugSlot.slot_index} className="rounded-lg border bg-slate-50 p-2">
+                            <div className="mb-1 flex items-center justify-between text-[11px] font-medium">
+                              <span>槽位 {debugSlot.slot_index} 抄像检查</span>
+                              <span className="flex gap-2 font-normal">
+                                <a className="text-sky-700 underline" href={debugSlot.crop_url} target="_blank" rel="noreferrer">裁剪</a>
+                                <a className="text-sky-700 underline" href={debugSlot.detail_url} target="_blank" rel="noreferrer">详情</a>
+                                <a className="text-sky-700 underline" href={debugSlot.top5_url} target="_blank" rel="noreferrer">Top5</a>
+                              </span>
+                            </div>
+                            <a href={debugSlot.detail_url} target="_blank" rel="noreferrer">
+                              <img src={debugSlot.detail_url} alt={`槽位 ${debugSlot.slot_index} 头像识别详情`} className="max-h-48 w-full rounded object-contain" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="grid gap-2">
                     {recognitionResult.slots.map((slot) => (
                       <div key={slot.slot_index} className="rounded-xl border bg-white p-2">

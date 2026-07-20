@@ -151,11 +151,11 @@ export const api = {
   health: () => request<{ status: string }>("/health"),
 
   recognition: {
-    enemyLineup: (file: File, topK = 5) => {
+    enemyLineup: (file: File, topK = 5, includeDebug = true) => {
       const formData = new FormData();
       formData.append("file", file);
       return uploadRequest<EnemyLineupRecognitionOut>(
-        `/recognition/enemy-lineup${qs({ top_k: topK })}`,
+        `/recognition/enemy-lineup${qs({ top_k: topK, include_debug: includeDebug })}`,
         formData,
       );
     },

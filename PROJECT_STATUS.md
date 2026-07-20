@@ -1,17 +1,21 @@
 # 当前项目状态
 
-更新日期：2026-07-06
+更新日期：2026-07-19
 
 ## 总体阶段
 
 项目已经从“后端骨架”推进到 **前后端可联调的手动输入 MVP + 实时面板反推主流程阶段**。
 
-当前核心目标是：在保持本地规则库、己方配置、战斗事件和状态快照稳定的基础上，继续巩固“实时面板估计 + 默认配置校验”的新反推方式，并补齐天气/状态公式修正、完整应对/防御结算和速度判断。事件重放后端能力保留，但前端入口暂时隐藏，当前阶段不把重放/复杂修正作为主流程功能。后端 MVP 完成路线已记录在 `docs/03_系统设计/后端MVP完成路线_v0.1.md`。旧候选接口、旧候选 service/schema/model/tests 已清理，`build_candidate` / `calculation_cache` 由 Alembic `0006_drop_legacy_candidate_tables` 删除。
+当前核心目标是：在保持本地规则库、己方配置、战斗事件和状态快照稳定的基础上，继续巩固“实时面板估计 + 默认配置校验”的新反推方式，并补齐天气/状态公式修正、完整应对/防御结算和速度判断。事件重放后端能力保留，但前端入口暂时隐藏，当前阶段不把重放/复杂修正作为主流程功能。后端 MVP 完成路线已记录在 `docs/03_系统设计/后端MVP完成路线_v0.1.md`。旧候选接口、旧候选 service/schema/model/tests 已清理，`build_candidate` / `calculation_cache` 由 Alembic `0006_drop_legacy_candidate_tables` 删除。2026-07-18 已清理未接入的第三方识图资料；当前准备页敌方头像识别已直接接入本项目自研透明模板库原型，后续仍需继续补充样本、校准阈值并验证稳定性。
 
 ## 已完成内容
 
 ### 后端
 
+- 2026-07-18 清理未接入的第三方识图资料目录，避免后续误以为外部识图路线已被本项目支持；当前仅保留本项目自研头像识别索引、前景聚焦和磁盘缓存等试验性代码/测试改造，工作区相关改动暂不提交。
+- 2026-07-19 基于《Codex_敌方精灵头像视觉识别复现说明.md》新增透明模板库头像识别原型：支持截图读取、透明 PNG/ZIP 素材、固定布局裁槽、Alpha 遮罩粗排、Lab 颜色复排、Top5 输出与调试产物导出；已直接接入准备页识别接口作为默认实现。
+- 2026-07-19 继续优化透明模板库头像识别：识别器改为进程级缓存，粗筛与精排继续收窄候选集，新增 `comparison/slot_{n}_detail.png` 和 `comparison/slot_{n}_top5.png` 详细抠像对比图，方便人工复核识别效果。
+- 2026-07-19 准备页识别接口新增 `include_debug` 参数，默认把整图框选、总览图、每槽裁剪、Top1 抠像/对齐/差异和 Top5 对比图保存到 `data/rocom/recognition/debug_runs/`，响应返回可直接访问的 `debug_artifacts` URL；前端识别结果区已直接展示这些调试图。旧调试目录会由后续请求按 24 小时 TTL 和最多 50 次运行上限清理。
 - 2026-07-06 完成项目静态规则同步检查升级：设置页同步入口改为同时检查/同步状态定义与 structured 技能规则，空库/旧库状态检查会提示状态定义缺失或过期；新增“技能使用次数”状态口径，精灵侧 1 层表示下次使用任意技能时等效多使用 1 次并参与能耗与理论总伤害展示；另保留“本技能使用次数增加”承载明确写明本技能永久变化的技能槽修正；事件重放入口暂时从前端隐藏，保留后端接口。
 - 2026-07-05 继续落地复杂技能分支第 3 批：新增下一次切换入场继承/回能、多目标资源变化、生命比例互换、按极性转中毒、一回合多次使用技能、离场增加技能使用次数、双方全队萌化层数动态连击等能力；真实换下/返场仍统一走 `switch_elf`，强制切换类技能当前写入结构化提示。
 - 已建立 FastAPI 应用入口和 API v1 路由聚合。
@@ -94,13 +98,15 @@
 - 速度先手概率未实现；当前只有基础面板速度观测匹配。
 - 事件重放重算已完成最小闭环：`replay-from` 会重建实时估计/evidence，并重算切换、HP、能量、最终状态实例和事件后快照链；自动结算副作用重演仍未实现。
 - 实时估计 evidence 已有阶段 F 解释页，可展示事件来源、快照、关键倍率、约束变化、未收窄原因和冲突摘要；后续还需补全复杂技能规则和更多天气/状态 modifier 数值来源。
-- 图像识别未开始。
+- 图像识别未进入正式主线；当前已接入透明模板库复现原型，但准确率和样本覆盖仍不足，暂不作为可用能力发布，也不应自动写入战斗事件流。
 - 正式 `effect_definition` 状态定义数据仍需继续扩展；项目状态定义和前三批人工属性/速度状态已有 JSON 种子、dry-run 导入器和本地 commit 验证，但不会在普通启动时自动写入。攻击印记、光合印记、萌芽、湿润、蓄电、奉献、传动等机制仍待确认。
 
 ## 当前验证情况
 
 最近进度文档记录的验证结果：
 
+- 2026-07-19 透明模板库头像识别本轮验证通过：`python -m pytest -q backend/app/tests/test_avatar_full_library.py backend/app/tests/test_recognition_api.py` 为 `8 passed`，`python -m pytest -q backend/app/tests` 为 `238 passed`，`python -m ruff check backend/app` 通过，`python -m py_compile backend/app/recognition/avatar/full_library.py backend/app/api/v1/endpoints/recognition.py` 通过，README/PROJECT_STATUS 和代码文件的 mojibake 扫描通过；前端 `npm.cmd run typecheck` 通过。
+- 2026-07-18 清理第三方识图资料后，头像识别服务聚焦测试 `python -m pytest app/tests/test_avatar_recognition_service.py -q`：`5 passed`；README/PROJECT_STATUS 编码扫描和 `git diff --check` 待本轮最终验证。
 - 默认配置校验接入后，后端 Ruff、前端 typecheck/build、相关中文文件 mojibake 扫描和 `git diff --check` 曾通过。
 - 前端 `npm.cmd run typecheck` 通过。
 - 前端结束回合接入后，`npm.cmd run typecheck` 通过，`BattleWorkbenchPage.tsx` 编码扫描通过。
@@ -153,6 +159,7 @@ docs/03_系统设计/后端MVP完成路线_v0.1.md
 3. 扩展实时面板估计反向推导：把当前普通攻击最小公式的 HP/双防/双攻低置信范围，继续扩展到应对、减伤、天气、状态上下文和速度先后手约束。
 4. 继续推进前端实时估计面板：补充重放结果提示，以及更多复杂规则未命中原因展示。
 5. 在 `EventReplayService` 当前闭环基础上，继续覆盖自动结算副作用重演。
+6. 头像识别继续保持试验线：先补评估样本、误识别案例和人工确认闭环，稳定前不提交为正式能力。
 
 ## 当前推进路线记录
 
@@ -175,3 +182,5 @@ docs/03_系统设计/后端MVP完成路线_v0.1.md
 - 2026-07-13 新增独立进化链静态表与 seed 导入：`elf_evolution_chain` / `elf_evolution_stage` 将每只精灵绑定到对应进化链，工作台运行时有效形态选择优先加载当前精灵可进化/退化的链内形态；切换时继续沿用既有 `runtime-form` 逻辑，保留性格与六维培养。
 
 - 2026-07-14 设置页补充“单独录入精灵进化链规则”入口：已有精灵基础数据的旧库可先 dry-run，再将 `backend/app/seed/elf_evolution_chains.json` 写入 `elf_evolution_chain` / `elf_evolution_stage`，无需重新导入 BWIKI cleaned 数据。
+
+- 2026-07-18 清理未接入的第三方识图资料，仅保留已经迁移为本项目自研头像识别链路的试验性代码/测试改造；头像识别效果尚未达到可用主线，相关工作区改动暂不提交。
