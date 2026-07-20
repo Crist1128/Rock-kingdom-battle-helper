@@ -69,7 +69,7 @@
 - **事件重放**
   - `EventReplayService` 后端能力保留；前端入口暂时隐藏，当前阶段不把重放/复杂修正作为主流程功能。
 - **图像识别准备**
-  - 已有头像识别素材采集方案文档；未接入的第三方识图资料已清理。当前仅保留本项目自研头像识别链路中的代码/测试改造，并新增基于透明模板库的试验性复现原型，可读取截图、透明 PNG/ZIP、输出 Top5、详细抠像对比图和调试图；识别器已改为进程级缓存，准备页前端会直接展示本次识别的框选图、总览图和每槽抠像详情，后端调试图片写入 `data/rocom/recognition/debug_runs/` 并由后续请求按保留时间/数量上限清理。
+  - 已有头像识别素材采集方案文档；未接入的第三方识图资料已清理。当前仅保留本项目自研头像识别链路中的代码/测试改造，并新增基于透明模板库的试验性复现原型，可读取截图、透明 PNG/ZIP、输出 Top2、详细抠像对比图和调试图；识别器已改为进程级缓存，准备页前端会直接展示本次识别的框选图、总览图和每槽抠像详情，后端调试图片写入 `data/rocom/recognition/debug_runs/` 并由后续请求按保留时间/数量上限清理。
 
 ### 仍在推进 / 未完成
 
@@ -147,7 +147,7 @@ http://127.0.0.1:5173
 
 - 战斗工作台：从首页创建或进入最近战斗。
 - 独立伤害计算器：侧边栏“伤害计算器”，也可访问 `/damage-calculator`。
-- 透明模板库头像识别原型：`python recognize_full_library.py --screenshot ... --avatars ... --output ...`；输出目录会包含 `comparison/slot_{n}_detail.png` 和 `comparison/slot_{n}_top5.png` 方便人工看抠像效果。
+- 透明模板库头像识别原型：`python recognize_full_library.py --screenshot ... --avatars ... --output ...`；输出目录会包含 `comparison/slot_{n}_detail.png` 和 `comparison/slot_{n}_top2.png` 方便人工看抠像效果。
 
 ### 一键启动（Windows）
 

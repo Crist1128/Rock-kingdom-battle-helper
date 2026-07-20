@@ -151,7 +151,7 @@ export const api = {
   health: () => request<{ status: string }>("/health"),
 
   recognition: {
-    enemyLineup: (file: File, topK = 5, includeDebug = true) => {
+    enemyLineup: (file: File, topK = 2, includeDebug = true) => {
       const formData = new FormData();
       formData.append("file", file);
       return uploadRequest<EnemyLineupRecognitionOut>(

@@ -303,7 +303,7 @@ export function PreparationPage() {
     if (!recognitionResult) return;
     const next = [...enemySlots];
     recognitionResult.slots.forEach((slot) => {
-      const matched = slot.candidates.find((candidate) => candidate.matched_elves.length > 0)?.matched_elves[0];
+      const matched = slot.candidates[0]?.matched_elves[0];
       const index = slot.slot_index - 1;
       if (!matched || index < 0 || index >= next.length) return;
       next[index] = {
@@ -689,7 +689,7 @@ export function PreparationPage() {
                           <img src={recognitionResult.debug_artifacts.annotated_image_url} alt="识别框选图" className="max-h-56 w-full rounded object-contain" />
                         </a>
                         <a href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-slate-50 p-2">
-                          <div className="mb-1 text-[11px] font-medium">Top5 总览</div>
+                          <div className="mb-1 text-[11px] font-medium">Top2 总览</div>
                           <img src={recognitionResult.debug_artifacts.contact_sheet_url} alt="识别候选总览图" className="max-h-56 w-full rounded object-contain" />
                         </a>
                       </div>
@@ -701,7 +701,7 @@ export function PreparationPage() {
                               <span className="flex gap-2 font-normal">
                                 <a className="text-sky-700 underline" href={debugSlot.crop_url} target="_blank" rel="noreferrer">裁剪</a>
                                 <a className="text-sky-700 underline" href={debugSlot.detail_url} target="_blank" rel="noreferrer">详情</a>
-                                <a className="text-sky-700 underline" href={debugSlot.top5_url} target="_blank" rel="noreferrer">Top5</a>
+                                <a className="text-sky-700 underline" href={debugSlot.top5_url} target="_blank" rel="noreferrer">Top2</a>
                               </span>
                             </div>
                             <a href={debugSlot.detail_url} target="_blank" rel="noreferrer">

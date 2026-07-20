@@ -67,7 +67,7 @@ class AvatarRecognitionService:
         """当前模板数量。"""
         return self.index.template_count
 
-    def recognize_crop(self, crop: Image.Image, *, top_k: int = 5) -> AvatarCropRecognition:
+    def recognize_crop(self, crop: Image.Image, *, top_k: int = 2) -> AvatarCropRecognition:
         """识别单张已裁头像，返回 Top-K 候选。"""
         candidates = self.index.recognize_crop(crop, top_k=top_k)
         return AvatarCropRecognition(
@@ -80,7 +80,7 @@ class AvatarRecognitionService:
         self,
         crops: list[Image.Image],
         *,
-        top_k: int = 5,
+        top_k: int = 2,
     ) -> list[AvatarCropRecognition]:
         """批量识别多张已裁头像，共用同一份模板特征。"""
         return [self.recognize_crop(crop, top_k=top_k) for crop in crops]

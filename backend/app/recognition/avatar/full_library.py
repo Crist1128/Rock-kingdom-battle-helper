@@ -22,6 +22,7 @@ import shutil
 import tempfile
 import zipfile
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -42,7 +43,7 @@ BASE_ROW_GAP = 59
 BASE_MARGIN = 7
 DEFAULT_MIRROR_MODE: Literal["enemy", "none", "both"] = "enemy"
 SEARCH_SIZE_OFFSETS = (-2, -1, 0, 1, 2)
-TOP_K = 5
+TOP_K = 2
 ALPHA_THRESHOLD_COARSE = 170
 ALPHA_THRESHOLD_FINE = 220
 COLOR_DISTANCE_SCALE = 40.0
@@ -51,6 +52,7 @@ IDENTITY_COLOR_WEIGHT = 0.18
 EDGE_MATCH_WEIGHT = 0.7
 GRAY_MATCH_WEIGHT = 0.3
 CHECKERBOARD_TILE_SIZE = 12
+VARIANT_DISK_CACHE_VERSION = "avatar_full_library_variant_cache_v1"
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,17 @@ class SlotBox:
     @property
     def height(self) -> int:
         return self.y2 - self.y1
+
+
+@dataclass(frozen=True)
+class SlotRoiFeatures:
+    """Preprocessed screenshot crop for one lineup slot."""
+
+    box: SlotBox
+    bgr: np.ndarray
+    gray: np.ndarray
+    edge: np.ndarray
+    lab: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -183,6 +196,14 @@ class SlotRecognitionResult:
             "top1": self.top1.to_dict() if self.top1 is not None else None,
             "top5": [candidate.to_dict() for candidate in self.top5],
         }
+
+
+@dataclass(frozen=True)
+class SlotRecognitionWorkResult:
+    """单个槽位并行识别任务的内部结果。"""
+
+    result: SlotRecognitionResult
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -334,6 +355,54 @@ def load_avatar_assets(source: str | Path) -> list[AvatarAsset]:
         return list(assets)
 
 
+def _variant_disk_cache_path(
+    icons_dir: Path,
+    *,
+    mirror_mode: Literal["enemy", "none", "both"],
+) -> Path:
+    """Return the local feature-cache path for preprocessed avatar variants."""
+    safe_mode = mirror_mode.replace("/", "_")
+    return icons_dir.parent / f".{icons_dir.name}_{safe_mode}_full_library_variants_v1.npz"
+
+
+def _variant_disk_cache_signature(
+    assets: list[AvatarAsset],
+    *,
+    mirror_mode: Literal["enemy", "none", "both"],
+) -> str:
+    """Build a signature that invalidates cache when avatar material changes."""
+    rows = []
+    for asset in assets:
+        try:
+            stat = asset.path.stat()
+            mtime_ns = stat.st_mtime_ns
+            size = stat.st_size
+        except OSError:
+            mtime_ns = 0
+            size = 0
+        rows.append(
+            {
+                "visual_id": asset.visual_id,
+                "label": asset.label,
+                "file_name": asset.file_name,
+                "path": str(asset.path),
+                "sha256": asset.sha256,
+                "mtime_ns": mtime_ns,
+                "size": size,
+            }
+        )
+    return json.dumps(
+        {
+            "version": VARIANT_DISK_CACHE_VERSION,
+            "mirror_mode": mirror_mode,
+            "size_offsets": list(SEARCH_SIZE_OFFSETS),
+            "assets": rows,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+
 @lru_cache(maxsize=8)
 def get_avatar_recognizer(
     icons_dir: str | Path,
@@ -341,8 +410,32 @@ def get_avatar_recognizer(
     mirror_mode: Literal["enemy", "none", "both"] = DEFAULT_MIRROR_MODE,
 ) -> AlphaTemplateRecognizer:
     """加载并缓存透明模板库识别器。"""
-    assets = load_avatar_assets(Path(icons_dir).resolve())
-    return AlphaTemplateRecognizer(assets, mirror_mode=mirror_mode)
+    icons_path = Path(icons_dir).resolve()
+    assets = load_avatar_assets(icons_path)
+    recognizer = AlphaTemplateRecognizer(assets, mirror_mode=mirror_mode)
+    cache_path = _variant_disk_cache_path(icons_path, mirror_mode=mirror_mode)
+    cache_signature = _variant_disk_cache_signature(assets, mirror_mode=mirror_mode)
+    recognizer.load_variant_disk_cache(cache_path, cache_signature)
+    recognizer.warm_up()
+    recognizer.write_variant_disk_cache(cache_path, cache_signature)
+    return recognizer
+
+
+def warm_avatar_variant_cache(
+    icons_dir: str | Path,
+    *,
+    mirror_mode: Literal["enemy", "none", "both"] = DEFAULT_MIRROR_MODE,
+) -> Path:
+    """显式预热本地头像素材的模板变体磁盘缓存。"""
+    icons_path = Path(icons_dir).resolve()
+    if not icons_path.is_dir():
+        raise ValueError("头像预处理缓存预热只支持本地文件夹素材")
+    recognizer = get_avatar_recognizer(icons_path, mirror_mode=mirror_mode)
+    cache_path = _variant_disk_cache_path(icons_path, mirror_mode=mirror_mode)
+    if not cache_path.is_file():
+        cache_signature = _variant_disk_cache_signature(recognizer.assets, mirror_mode=mirror_mode)
+        recognizer.write_variant_disk_cache(cache_path, cache_signature)
+    return cache_path
 
 
 def _scale_value(value: int, scale: float) -> int:
@@ -465,22 +558,33 @@ def _build_variant(asset: AvatarAsset, *, size: int, mirrored: bool) -> Template
     )
 
 
+def _prepare_slot_roi_features(screenshot_bgr: np.ndarray, box: SlotBox) -> SlotRoiFeatures:
+    """Preprocess one slot ROI once instead of once per template."""
+    roi_bgr = screenshot_bgr[box.y1 : box.y2, box.x1 : box.x2]
+    roi_gray = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2GRAY)
+    roi_edge = _template_edge(roi_gray, np.full_like(roi_gray, 255, dtype=np.uint8))
+    roi_lab = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+    return SlotRoiFeatures(
+        box=box,
+        bgr=roi_bgr,
+        gray=roi_gray,
+        edge=roi_edge,
+        lab=roi_lab,
+    )
+
+
 def _template_score_on_roi(
-    roi_bgr: np.ndarray,
-    slot: SlotBox,
+    roi: SlotRoiFeatures,
     variant: TemplateVariant,
 ) -> TemplateVisualScore:
-    """Match one variant against a slot ROI with structure-first scoring."""
-    del slot
+    """Match one variant against a preprocessed slot ROI."""
     template_h, template_w = variant.template_bgr.shape[:2]
-    roi_h, roi_w = roi_bgr.shape[:2]
+    roi_h, roi_w = roi.bgr.shape[:2]
     if template_h > roi_h or template_w > roi_w:
         return TemplateVisualScore(0.0, 0.0, 0.0, None)
 
-    roi_gray = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2GRAY)
-    roi_edge = _template_edge(roi_gray, np.full_like(roi_gray, 255, dtype=np.uint8))
-    gray_response = _masked_match_response(roi_gray, variant.template_gray, variant.alpha_mask)
-    edge_response = _masked_match_response(roi_edge, variant.template_edge, variant.alpha_mask)
+    gray_response = _masked_match_response(roi.gray, variant.template_gray, variant.alpha_mask)
+    edge_response = _masked_match_response(roi.edge, variant.template_edge, variant.alpha_mask)
     if gray_response is None and edge_response is None:
         return TemplateVisualScore(0.0, 0.0, 0.0, None)
 
@@ -506,12 +610,11 @@ def _template_score_on_roi(
 
 def _candidate_color_delta_e(
     template: TemplateVariant,
-    patch_bgr: np.ndarray,
+    patch_lab: np.ndarray,
 ) -> float:
-    """计算遮蔽区域的平均 Lab 颜色距离。"""
-    if patch_bgr.shape[:2] != template.template_bgr.shape[:2]:
+    """Calculate mean Lab color distance inside the alpha-covered area."""
+    if patch_lab.shape[:2] != template.template_bgr.shape[:2]:
         return float("inf")
-    patch_lab = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
     delta = np.linalg.norm(template.template_lab - patch_lab, axis=2)
     template_alpha = template.template_alpha >= ALPHA_THRESHOLD_FINE
     if template_alpha.sum() < 20:
@@ -596,6 +699,95 @@ class AlphaTemplateRecognizer:
         self._variant_cache: dict[tuple[int, int, bool], TemplateVariant] = {}
         self._variants_by_size: dict[int, list[TemplateVariant]] = {}
 
+    def load_variant_disk_cache(self, cache_path: Path, signature: str) -> None:
+        """Load preprocessed template variants from a local npz cache if valid."""
+        if not cache_path.is_file():
+            return
+        asset_map = {asset.visual_id: asset for asset in self.assets}
+        try:
+            with np.load(cache_path, allow_pickle=False) as payload:
+                cached_signature = str(payload["signature"][0])
+                if cached_signature != signature:
+                    return
+                metadata = json.loads(str(payload["metadata"][0]))
+                variant_cache: dict[tuple[int, int, bool], TemplateVariant] = {}
+                variants_by_size: dict[int, list[TemplateVariant]] = {}
+                for index, row in enumerate(metadata):
+                    visual_id = int(row["visual_id"])
+                    size = int(row["size"])
+                    mirrored = bool(row["mirrored"])
+                    asset = asset_map.get(visual_id)
+                    if asset is None:
+                        return
+                    variant = TemplateVariant(
+                        visual_id=visual_id,
+                        label=asset.label,
+                        file_name=asset.file_name,
+                        path=asset.path,
+                        sha256=asset.sha256,
+                        size=size,
+                        mirrored=mirrored,
+                        template_bgr=payload[f"template_bgr_{index}"].astype(np.uint8),
+                        template_gray=payload[f"template_gray_{index}"].astype(np.uint8),
+                        template_edge=payload[f"template_edge_{index}"].astype(np.uint8),
+                        template_lab=payload[f"template_lab_{index}"].astype(np.float32),
+                        template_alpha=payload[f"template_alpha_{index}"].astype(np.uint8),
+                        alpha_mask=payload[f"alpha_mask_{index}"].astype(np.uint8),
+                        alpha_indices=payload[f"alpha_indices_{index}"].astype(np.int64),
+                    )
+                    key = _variant_key(asset, size, mirrored)
+                    variant_cache[key] = variant
+                    variants_by_size.setdefault(size, []).append(variant)
+                self._variant_cache = variant_cache
+                self._variants_by_size = variants_by_size
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            return
+
+    def write_variant_disk_cache(self, cache_path: Path, signature: str) -> None:
+        """Persist preprocessed template variants to local npz cache for faster cold starts."""
+        if not self._variant_cache:
+            return
+        temp_path: Path | None = None
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            variants = sorted(
+                self._variant_cache.values(),
+                key=lambda item: (item.size, item.visual_id, item.mirrored),
+            )
+            metadata = [
+                {
+                    "visual_id": variant.visual_id,
+                    "size": variant.size,
+                    "mirrored": variant.mirrored,
+                }
+                for variant in variants
+            ]
+            arrays: dict[str, np.ndarray] = {
+                "signature": np.asarray([signature]),
+                "metadata": np.asarray([json.dumps(metadata, ensure_ascii=False)]),
+            }
+            for index, variant in enumerate(variants):
+                arrays[f"template_bgr_{index}"] = variant.template_bgr
+                arrays[f"template_gray_{index}"] = variant.template_gray
+                arrays[f"template_edge_{index}"] = variant.template_edge
+                arrays[f"template_lab_{index}"] = variant.template_lab
+                arrays[f"template_alpha_{index}"] = variant.template_alpha
+                arrays[f"alpha_mask_{index}"] = variant.alpha_mask
+                arrays[f"alpha_indices_{index}"] = variant.alpha_indices
+            with tempfile.NamedTemporaryFile(
+                dir=cache_path.parent,
+                prefix=f"{cache_path.name}.",
+                suffix=".tmp.npz",
+                delete=False,
+            ) as handle:
+                temp_path = Path(handle.name)
+                np.savez(handle, **arrays)
+            temp_path.replace(cache_path)
+        except OSError:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+            return
+
     def _variants_for_asset(self, asset: AvatarAsset, size: int) -> list[TemplateVariant]:
         """获取某个模板在指定尺寸下的方向变体。"""
         mirror_flags: list[bool]
@@ -624,6 +816,17 @@ class AlphaTemplateRecognizer:
         self._variants_by_size[size] = variants
         return variants
 
+    def _variants_for_sizes(self, sizes: tuple[int, ...]) -> list[TemplateVariant]:
+        """Return variants for multiple sizes while reusing preprocessed features."""
+        return [variant for size in sizes for variant in self._variants_for_size(size)]
+
+    def warm_up(self, sizes: tuple[int, ...] | None = None) -> None:
+        """Warm up common template variants and their grayscale/edge/Lab/alpha features."""
+        warm_sizes = sizes or tuple(BASE_ICON_CANVAS + offset for offset in SEARCH_SIZE_OFFSETS)
+        for size in warm_sizes:
+            if size > 0:
+                self._variants_for_size(int(size))
+
     @staticmethod
     def _candidate_sizes(image_size: tuple[int, int]) -> tuple[int, ...]:
         """根据截图尺寸估算本次识别需要搜索的模板尺寸。"""
@@ -633,6 +836,108 @@ class AlphaTemplateRecognizer:
         sizes = sorted({max(1, expected + offset) for offset in SEARCH_SIZE_OFFSETS})
         return tuple(sizes)
 
+    def _recognize_slot(
+        self,
+        slot_index: int,
+        slot_roi: SlotRoiFeatures,
+        candidate_variants: list[TemplateVariant],
+        asset_map: dict[int, AvatarAsset],
+    ) -> SlotRecognitionWorkResult:
+        """识别单个敌方槽位，供串行或并行调度复用。"""
+        box = slot_roi.box
+        ranked_coarse: list[AvatarMatchCandidate] = []
+        # Accuracy first: do not use low-resolution signature prefiltering here.
+        # Match every transparent template variant with Alpha mask, then run
+        # color refinement for all coarse candidates to avoid recall loss.
+        for candidate_variant in candidate_variants:
+            template_h, template_w = candidate_variant.template_bgr.shape[:2]
+            if template_h > slot_roi.bgr.shape[0] or template_w > slot_roi.bgr.shape[1]:
+                continue
+            visual_score = _template_score_on_roi(slot_roi, candidate_variant)
+            if visual_score.loc is None:
+                continue
+            local_x, local_y = visual_score.loc
+            patch = slot_roi.bgr[
+                local_y : local_y + template_h,
+                local_x : local_x + template_w,
+            ]
+            if patch.shape[:2] != (template_h, template_w):
+                continue
+            ranked_coarse.append(
+                AvatarMatchCandidate(
+                    slot=box.slot,
+                    visual_id=candidate_variant.visual_id,
+                    label=candidate_variant.label,
+                    file_name=candidate_variant.file_name,
+                    path=str(candidate_variant.path),
+                    sha256=candidate_variant.sha256,
+                    coarse_score=float(visual_score.identity_score),
+                    gray_score=float(visual_score.gray_score),
+                    edge_score=float(visual_score.edge_score),
+                    color_delta_e=0.0,
+                    final_score=float(visual_score.identity_score),
+                    size=candidate_variant.size,
+                    mirrored=candidate_variant.mirrored,
+                    local_x=local_x,
+                    local_y=local_y,
+                    screen_x=box.x1 + local_x,
+                    screen_y=box.y1 + local_y,
+                )
+            )
+
+        refined: list[AvatarMatchCandidate] = []
+        for candidate in sorted(
+            ranked_coarse,
+            key=lambda item: item.coarse_score,
+            reverse=True,
+        ):
+            variant = self._variant_cache[
+                _variant_key(
+                    asset_map[candidate.visual_id],
+                    candidate.size,
+                    candidate.mirrored,
+                )
+            ]
+            template_h, template_w = variant.template_bgr.shape[:2]
+            patch_lab = slot_roi.lab[
+                candidate.local_y : candidate.local_y + template_h,
+                candidate.local_x : candidate.local_x + template_w,
+            ]
+            if patch_lab.shape[:2] != (template_h, template_w):
+                continue
+            color_delta_e = _candidate_color_delta_e(variant, patch_lab)
+            color_similarity = math.exp(-color_delta_e / COLOR_DISTANCE_SCALE)
+            final_score = (
+                IDENTITY_STRUCTURE_WEIGHT * candidate.coarse_score
+                + IDENTITY_COLOR_WEIGHT * color_similarity
+            )
+            refined.append(
+                AvatarMatchCandidate(
+                    **{
+                        **candidate.__dict__,
+                        "color_delta_e": float(color_delta_e),
+                        "final_score": float(final_score),
+                    }
+                )
+            )
+
+        ranked = _normalize_slot_candidates(refined)
+        warnings: list[str] = []
+        if ranked:
+            top1 = ranked[0]
+        else:
+            warnings.append(f"slot {slot_index + 1} 未找到可用候选")
+            top1 = None
+        return SlotRecognitionWorkResult(
+            result=SlotRecognitionResult(
+                slot=box.slot,
+                box=box,
+                top1=top1,
+                top5=ranked[:TOP_K],
+            ),
+            warnings=warnings,
+        )
+
     def recognize_screenshot(self, screenshot_bgr: np.ndarray) -> RecognitionRunResult:
         """识别整张准备页截图。"""
         if screenshot_bgr.ndim != 3 or screenshot_bgr.shape[2] != 3:
@@ -640,106 +945,34 @@ class AlphaTemplateRecognizer:
         asset_map = {asset.visual_id: asset for asset in self.assets}
         screenshot_h, screenshot_w = screenshot_bgr.shape[:2]
         slot_boxes = build_slot_boxes((screenshot_w, screenshot_h))
-        slot_rois = [screenshot_bgr[box.y1 : box.y2, box.x1 : box.x2] for box in slot_boxes]
-        candidate_sizes = self._candidate_sizes((screenshot_w, screenshot_h))
-        candidate_variants = [
-            variant
-            for size in candidate_sizes
-            for variant in self._variants_for_size(size)
+        slot_rois = [
+            _prepare_slot_roi_features(screenshot_bgr, box)
+            for box in slot_boxes
         ]
+        candidate_sizes = self._candidate_sizes((screenshot_w, screenshot_h))
+        candidate_variants = self._variants_for_sizes(candidate_sizes)
 
         warnings: list[str] = []
-        slot_results: list[SlotRecognitionResult] = []
-        for slot_index, box in enumerate(slot_boxes):
-            slot_roi = slot_rois[slot_index]
-            ranked_coarse: list[AvatarMatchCandidate] = []
-            # Accuracy first: do not use low-resolution signature prefiltering or
-            # fixed-size candidate truncation here. Match every transparent template
-            # variant with Alpha mask, then run color refinement.
-            for candidate_variant in candidate_variants:
-                template_h, template_w = candidate_variant.template_bgr.shape[:2]
-                if template_h > slot_roi.shape[0] or template_w > slot_roi.shape[1]:
-                    continue
-                visual_score = _template_score_on_roi(slot_roi, box, candidate_variant)
-                if visual_score.loc is None:
-                    continue
-                local_x, local_y = visual_score.loc
-                patch = slot_roi[
-                    local_y : local_y + template_h,
-                    local_x : local_x + template_w,
-                ]
-                if patch.shape[:2] != (template_h, template_w):
-                    continue
-                ranked_coarse.append(
-                    AvatarMatchCandidate(
-                        slot=box.slot,
-                        visual_id=candidate_variant.visual_id,
-                        label=candidate_variant.label,
-                        file_name=candidate_variant.file_name,
-                        path=str(candidate_variant.path),
-                        sha256=candidate_variant.sha256,
-                        coarse_score=float(visual_score.identity_score),
-                        gray_score=float(visual_score.gray_score),
-                        edge_score=float(visual_score.edge_score),
-                        color_delta_e=0.0,
-                        final_score=float(visual_score.identity_score),
-                        size=candidate_variant.size,
-                        mirrored=candidate_variant.mirrored,
-                        local_x=local_x,
-                        local_y=local_y,
-                        screen_x=box.x1 + local_x,
-                        screen_y=box.y1 + local_y,
+        if len(slot_rois) > 1:
+            with ThreadPoolExecutor(max_workers=min(SLOT_COUNT, len(slot_rois))) as executor:
+                work_results = list(
+                    executor.map(
+                        lambda item: self._recognize_slot(
+                            item[0],
+                            item[1],
+                            candidate_variants,
+                            asset_map,
+                        ),
+                        enumerate(slot_rois),
                     )
                 )
-            refined: list[AvatarMatchCandidate] = []
-            for candidate in sorted(
-                ranked_coarse,
-                key=lambda item: item.coarse_score,
-                reverse=True,
-            ):
-                variant = self._variant_cache[
-                    _variant_key(
-                        asset_map[candidate.visual_id],
-                        candidate.size,
-                        candidate.mirrored,
-                    )
-                ]
-                template_h, template_w = variant.template_bgr.shape[:2]
-                patch = slot_roi[
-                    candidate.local_y : candidate.local_y + template_h,
-                    candidate.local_x : candidate.local_x + template_w,
-                ]
-                if patch.shape[:2] != (template_h, template_w):
-                    continue
-                color_delta_e = _candidate_color_delta_e(variant, patch)
-                color_similarity = math.exp(-color_delta_e / COLOR_DISTANCE_SCALE)
-                final_score = (
-                    IDENTITY_STRUCTURE_WEIGHT * candidate.coarse_score
-                    + IDENTITY_COLOR_WEIGHT * color_similarity
-                )
-                refined.append(
-                    AvatarMatchCandidate(
-                        **{
-                            **candidate.__dict__,
-                            "color_delta_e": float(color_delta_e),
-                            "final_score": float(final_score),
-                        }
-                    )
-                )
-            ranked = _normalize_slot_candidates(refined)
-            if ranked:
-                top1 = ranked[0]
-            else:
-                warnings.append(f"slot {slot_index + 1} 未找到可用候选")
-                top1 = None
-            slot_results.append(
-                SlotRecognitionResult(
-                    slot=slot_index + 1,
-                    box=box,
-                    top1=top1,
-                    top5=ranked[:TOP_K],
-                )
-            )
+        else:
+            work_results = [
+                self._recognize_slot(0, slot_rois[0], candidate_variants, asset_map)
+            ]
+        slot_results = [work.result for work in work_results]
+        for work in work_results:
+            warnings.extend(work.warnings)
         return RecognitionRunResult(
             source_image_size=(screenshot_w, screenshot_h),
             asset_count=len(self.assets),
@@ -821,7 +1054,7 @@ def _contact_sheet(
     assets: list[AvatarAsset],
     output_dir: Path,
 ) -> None:
-    """输出对照图，便于人工查看每槽 Top5。"""
+    """输出对照图，便于人工查看每槽 Top2。"""
     asset_map = {asset.visual_id: asset for asset in assets}
     columns = 1 + TOP_K
     cell_w = 128
@@ -999,7 +1232,7 @@ def _save_detailed_comparisons(
     recognizer: AlphaTemplateRecognizer,
     output_dir: Path,
 ) -> None:
-    """保存详细的抄像与 Top5 对比图。"""
+    """保存详细的抄像与 Top2 对比图。"""
     compare_dir = output_dir / "comparison"
     compare_dir.mkdir(parents=True, exist_ok=True)
     for slot in result.slots:
@@ -1029,7 +1262,7 @@ def _save_detailed_comparisons(
             top5_panels.append(_panel_with_title(panel, title))
         if top5_panels:
             sheet = _compose_panel_grid(top5_panels, columns=TOP_K)
-            sheet.save(compare_dir / f"slot_{slot.slot}_top5.png")
+            sheet.save(compare_dir / f"slot_{slot.slot}_top2.png")
 
 
 def save_debug_artifacts(
@@ -1038,7 +1271,7 @@ def save_debug_artifacts(
     recognizer: AlphaTemplateRecognizer,
     output_dir: str | Path,
 ) -> None:
-    """保存截图框选、槽位裁剪、Top5 和详细抠像对比图。"""
+    """保存截图框选、槽位裁剪、Top2 和详细抠像对比图。"""
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     assets = recognizer.assets
@@ -1134,9 +1367,14 @@ def write_outputs(
 def build_parser() -> argparse.ArgumentParser:
     """构造命令行参数。"""
     parser = argparse.ArgumentParser(description="敌方六只精灵头像透明模板库识别")
-    parser.add_argument("--screenshot", required=True, help="游戏准备界面截图")
+    parser.add_argument("--screenshot", help="游戏准备界面截图")
     parser.add_argument("--avatars", required=True, help="透明头像文件夹或 ZIP")
-    parser.add_argument("--output", required=True, help="输出目录")
+    parser.add_argument("--output", help="输出目录")
+    parser.add_argument(
+        "--warm-cache",
+        action="store_true",
+        help="只预热本地头像素材预处理缓存；同时给出截图和输出目录时会继续执行识别",
+    )
     parser.add_argument(
         "--mirror-mode",
         choices=["enemy", "none", "both"],
@@ -1150,6 +1388,16 @@ def main(argv: list[str] | None = None) -> int:
     """命令行入口。"""
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.warm_cache:
+        try:
+            cache_path = warm_avatar_variant_cache(args.avatars, mirror_mode=args.mirror_mode)
+        except ValueError as exc:
+            parser.error(str(exc))
+        print(f"头像预处理缓存已就绪: {cache_path}")
+        if args.screenshot is None and args.output is None:
+            return 0
+    if args.screenshot is None or args.output is None:
+        parser.error("--screenshot 和 --output 在执行识别时必填")
     result = write_outputs(
         args.screenshot,
         args.avatars,

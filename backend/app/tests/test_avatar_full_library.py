@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import zipfile
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from app.recognition.avatar.full_library import (
     build_slot_boxes,
     get_avatar_recognizer,
     load_avatar_assets,
+    main,
+    warm_avatar_variant_cache,
     write_outputs,
 )
 
@@ -81,12 +84,13 @@ def test_alpha_template_recognizer_matches_screenshot_and_writes_outputs(tmp_pat
     assert [slot.top1.label for slot in result.slots] == [
         f"{index:03d}_icon" for index in range(1, 7)
     ]
+    assert all(len(slot.top5) <= 2 for slot in result.slots)
     assert (output_dir / "results.json").is_file()
     assert (output_dir / "results.csv").is_file()
     assert (output_dir / "annotated_recognition.png").is_file()
     assert (output_dir / "recognition_contact_sheet.png").is_file()
     assert (output_dir / "comparison" / "slot_1_detail.png").is_file()
-    assert (output_dir / "comparison" / "slot_1_top5.png").is_file()
+    assert (output_dir / "comparison" / "slot_1_top2.png").is_file()
     assert len(list((output_dir / "slot_crops").glob("slot_*.png"))) == 6
     assert len(list((output_dir / "matched_assets").glob("slot_*"))) == 6
 
@@ -196,26 +200,37 @@ def test_recognizer_exhaustively_scores_full_template_library(
     screenshot.save(screenshot_path)
 
     original_score = full_library._template_score_on_roi
+    original_prepare_roi = full_library._prepare_slot_roi_features
     score_calls = {"count": 0}
+    prepare_roi_calls = {"count": 0}
+    score_lock = threading.Lock()
 
-    def wrapped_score(slot_roi, slot, variant):
-        score_calls["count"] += 1
-        return original_score(slot_roi, slot, variant)
+    def wrapped_score(slot_roi, variant):
+        with score_lock:
+            score_calls["count"] += 1
+        return original_score(slot_roi, variant)
+
+    def wrapped_prepare_roi(screenshot_bgr, box):
+        prepare_roi_calls["count"] += 1
+        return original_prepare_roi(screenshot_bgr, box)
 
     get_avatar_recognizer.cache_clear()
     monkeypatch.setattr(full_library, "_template_score_on_roi", wrapped_score)
+    monkeypatch.setattr(full_library, "_prepare_slot_roi_features", wrapped_prepare_roi)
 
     result = write_outputs(screenshot_path, icons_dir, tmp_path / "output")
 
     expected_calls = 6 * len(list(icons_dir.glob("*.png"))) * len(
         full_library.AlphaTemplateRecognizer._candidate_sizes(screenshot.size)
     )
+    assert prepare_roi_calls["count"] == 6
     assert score_calls["count"] == expected_calls
     assert [slot.top1.label for slot in result.slots] == [
         f"{index:03d}_icon" for index in range(1, 7)
     ]
     for slot in result.slots:
         visual_ids = [candidate.visual_id for candidate in slot.top5]
+        assert len(visual_ids) <= 2
         assert len(visual_ids) == len(set(visual_ids))
 
 
@@ -261,6 +276,60 @@ def test_alpha_template_recognizer_supports_unicode_paths(tmp_path: Path) -> Non
     assert all(slot.top1 is not None for slot in result.slots)
 
 
+
+def test_disk_variant_cache_skips_rebuilding_template_features(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Disk cache should restore preprocessed variants without rebuilding them."""
+    icons_dir = tmp_path / "icons"
+    icons_dir.mkdir()
+    _write_circle_icon(icons_dir / "001_icon.png", (220, 30, 30))
+    _write_circle_icon(icons_dir / "002_icon.png", (30, 220, 30))
+
+    get_avatar_recognizer.cache_clear()
+    first = get_avatar_recognizer(icons_dir)
+    cache_path = full_library._variant_disk_cache_path(
+        icons_dir.resolve(),
+        mirror_mode=full_library.DEFAULT_MIRROR_MODE,
+    )
+    assert cache_path.is_file()
+    assert first._variant_cache
+
+    def fail_build_variant(*args, **kwargs):
+        raise AssertionError("disk cache was not used")
+
+    get_avatar_recognizer.cache_clear()
+    monkeypatch.setattr(full_library, "_build_variant", fail_build_variant)
+
+    second = get_avatar_recognizer(icons_dir)
+
+    assert second._variant_cache
+    assert set(second._variants_by_size) == set(first._variants_by_size)
+    assert [slot.label for slot in second._variants_by_size[full_library.BASE_ICON_CANVAS]] == [
+        slot.label for slot in first._variants_by_size[full_library.BASE_ICON_CANVAS]
+    ]
+
+
+def test_warm_avatar_variant_cache_cli_prepares_local_feature_file(tmp_path: Path) -> None:
+    """显式缓存预热应能为本地头像素材生成可复用的预处理文件。"""
+    icons_dir = tmp_path / "icons"
+    icons_dir.mkdir()
+    _write_circle_icon(icons_dir / "001_icon.png", (220, 30, 30))
+    _write_circle_icon(icons_dir / "002_icon.png", (30, 220, 30))
+
+    get_avatar_recognizer.cache_clear()
+    cache_path = warm_avatar_variant_cache(icons_dir)
+
+    assert cache_path.is_file()
+
+    cache_path.unlink()
+    get_avatar_recognizer.cache_clear()
+
+    assert main(["--avatars", str(icons_dir), "--warm-cache"]) == 0
+    assert cache_path.is_file()
+
+
 def test_cached_recognizer_reuses_loaded_assets(tmp_path: Path, monkeypatch) -> None:
     """同目录重复获取识别器时，应复用进程级缓存。"""
     icons_dir = tmp_path / "icons"
@@ -282,6 +351,18 @@ def test_cached_recognizer_reuses_loaded_assets(tmp_path: Path, monkeypatch) -> 
     )
 
     recognizer_one = get_avatar_recognizer(icons_dir)
+    expected_sizes = tuple(
+        full_library.BASE_ICON_CANVAS + offset
+        for offset in full_library.SEARCH_SIZE_OFFSETS
+    )
+    assert set(recognizer_one._variants_by_size) == set(expected_sizes)
+    for variants in recognizer_one._variants_by_size.values():
+        assert variants
+        for variant in variants:
+            assert variant.template_gray.shape == variant.template_alpha.shape
+            assert variant.template_edge.shape == variant.template_alpha.shape
+            assert variant.template_lab.shape[:2] == variant.template_alpha.shape
+
     recognizer_two = get_avatar_recognizer(icons_dir)
 
     assert recognizer_one is recognizer_two

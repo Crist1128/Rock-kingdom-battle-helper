@@ -131,6 +131,7 @@ def test_recognition_api_returns_confirmable_candidates(api_client: TestClient) 
     assert body["source_image_size"] == [1150, 643]
     assert body["icon_template_count"] == 2
     assert len(body["slots"]) == 6
+    assert len(body["slots"][0]["candidates"]) == 2
     first_candidate = body["slots"][0]["candidates"][0]
     assert first_candidate["dex_no"] == "001"
     assert first_candidate["icon_url"].endswith("/001_red.png")

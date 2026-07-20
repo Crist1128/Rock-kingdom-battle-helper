@@ -54,7 +54,7 @@ class EnemyAvatarSlotRecognitionOut(BaseModel):
     location_confidence: float = Field(..., description="头像定位置信度，仅用于提示定位可靠性")
     candidates: list[EnemyAvatarCandidateOut] = Field(
         default_factory=list,
-        description="该槽位的 Top N 头像识别候选",
+        description="该槽位的 Top2 头像识别候选",
     )
 
 
@@ -64,7 +64,7 @@ class EnemyAvatarSlotDebugOut(BaseModel):
     slot_index: int = Field(..., description="槽位序号，1-6")
     crop_url: str = Field(..., description="该槽位实际裁剪图 URL")
     detail_url: str = Field(..., description="原图、抄像、对齐和差异热力图综合对比 URL")
-    top5_url: str = Field(..., description="该槽位 Top5 透明抄像候选对比 URL")
+    top5_url: str = Field(..., description="该槽位 Top2 透明抄像候选对比 URL")
 
 
 class EnemyLineupRecognitionDebugOut(BaseModel):
@@ -76,7 +76,7 @@ class EnemyLineupRecognitionDebugOut(BaseModel):
     contact_sheet_url: str = Field(..., description="全槽位候选总览图 URL")
     slots: list[EnemyAvatarSlotDebugOut] = Field(
         default_factory=list,
-        description="每个槽位的裁剪图、详细对比图和 Top5 图 URL",
+        description="每个槽位的裁剪图、详细对比图和 Top2 图 URL",
     )
 
 

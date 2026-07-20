@@ -160,7 +160,7 @@ def _save_recognition_debug_artifacts(
                     relative_dir / "comparison" / f"slot_{slot.slot}_detail.png"
                 ),
                 top5_url=_rocom_asset_url(
-                    relative_dir / "comparison" / f"slot_{slot.slot}_top5.png"
+                    relative_dir / "comparison" / f"slot_{slot.slot}_top2.png"
                 ),
             )
             for slot in result.slots
@@ -265,7 +265,7 @@ def _candidate_to_out(
 @router.post("/enemy-lineup", response_model=EnemyLineupRecognitionOut)
 async def recognize_enemy_lineup_from_screenshot(
     file: UploadFile = File(..., description="战斗准备页截图"),
-    top_k: int = Query(default=5, ge=1, le=10, description="每个槽位返回的候选数量"),
+    top_k: int = Query(default=2, ge=1, le=2, description="每个槽位返回的候选数量"),
     include_debug: bool = Query(default=True, description="是否保存并返回调试图片 URL"),
     db: Session = Depends(get_db),
 ) -> EnemyLineupRecognitionOut:
