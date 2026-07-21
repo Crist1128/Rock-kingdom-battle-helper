@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -35,10 +35,21 @@ const COLLAPSE_STORAGE_KEY = "rock-pvp-helper.sidebarCollapsed";
 const THEME_STORAGE_KEY = "rock-pvp-helper.theme";
 
 export function Layout() {
+  const location = useLocation();
+  const themeAnimationTimerRef = useRef<number | null>(null);
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1",
   );
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  useEffect(() => {
+    return () => {
+      if (themeAnimationTimerRef.current !== null) {
+        window.clearTimeout(themeAnimationTimerRef.current);
+      }
+      document.documentElement.classList.remove("theme-animating");
+    };
+  }, []);
 
   const toggleCollapsed = () => {
     setCollapsed((current) => {
@@ -50,8 +61,17 @@ export function Layout() {
   const toggleTheme = () => {
     setIsDark((current) => {
       const next = !current;
+      // 临时挂载过渡类，让深浅切换的颜色变化在 200ms 内平滑完成
+      if (themeAnimationTimerRef.current !== null) {
+        window.clearTimeout(themeAnimationTimerRef.current);
+      }
+      document.documentElement.classList.add("theme-animating");
       document.documentElement.classList.toggle("dark", next);
       localStorage.setItem(THEME_STORAGE_KEY, next ? "dark" : "light");
+      themeAnimationTimerRef.current = window.setTimeout(() => {
+        document.documentElement.classList.remove("theme-animating");
+        themeAnimationTimerRef.current = null;
+      }, 260);
       return next;
     });
   };
@@ -157,7 +177,9 @@ export function Layout() {
         <BattleHud />
         <main className="min-w-0 flex-1 p-6">
           <FormulaUnavailableBanner />
-          <Outlet />
+          <div key={location.pathname} className="animate-page-in">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

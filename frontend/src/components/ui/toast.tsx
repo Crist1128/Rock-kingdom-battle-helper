@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +16,7 @@ interface ToastItem {
   id: number;
   message: string;
   variant: ToastVariant;
+  closing?: boolean;
 }
 
 interface ToastContextValue {
@@ -32,18 +41,40 @@ const VARIANT_STYLES: Record<ToastVariant, { icon: typeof Info; className: strin
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
+  const timersRef = useRef<number[]>([]);
+
+  const schedule = useCallback((callback: () => void, delay: number) => {
+    const timer = window.setTimeout(() => {
+      timersRef.current = timersRef.current.filter((item) => item !== timer);
+      callback();
+    }, delay);
+    timersRef.current.push(timer);
+    return timer;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((timer) => window.clearTimeout(timer));
+      timersRef.current = [];
+    };
+  }, []);
 
   const dismiss = useCallback((id: number) => {
-    setItems((current) => current.filter((item) => item.id !== id));
-  }, []);
+    setItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, closing: true } : item)),
+    );
+    schedule(() => {
+      setItems((current) => current.filter((item) => item.id !== id));
+    }, 170);
+  }, [schedule]);
 
   const toast = useCallback(
     (message: string, variant: ToastVariant = "default") => {
       const id = ++nextToastId;
       setItems((current) => [...current.slice(-3), { id, message, variant }]);
-      window.setTimeout(() => dismiss(id), 4200);
+      schedule(() => dismiss(id), 4200);
     },
-    [dismiss],
+    [dismiss, schedule],
   );
 
   return (
@@ -58,7 +89,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               key={item.id}
               className={cn(
                 "pointer-events-auto flex items-start gap-2.5 rounded-lg border bg-card/95 p-3 text-sm shadow-xl backdrop-blur-md",
-                "animate-[toast-in_180ms_ease-out]",
+                item.closing ? "animate-toast-out" : "animate-toast-in",
                 style.className,
               )}
               role="status"

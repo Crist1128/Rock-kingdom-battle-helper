@@ -836,7 +836,7 @@ export function DamageCalculatorPage() {
               <CardDescription>理论伤害来自当前后端公式链，未知因素会在结果中展示。</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div key={mode} className="transition-all duration-300 ease-out animate-in fade-in slide-in-from-bottom-2">
+              <div key={mode} className="animate-fade-in-up">
                 {mode === "calculate" ? (
                   <div className="space-y-4">
                     <Button className="w-full" type="submit" disabled={calculateMutation.isPending}>

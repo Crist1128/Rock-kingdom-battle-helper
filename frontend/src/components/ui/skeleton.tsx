@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded-lg bg-raised/70", className)} />;
+  return <div className={cn("animate-skeleton-shimmer rounded-lg bg-raised/70", className)} />;
 }
 
 /** 路由级懒加载的页面占位：标题 + 两张卡片轮廓。 */

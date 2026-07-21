@@ -171,6 +171,92 @@ select {
   }
 }
 
+/* ---- 全局动效 ---- */
+
+/* 页面/内容进入：淡入 + 轻微上移 */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 局部内容进入（模式切换、结果区） */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 遮罩淡入 */
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 遮罩淡出 */
+@keyframes overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 弹窗进入：轻微缩放 + 上移，区分于 Toast */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 弹窗退出 */
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+
+/* 右侧抽屉滑入 */
+@keyframes sheet-in {
+  from {
+    opacity: 0.4;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 右侧抽屉滑出 */
+@keyframes sheet-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0.4;
+    transform: translateX(32px);
+  }
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -179,5 +265,116 @@ select {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+/* 骨架屏流光，比单纯 pulse 更贴合科技风 */
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@layer utilities {
+  .animate-page-in {
+    animation: page-in 220ms ease-out both;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 180ms ease-out both;
+  }
+
+  .animate-overlay-in {
+    animation: overlay-in 150ms ease-out both;
+  }
+
+  .animate-overlay-out {
+    animation: overlay-out 140ms ease-in both;
+  }
+
+  .animate-modal-in {
+    animation: modal-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-modal-out {
+    animation: modal-out 140ms ease-in both;
+  }
+
+  .animate-sheet-in {
+    animation: sheet-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-sheet-out {
+    animation: sheet-out 160ms ease-in both;
+  }
+
+  .animate-toast-in {
+    animation: toast-in 180ms ease-out both;
+  }
+
+  .animate-toast-out {
+    animation: toast-out 160ms ease-in both;
+  }
+
+  .animate-skeleton-shimmer {
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+    background-image:
+      linear-gradient(
+        90deg,
+        hsl(var(--raised) / 0.56) 0%,
+        hsl(var(--primary) / 0.12) 48%,
+        hsl(var(--raised) / 0.56) 100%
+      );
+    background-size: 200% 100%;
+  }
+}
+
+/* 折叠区展开时内容淡入（全局 details 生效） */
+details[open] > *:not(summary) {
+  animation: fade-in-up 160ms ease-out;
+}
+
+/* 主题切换时的临时全局色彩过渡（由主题开关临时挂载） */
+.theme-animating,
+.theme-animating *,
+.theme-animating *::before,
+.theme-animating *::after {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease !important;
+}
+
+/* 全局平滑滚动 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 尊重系统减弱动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
   }
 }

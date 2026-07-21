@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -27,10 +35,25 @@ interface PendingConfirm {
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   const confirm = useCallback<ConfirmFn>(
     (options) =>
       new Promise<boolean>((resolve) => {
+        if (closeTimerRef.current !== null) {
+          window.clearTimeout(closeTimerRef.current);
+          closeTimerRef.current = null;
+        }
+        setIsClosing(false);
         setPending({ options, resolve });
       }),
     [],
@@ -38,10 +61,16 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
   const close = useCallback(
     (value: boolean) => {
-      pending?.resolve(value);
-      setPending(null);
+      if (!pending || isClosing) return;
+      setIsClosing(true);
+      closeTimerRef.current = window.setTimeout(() => {
+        pending.resolve(value);
+        setPending(null);
+        setIsClosing(false);
+        closeTimerRef.current = null;
+      }, 150);
     },
-    [pending],
+    [isClosing, pending],
   );
 
   return (
@@ -50,7 +79,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {pending ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <button
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className={cn(
+              "absolute inset-0 bg-black/60 backdrop-blur-sm",
+              isClosing ? "animate-overlay-out" : "animate-overlay-in",
+            )}
             onClick={() => close(false)}
             aria-label="取消"
           />
@@ -60,7 +92,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             aria-label={pending.options.title}
             className={cn(
               "relative w-full max-w-sm rounded-xl border bg-card p-5 shadow-2xl",
-              "animate-[toast-in_160ms_ease-out]",
+              isClosing ? "animate-modal-out" : "animate-modal-in",
               pending.options.danger && "border-destructive/30",
             )}
           >

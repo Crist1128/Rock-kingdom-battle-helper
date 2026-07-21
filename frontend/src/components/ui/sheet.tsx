@@ -13,17 +13,46 @@ interface SheetProps {
 }
 
 export function Sheet({ open, title, description, onClose, children, widthClassName }: SheetProps) {
-  if (!open) return null;
+  const [rendered, setRendered] = React.useState(open);
+  const [isClosing, setIsClosing] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open) {
+      setRendered(true);
+      setIsClosing(false);
+      return;
+    }
+
+    if (!rendered) return;
+
+    setIsClosing(true);
+    const timer = window.setTimeout(() => {
+      setRendered(false);
+      setIsClosing(false);
+    }, 170);
+    return () => window.clearTimeout(timer);
+  }, [open, rendered]);
+
+  if (!rendered) return null;
+
+  const requestClose = () => {
+    if (!isClosing) onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        className={cn(
+          "absolute inset-0 bg-black/60 backdrop-blur-sm",
+          isClosing ? "animate-overlay-out" : "animate-overlay-in",
+        )}
+        onClick={requestClose}
         aria-label="关闭抽屉背景"
       />
       <aside
         className={cn(
           "relative h-full w-[520px] overflow-y-auto border-l border-border/80 bg-card/95 shadow-2xl backdrop-blur-md",
+          isClosing ? "animate-sheet-out" : "animate-sheet-in",
           widthClassName,
         )}
       >
@@ -32,7 +61,7 @@ export function Sheet({ open, title, description, onClose, children, widthClassN
             <h2 className="text-base font-semibold tracking-wide">{title}</h2>
             {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={requestClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
