@@ -80,7 +80,7 @@ export function Layout() {
     <div className="flex min-h-screen">
       <aside
         className={cn(
-          "sticky top-0 flex h-screen shrink-0 flex-col border-r border-border/70 bg-card/60 backdrop-blur-md transition-all duration-200",
+          "sticky top-0 flex h-screen shrink-0 flex-col border-r border-border/70 bg-card/60 backdrop-blur-md transition-[background-color,border-color,color,transform,width,padding] duration-200",
           collapsed ? "w-14 p-2" : "w-52 p-3",
         )}
       >
@@ -210,7 +210,7 @@ function BattleHud() {
   const turnNumber = stateQuery.data?.battle.turn_number;
 
   return (
-    <header className="sticky top-0 z-40 flex h-12 items-center justify-between gap-4 border-b border-border/70 bg-background/70 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-40 flex h-12 items-center justify-between gap-4 border-b border-border/70 bg-background/70 px-6 backdrop-blur-md transition-colors duration-150">
       <div className="flex min-w-0 items-center gap-3 text-sm">
         {currentBattleId ? (
           <>

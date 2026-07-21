@@ -348,16 +348,25 @@ details[open] > *:not(summary) {
   animation: fade-in-up 160ms ease-out;
 }
 
-/* 主题切换时的临时全局色彩过渡（由主题开关临时挂载） */
-.theme-animating,
-.theme-animating *,
-.theme-animating *::before,
-.theme-animating *::after {
+/* 主题切换时只让主壳层平滑过渡，避免全局子树逐一挂载 transition 导致卡顿 */
+html.theme-animating body,
+html.theme-animating #root {
   transition:
-    background-color 200ms ease,
-    border-color 200ms ease,
-    color 200ms ease,
-    box-shadow 200ms ease !important;
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+html.theme-animating body {
+  background-attachment: scroll;
+}
+
+html.theme-animating .glass,
+html.theme-animating [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+}
+
+html.theme-animating [class*="shadow-"] {
+  box-shadow: none !important;
 }
 
 /* 全局平滑滚动 */

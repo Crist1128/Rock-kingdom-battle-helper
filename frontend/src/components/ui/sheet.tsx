@@ -51,12 +51,12 @@ export function Sheet({ open, title, description, onClose, children, widthClassN
       />
       <aside
         className={cn(
-          "relative h-full w-[520px] overflow-y-auto border-l border-border/80 bg-card/95 shadow-2xl backdrop-blur-md",
+          "relative h-full w-[520px] overflow-y-auto border-l border-border/80 bg-card/95 shadow-2xl backdrop-blur-md transition-colors duration-150",
           isClosing ? "animate-sheet-out" : "animate-sheet-in",
           widthClassName,
         )}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-border/70 bg-card/90 p-5 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-border/70 bg-card/90 p-5 backdrop-blur transition-colors duration-150">
           <div>
             <h2 className="text-base font-semibold tracking-wide">{title}</h2>
             {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}

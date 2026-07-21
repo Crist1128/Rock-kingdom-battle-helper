@@ -91,7 +91,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             aria-modal="true"
             aria-label={pending.options.title}
             className={cn(
-              "relative w-full max-w-sm rounded-xl border bg-card p-5 shadow-2xl",
+              "relative w-full max-w-sm rounded-xl border bg-card p-5 shadow-2xl transition-colors duration-150",
               isClosing ? "animate-modal-out" : "animate-modal-in",
               pending.options.danger && "border-destructive/30",
             )}

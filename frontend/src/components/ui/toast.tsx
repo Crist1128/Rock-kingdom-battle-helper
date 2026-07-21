@@ -88,7 +88,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={item.id}
               className={cn(
-                "pointer-events-auto flex items-start gap-2.5 rounded-lg border bg-card/95 p-3 text-sm shadow-xl backdrop-blur-md",
+                "pointer-events-auto flex items-start gap-2.5 rounded-lg border bg-card/95 p-3 text-sm shadow-xl backdrop-blur-md transition-colors duration-150",
                 item.closing ? "animate-toast-out" : "animate-toast-in",
                 style.className,
               )}
