@@ -71,6 +71,10 @@ export interface EnemyAvatarMatchedElfOut {
   avatar: string;
   element_types_json: string;
   data_version?: string | null;
+  is_opening_eligible?: boolean;
+  recognition_role?: "opening_candidate" | "runtime_form" | string;
+  related_opening_elf_id?: string | null;
+  relation_reason?: string | null;
 }
 
 export interface EnemyAvatarCandidateOut {
@@ -86,6 +90,7 @@ export interface EnemyAvatarCandidateOut {
   edge_score: number;
   confidence_level: "high" | "medium" | "low" | string;
   matched_elves: EnemyAvatarMatchedElfOut[];
+  related_forms?: EnemyAvatarMatchedElfOut[];
 }
 
 export interface EnemyAvatarSlotRecognitionOut {

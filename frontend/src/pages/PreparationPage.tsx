@@ -691,7 +691,7 @@ export function PreparationPage() {
                           <img src={recognitionResult.debug_artifacts.annotated_image_url} alt="识别框选图" className="max-h-56 w-full rounded object-contain" />
                         </a>
                         <a href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-raised/60 p-2">
-                          <div className="mb-1 text-[11px] font-medium">Top2 总览</div>
+                          <div className="mb-1 text-[11px] font-medium">TopK 总览</div>
                           <img src={recognitionResult.debug_artifacts.contact_sheet_url} alt="识别候选总览图" className="max-h-56 w-full rounded object-contain" />
                         </a>
                       </div>
@@ -703,7 +703,7 @@ export function PreparationPage() {
                               <span className="flex gap-2 font-normal">
                                 <a className="text-info underline" href={debugSlot.crop_url} target="_blank" rel="noreferrer">裁剪</a>
                                 <a className="text-info underline" href={debugSlot.detail_url} target="_blank" rel="noreferrer">详情</a>
-                                <a className="text-info underline" href={debugSlot.top5_url} target="_blank" rel="noreferrer">Top2</a>
+                                <a className="text-info underline" href={debugSlot.top5_url} target="_blank" rel="noreferrer">TopK</a>
                               </span>
                             </div>
                             <a href={debugSlot.detail_url} target="_blank" rel="noreferrer">
@@ -758,6 +758,13 @@ export function PreparationPage() {
                                   <span className="text-[11px] text-warning">该候选暂未映射到数据库</span>
                                 )}
                               </div>
+                              {candidate.related_forms && candidate.related_forms.length > 0 ? (
+                                <div className="mt-1 text-[11px] text-muted-foreground">
+                                  已保留局内形态提示：
+                                  {candidate.related_forms.map((elf) => elf.elf_name).join("、")}
+                                  ；准备阶段不会自动采用。
+                                </div>
+                              ) : null}
                             </div>
                           ))}
                         </div>

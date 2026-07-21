@@ -20,6 +20,16 @@ class EnemyAvatarMatchedElfOut(BaseModel):
     avatar: str = Field(..., description="数据库头像 URL 或路径")
     element_types_json: str = Field(..., description="精灵系别 JSON 字符串")
     data_version: str | None = Field(default=None, description="静态数据版本")
+    is_opening_eligible: bool = Field(default=True, description="是否适合作为准备阶段开局阵容精灵")
+    recognition_role: str = Field(
+        default="opening_candidate",
+        description="识别映射角色：opening_candidate/runtime_form",
+    )
+    related_opening_elf_id: str | None = Field(
+        default=None,
+        description="局内形态对应的可开局基础精灵 ID",
+    )
+    relation_reason: str | None = Field(default=None, description="形态关系说明")
 
 
 class EnemyAvatarCandidateOut(BaseModel):
@@ -38,7 +48,11 @@ class EnemyAvatarCandidateOut(BaseModel):
     confidence_level: str = Field(..., description="粗略置信等级 high/medium/low")
     matched_elves: list[EnemyAvatarMatchedElfOut] = Field(
         default_factory=list,
-        description="按图鉴编号和名称映射到数据库的候选精灵；可能为空或多个",
+        description="按图鉴编号和名称映射到数据库的准备阶段可选精灵；可能为空或多个",
+    )
+    related_forms: list[EnemyAvatarMatchedElfOut] = Field(
+        default_factory=list,
+        description="同图鉴编号/同进化链的局内形态提示；不用于准备阶段自动采用",
     )
 
 
@@ -54,7 +68,7 @@ class EnemyAvatarSlotRecognitionOut(BaseModel):
     location_confidence: float = Field(..., description="头像定位置信度，仅用于提示定位可靠性")
     candidates: list[EnemyAvatarCandidateOut] = Field(
         default_factory=list,
-        description="该槽位的 Top2 头像识别候选",
+        description="该槽位的 TopK 头像识别候选",
     )
 
 
@@ -64,7 +78,7 @@ class EnemyAvatarSlotDebugOut(BaseModel):
     slot_index: int = Field(..., description="槽位序号，1-6")
     crop_url: str = Field(..., description="该槽位实际裁剪图 URL")
     detail_url: str = Field(..., description="原图、抄像、对齐和差异热力图综合对比 URL")
-    top5_url: str = Field(..., description="该槽位 Top2 透明抄像候选对比 URL")
+    top5_url: str = Field(..., description="该槽位 TopK 透明抄像候选对比 URL")
 
 
 class EnemyLineupRecognitionDebugOut(BaseModel):
@@ -76,7 +90,7 @@ class EnemyLineupRecognitionDebugOut(BaseModel):
     contact_sheet_url: str = Field(..., description="全槽位候选总览图 URL")
     slots: list[EnemyAvatarSlotDebugOut] = Field(
         default_factory=list,
-        description="每个槽位的裁剪图、详细对比图和 Top2 图 URL",
+        description="每个槽位的裁剪图、详细对比图和 TopK 图 URL",
     )
 
 

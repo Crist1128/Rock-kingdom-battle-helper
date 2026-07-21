@@ -21,7 +21,7 @@ from app.models import effect as _effect_models  # noqa: F401
 from app.models import estimate as _estimate_models  # noqa: F401
 from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
-from app.models.static import ElfDefinition
+from app.models.static import ElfDefinition, ElfEvolutionChain, ElfEvolutionStage
 from app.utils.json import dumps_json
 
 
@@ -75,6 +75,43 @@ def api_client(tmp_path, monkeypatch) -> Iterator[TestClient]:
                     base_magic_attack_talent=100,
                     base_magic_defense_talent=100,
                     base_speed_talent=100,
+                    data_version="test",
+                ),
+                ElfDefinition(
+                    elf_id="rocom_elf_0001_boss",
+                    elf_name="boss_red",
+                    avatar="/avatars/boss_red.png",
+                    element_types_json=dumps_json(["fire"]),
+                    base_hp_talent=120,
+                    base_physical_attack_talent=120,
+                    base_physical_defense_talent=120,
+                    base_magic_attack_talent=120,
+                    base_magic_defense_talent=120,
+                    base_speed_talent=120,
+                    data_version="test",
+                ),
+                ElfEvolutionChain(
+                    chain_id="chain_red",
+                    chain_key="chain_red",
+                    chain_name="red -> boss_red",
+                    source="test",
+                    data_version="test",
+                ),
+                ElfEvolutionStage(
+                    chain_id="chain_red",
+                    elf_id="rocom_elf_0001_test",
+                    stage_index=1,
+                    stage_name="red",
+                    source_stage_json=dumps_json({"source_pet_id": 1}),
+                    data_version="test",
+                ),
+                ElfEvolutionStage(
+                    chain_id="chain_red",
+                    elf_id="rocom_elf_0001_boss",
+                    stage_index=2,
+                    stage_name="boss_red",
+                    evolves_from_elf_id="rocom_elf_0001_test",
+                    source_stage_json=dumps_json({"source_pet_id": 1}),
                     data_version="test",
                 ),
             ]
@@ -136,6 +173,10 @@ def test_recognition_api_returns_confirmable_candidates(api_client: TestClient) 
     assert first_candidate["dex_no"] == "001"
     assert first_candidate["icon_url"].endswith("/001_red.png")
     assert first_candidate["matched_elves"][0]["elf_id"] == "rocom_elf_0001_test"
+    assert [elf["elf_id"] for elf in first_candidate["matched_elves"]] == ["rocom_elf_0001_test"]
+    assert first_candidate["related_forms"][0]["elf_id"] == "rocom_elf_0001_boss"
+    assert first_candidate["related_forms"][0]["recognition_role"] == "runtime_form"
+    assert first_candidate["related_forms"][0]["related_opening_elf_id"] == "rocom_elf_0001_test"
     assert "不会自动写入阵容" in body["warnings"][0]
 
 
