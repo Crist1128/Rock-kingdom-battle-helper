@@ -20,7 +20,12 @@ from app.models import event as _event_models  # noqa: F401
 from app.models import static as _static_models  # noqa: F401
 from app.models.battle import Battle, BattleElfState, BattleSkillSlot
 from app.models.event import BattleEvent, DamageEvent
-from app.models.static import ElfDefinition, NatureDefinition, SkillDefinition
+from app.models.static import (
+    ElfDefinition,
+    NatureDefinition,
+    SkillDefinition,
+    TypeEffectivenessRule,
+)
 from app.schemas.damage_calculator import (
     DamageCalculatorAttackerCandidateOut,
     DamageCalculatorDefenderCandidateOut,
@@ -131,6 +136,34 @@ def seed_static_data(session: Session) -> None:
                 base_energy_cost=2,
                 priority_modifier=0,
             ),
+            SkillDefinition(
+                skill_id="skill_illusion",
+                skill_name="幻系打击",
+                element_type="幻",
+                skill_category="physical",
+                base_power=50,
+                base_energy_cost=2,
+                priority_modifier=0,
+            ),
+        ]
+    )
+    session.commit()
+
+
+def seed_type_rules(session: Session) -> None:
+    """Seed local type-effectiveness rules used only by starfall combo tests."""
+    session.add_all(
+        [
+            TypeEffectivenessRule(
+                attack_element_type="fire",
+                defense_element_type="grass",
+                multiplier=2.0,
+            ),
+            TypeEffectivenessRule(
+                attack_element_type="illusion",
+                defense_element_type="grass",
+                multiplier=2.0,
+            ),
         ]
     )
     session.commit()
@@ -186,6 +219,160 @@ def test_calculate_basic_attack_without_writing_battle_events(
     with session_factory() as session:
         assert session.scalar(select(func.count()).select_from(BattleEvent)) == 0
         assert session.scalar(select(func.count()).select_from(DamageEvent)) == 0
+
+
+def test_starfall_combo_calculates_skill_and_mark_damage(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, session_factory = api_client
+    with session_factory() as session:
+        seed_static_data(session)
+        seed_type_rules(session)
+
+    response = client.post(
+        "/api/v1/damage-calculator/starfall-combo",
+        json={
+            "attacker": {
+                "elf_id": "elf_attacker",
+                "panel_stats": {
+                    "hp": 500,
+                    "physical_attack": 200,
+                    "physical_defense": 100,
+                    "magic_attack": 120,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+            },
+            "defender": {
+                "elf_id": "elf_defender",
+                "panel_stats": {
+                    "hp": 1000,
+                    "physical_attack": 100,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 80,
+                },
+            },
+            "trigger_skill_id": "skill_test",
+            "starfall_layers": 3,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "calculated"
+    assert body["skill_damage_value"] == 225
+    assert body["starfall_damage_value"] == 205
+    assert body["total_damage_value"] == 430
+    assert body["damage_percent"] == 43
+    assert body["remaining_hp"] == 570
+    assert body["is_kill"] is False
+    assert body["starfall_result"]["explanation"]["starfall_power"] == 57
+    assert body["side_effect_policy"] == "read_only_no_battle_mutation"
+
+    with session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(BattleEvent)) == 0
+        assert session.scalar(select(func.count()).select_from(DamageEvent)) == 0
+
+
+def test_starfall_combo_skips_mark_when_layers_zero_or_illusion_skill(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, session_factory = api_client
+    with session_factory() as session:
+        seed_static_data(session)
+        seed_type_rules(session)
+
+    base_payload = {
+        "attacker": {
+            "elf_id": "elf_attacker",
+            "panel_stats": {
+                "hp": 500,
+                "physical_attack": 200,
+                "physical_defense": 100,
+                "magic_attack": 120,
+                "magic_defense": 100,
+                "speed": 100,
+            },
+        },
+        "defender": {
+            "elf_id": "elf_defender",
+            "panel_stats": {
+                "hp": 1000,
+                "physical_attack": 100,
+                "physical_defense": 100,
+                "magic_attack": 100,
+                "magic_defense": 100,
+                "speed": 80,
+            },
+        },
+    }
+    zero_layers = client.post(
+        "/api/v1/damage-calculator/starfall-combo",
+        json={**base_payload, "trigger_skill_id": "skill_test", "starfall_layers": 0},
+    )
+    illusion_skill = client.post(
+        "/api/v1/damage-calculator/starfall-combo",
+        json={**base_payload, "trigger_skill_id": "skill_illusion", "starfall_layers": 3},
+    )
+
+    assert zero_layers.status_code == 200, zero_layers.text
+    assert zero_layers.json()["starfall_damage_value"] == 0
+    assert zero_layers.json()["starfall_result"]["status"] == "not_triggered"
+    assert zero_layers.json()["total_damage_value"] == zero_layers.json()["skill_damage_value"]
+
+    assert illusion_skill.status_code == 200, illusion_skill.text
+    illusion_body = illusion_skill.json()
+    assert illusion_body["starfall_damage_value"] == 0
+    assert illusion_body["starfall_result"]["status"] == "not_triggered"
+    assert illusion_body["total_damage_value"] == illusion_body["skill_damage_value"]
+
+
+def test_starfall_combo_damage_reduction_affects_skill_and_mark(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, session_factory = api_client
+    with session_factory() as session:
+        seed_static_data(session)
+        seed_type_rules(session)
+
+    response = client.post(
+        "/api/v1/damage-calculator/starfall-combo",
+        json={
+            "attacker": {
+                "elf_id": "elf_attacker",
+                "panel_stats": {
+                    "hp": 500,
+                    "physical_attack": 200,
+                    "physical_defense": 100,
+                    "magic_attack": 120,
+                    "magic_defense": 100,
+                    "speed": 100,
+                },
+            },
+            "defender": {
+                "elf_id": "elf_defender",
+                "panel_stats": {
+                    "hp": 1000,
+                    "physical_attack": 100,
+                    "physical_defense": 100,
+                    "magic_attack": 100,
+                    "magic_defense": 100,
+                    "speed": 80,
+                },
+            },
+            "trigger_skill_id": "skill_test",
+            "starfall_layers": 3,
+            "modifiers": {"damage_reductions": [0.25]},
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["skill_damage_value"] == 169
+    assert body["starfall_damage_value"] == 154
+    assert body["total_damage_value"] == 323
 
 
 def test_calculate_accepts_manual_base_power_override(

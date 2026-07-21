@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   Calculator,
+  ChevronDown,
   ChevronsLeft,
   ChevronsRight,
   Database,
@@ -12,6 +13,7 @@ import {
   Moon,
   Settings,
   Shield,
+  Sparkles,
   Sun,
   Sword,
 } from "lucide-react";
@@ -20,12 +22,19 @@ import { cn, compactId, phaseName } from "@/lib/utils";
 import { useAppStore } from "@/store/useAppStore";
 import { FormulaUnavailableBanner } from "./FormulaUnavailableBanner";
 
-const navItems = [
+const primaryNavItems = [
   { to: "/builds", label: "己方配置", icon: Shield },
   { to: "/", label: "战斗", icon: Home },
   { to: "/preparation", label: "准备阶段", icon: ListChecks },
   { to: "/battle", label: "战斗工作台", icon: Sword },
+];
+
+const toolNavItems = [
   { to: "/damage-calculator", label: "伤害计算器", icon: Calculator },
+  { to: "/starfall-calculator", label: "星陨伤害计算器", icon: Sparkles },
+];
+
+const secondaryNavItems = [
   { to: "/events", label: "事件日志", icon: Activity },
   { to: "/rules", label: "规则库", icon: Database },
   { to: "/settings", label: "设置", icon: Settings },
@@ -40,7 +49,16 @@ export function Layout() {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1",
   );
+  const [toolsExpanded, setToolsExpanded] = useState(() =>
+    toolNavItems.some((item) => item.to === location.pathname),
+  );
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  useEffect(() => {
+    if (toolNavItems.some((item) => item.to === location.pathname)) {
+      setToolsExpanded(true);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     return () => {
@@ -108,7 +126,87 @@ export function Layout() {
         </Link>
 
         <nav className="flex-1 space-y-0.5">
-          {navItems.map((item) => {
+          {[...primaryNavItems].map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                title={collapsed ? item.label : undefined}
+                className={({ isActive }) =>
+                  cn(
+                    "group relative flex items-center gap-2.5 rounded-lg py-2 text-[13px] font-medium transition-colors",
+                    collapsed ? "justify-center px-0" : "px-2.5",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-raised hover:text-foreground",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive ? (
+                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary shadow-glow-sm" />
+                    ) : null}
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setToolsExpanded((current) => !current)}
+              title={collapsed ? "工具包" : undefined}
+              className={cn(
+                "group relative flex w-full items-center gap-2.5 rounded-lg py-2 text-[13px] font-medium transition-colors",
+                collapsed ? "justify-center px-0" : "px-2.5",
+                toolNavItems.some((item) => item.to === location.pathname)
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-raised hover:text-foreground",
+              )}
+            >
+              {toolNavItems.some((item) => item.to === location.pathname) ? (
+                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary shadow-glow-sm" />
+              ) : null}
+              <Calculator className="h-4 w-4 shrink-0" />
+              {collapsed ? <span className="sr-only">工具包</span> : <span className="flex-1 text-left">工具包</span>}
+              {!collapsed ? (
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", toolsExpanded && "rotate-180")} />
+              ) : null}
+            </button>
+            {toolsExpanded ? (
+              <div className={cn("mt-1 space-y-0.5", collapsed ? "pl-0" : "pl-3")}>
+                {toolNavItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      title={collapsed ? item.label : undefined}
+                      className={({ isActive }) =>
+                        cn(
+                          "group relative flex items-center gap-2 rounded-lg py-1.5 text-xs font-medium transition-colors",
+                          collapsed ? "justify-center px-0" : "px-2.5",
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:bg-raised hover:text-foreground",
+                        )
+                      }
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          {secondaryNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

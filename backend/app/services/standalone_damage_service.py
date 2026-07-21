@@ -44,6 +44,8 @@ from app.schemas.damage_calculator import (
     DamageCalculatorResultOut,
     DamageCalculatorTalentInput,
     DamageCalculatorTypeEffectivenessOut,
+    StarfallComboCalculateInput,
+    StarfallComboResultOut,
 )
 from app.services.estimate_service import EstimateService
 from app.utils.json import loads_json
@@ -192,6 +194,161 @@ class StandaloneDamageService:
             explanation=result.explanation,
             multipliers=self._multipliers_from_result(result.explanation, resolved_context),
             observed_comparison=observed_comparison,
+        )
+
+    def calculate_starfall_combo(
+        self,
+        payload: StarfallComboCalculateInput,
+    ) -> StarfallComboResultOut:
+        """计算只读触发技能伤害与星陨印记伤害。"""
+        skill = self._require_skill(payload.trigger_skill_id)
+        skill_payload = DamageCalculatorCalculateInput(
+            attacker=payload.attacker,
+            defender=payload.defender,
+            skill_id=payload.trigger_skill_id,
+            formula_type="attack",
+            modifiers=payload.modifiers,
+            notes=payload.notes,
+        )
+        skill_result = self.calculate(skill_payload)
+        defender_hp = skill_result.defender.panel_stats.hp
+
+        starfall_result = self._calculate_starfall_part(
+            payload=payload,
+            skill=skill,
+            attacker=skill_result.attacker,
+            defender=skill_result.defender,
+        )
+
+        skill_damage = skill_result.damage_value
+        starfall_damage = (
+            0
+            if starfall_result.status == "not_triggered"
+            else starfall_result.damage_value
+        )
+        total_damage = (
+            skill_damage + starfall_damage
+            if skill_damage is not None and starfall_damage is not None
+            else None
+        )
+        missing_parts = list(
+            dict.fromkeys(skill_result.missing_parts + starfall_result.missing_parts)
+        )
+        unknown_factors = list(
+            dict.fromkeys(skill_result.unknown_factors + starfall_result.unknown_factors)
+        )
+        status = (
+            "calculated"
+            if total_damage is not None and not missing_parts
+            else "partial"
+        )
+        remaining_hp = max(defender_hp - total_damage, 0) if total_damage is not None else None
+        observed_comparison = self._observed_comparison(
+            payload.observed_damage_value,
+            total_damage,
+        )
+
+        return StarfallComboResultOut(
+            status=status,
+            attacker=skill_result.attacker,
+            defender=skill_result.defender,
+            trigger_skill_id=skill.skill_id,
+            trigger_skill_name=skill.skill_name,
+            starfall_layers=payload.starfall_layers,
+            skill_damage_value=skill_damage,
+            starfall_damage_value=starfall_damage,
+            total_damage_value=total_damage,
+            damage_percent=self._damage_percent(total_damage, defender_hp),
+            remaining_hp=remaining_hp,
+            is_kill=total_damage >= defender_hp if total_damage is not None else None,
+            confidence=min(skill_result.confidence, starfall_result.confidence),
+            missing_parts=missing_parts,
+            unknown_factors=unknown_factors,
+            skill_result=skill_result,
+            starfall_result=starfall_result,
+            observed_comparison=observed_comparison,
+        )
+
+    def _calculate_starfall_part(
+        self,
+        *,
+        payload: StarfallComboCalculateInput,
+        skill: SkillDefinition,
+        attacker: DamageCalculatorParticipantOut,
+        defender: DamageCalculatorParticipantOut,
+    ) -> DamageCalculatorResultOut:
+        """计算星陨印记段伤害；未触发时返回 0 伤害。"""
+        if payload.starfall_layers <= 0:
+            return DamageCalculatorResultOut(
+                status="not_triggered",
+                formula_type="starfall",
+                attacker=attacker,
+                defender=defender,
+                skill_id=skill.skill_id,
+                skill_name=skill.skill_name,
+                damage_value=0,
+                damage_percent=0,
+                confidence=1.0,
+                explanation={
+                    "trigger_condition": "starfall_layers_positive",
+                    "starfall_layers": payload.starfall_layers,
+                    "reason": "starfall_layers_zero",
+                },
+            )
+
+        attacker_panel = PanelStats(**attacker.panel_stats.model_dump())
+        defender_panel = PanelStats(**defender.panel_stats.model_dump())
+        context = DamageFormulaContext(
+            battle_id="standalone_starfall_calculator",
+            formula_type="starfall",
+            attacker_side="self",
+            attacker_elf_id=attacker.elf_id,
+            defender_side="enemy",
+            defender_elf_id=defender.elf_id,
+            skill_id=skill.skill_id,
+            skill_element_type=skill.element_type,
+            skill_category=skill.skill_category,
+            trigger_skill_id=skill.skill_id,
+            trigger_skill_element_type=skill.element_type,
+            trigger_skill_category=skill.skill_category,
+            attacker_panel_stats=attacker_panel,
+            defender_panel_stats=defender_panel,
+            defender_max_hp=defender_panel.hp,
+            attacker_element_types=attacker.element_types,
+            defender_element_types=defender.element_types,
+            effect_id="effect_starfall_mark",
+            effect_layers=payload.starfall_layers,
+            starfall_element_type="illusion",
+            notes=payload.notes,
+        )
+        if payload.modifiers.damage_reductions:
+            context.damage_reductions = [
+                Decimal(str(item)) for item in payload.modifiers.damage_reductions
+            ]
+        resolver_payload: dict[str, Any] = {"resolve_rules": True}
+        if payload.modifiers.damage_reductions:
+            resolver_payload["damage_reductions"] = payload.modifiers.damage_reductions
+        if payload.starfall_type_multiplier is not None:
+            context.type_multiplier = Decimal(str(payload.starfall_type_multiplier))
+            resolver_payload["type_multiplier"] = payload.starfall_type_multiplier
+
+        resolved_context = RuleResolver(self.db).resolve_damage_context(context, resolver_payload)
+        result = DamageCalculator().calculate(resolved_context)
+        starfall_damage = 0 if result.status == "not_triggered" else result.damage_value
+        return DamageCalculatorResultOut(
+            status=result.status,
+            formula_type=result.formula_type,
+            attacker=attacker,
+            defender=defender,
+            skill_id=skill.skill_id,
+            skill_name=skill.skill_name,
+            damage_value=starfall_damage,
+            damage_percent=self._damage_percent(starfall_damage, defender_panel.hp),
+            confidence=result.confidence,
+            missing_parts=result.missing_parts,
+            unknown_factors=result.unknown_factors,
+            explanation=result.explanation,
+            multipliers=self._multipliers_from_result(result.explanation, resolved_context),
         )
 
     def infer_defender(

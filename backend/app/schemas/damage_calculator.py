@@ -204,6 +204,54 @@ class DamageCalculatorResultOut(BaseModel):
     side_effect_policy: str = "read_only_no_battle_mutation"
 
 
+class StarfallComboCalculateInput(BaseModel):
+    """只读星陨组合伤害计算请求。"""
+
+    attacker: DamageCalculatorParticipantInput = Field(..., description="Attacker")
+    defender: DamageCalculatorParticipantInput = Field(..., description="Defender")
+    trigger_skill_id: str = Field(..., description="Attack skill ID that triggers starfall")
+    starfall_layers: int = Field(default=1, ge=0, le=99, description="Starfall mark layers")
+    modifiers: DamageCalculatorModifierInput = Field(
+        default_factory=DamageCalculatorModifierInput,
+        description="Skill damage modifiers; damage reductions also apply to starfall damage",
+    )
+    starfall_type_multiplier: float | None = Field(
+        default=None,
+        ge=0,
+        description="Optional manual override for starfall illusion type multiplier",
+    )
+    observed_damage_value: int | None = Field(
+        default=None,
+        ge=0,
+        description="Optional observed total damage for comparison only",
+    )
+    notes: str | None = Field(default=None, description="Notes")
+
+
+class StarfallComboResultOut(BaseModel):
+    """只读星陨组合伤害计算结果。"""
+
+    status: str
+    attacker: DamageCalculatorParticipantOut
+    defender: DamageCalculatorParticipantOut
+    trigger_skill_id: str
+    trigger_skill_name: str | None = None
+    starfall_layers: int
+    skill_damage_value: int | None = None
+    starfall_damage_value: int | None = None
+    total_damage_value: int | None = None
+    damage_percent: float | None = None
+    remaining_hp: int | None = None
+    is_kill: bool | None = None
+    confidence: float
+    missing_parts: list[str] = Field(default_factory=list)
+    unknown_factors: list[str] = Field(default_factory=list)
+    skill_result: DamageCalculatorResultOut
+    starfall_result: DamageCalculatorResultOut
+    observed_comparison: DamageCalculatorObservedComparisonOut | None = None
+    side_effect_policy: str = "read_only_no_battle_mutation"
+
+
 class DamageCalculatorInferDefenderInput(BaseModel):
     """根据扣血百分比/真实伤害反推防御方配置候选的请求。"""
 

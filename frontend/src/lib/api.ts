@@ -55,6 +55,8 @@ import type {
   SkillRuleManualUpdate,
   SkillRuleReviewOut,
   SkillUseEventCreate,
+  StarfallComboCalculateInput,
+  StarfallComboResultOut,
   StartBattleInput,
   StaticSkillRuleSyncRequest,
   StaticSkillRuleSyncResponse,
@@ -207,6 +209,11 @@ export const api = {
       }),
     inferAttacker: (payload: DamageCalculatorInferAttackerInput) =>
       request<DamageCalculatorInferAttackerOut>("/damage-calculator/infer-attacker", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    starfallCombo: (payload: StarfallComboCalculateInput) =>
+      request<StarfallComboResultOut>("/damage-calculator/starfall-combo", {
         method: "POST",
         body: JSON.stringify(payload),
       }),

@@ -16,6 +16,7 @@ const PlayerBuildsPage = lazyPage(() => import("@/pages/PlayerBuildsPage"), "Pla
 const PreparationPage = lazyPage(() => import("@/pages/PreparationPage"), "PreparationPage");
 const BattleWorkbenchPage = lazyPage(() => import("@/pages/BattleWorkbenchPage"), "BattleWorkbenchPage");
 const DamageCalculatorPage = lazyPage(() => import("@/pages/DamageCalculatorPage"), "DamageCalculatorPage");
+const StarfallCalculatorPage = lazyPage(() => import("@/pages/StarfallCalculatorPage"), "StarfallCalculatorPage");
 const EventLogPage = lazyPage(() => import("@/pages/EventLogPage"), "EventLogPage");
 const RulesPage = lazyPage(() => import("@/pages/RulesPage"), "RulesPage");
 const SettingsPage = lazyPage(() => import("@/pages/SettingsPage"), "SettingsPage");
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="preparation" element={page(<PreparationPage />)} />
         <Route path="battle" element={page(<BattleWorkbenchPage />)} />
         <Route path="damage-calculator" element={page(<DamageCalculatorPage />)} />
+        <Route path="starfall-calculator" element={page(<StarfallCalculatorPage />)} />
         <Route path="events" element={page(<EventLogPage />)} />
         <Route path="rules" element={page(<RulesPage />)} />
         <Route path="settings" element={page(<SettingsPage />)} />

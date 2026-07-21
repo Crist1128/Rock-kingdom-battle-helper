@@ -12,6 +12,8 @@ from app.schemas.damage_calculator import (
     DamageCalculatorInferDefenderInput,
     DamageCalculatorInferDefenderOut,
     DamageCalculatorResultOut,
+    StarfallComboCalculateInput,
+    StarfallComboResultOut,
 )
 from app.services.standalone_damage_service import StandaloneDamageService
 
@@ -36,6 +38,21 @@ def calculate_standalone_damage(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/starfall-combo", response_model=StarfallComboResultOut)
+def calculate_starfall_combo(
+    payload: StarfallComboCalculateInput,
+    db: Session = Depends(get_db),
+) -> StarfallComboResultOut:
+    """执行只读星陨组合伤害计算。"""
+    try:
+        return StandaloneDamageService(db).calculate_starfall_combo(payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
 
 
 @router.post("/infer-defender", response_model=DamageCalculatorInferDefenderOut)

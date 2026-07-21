@@ -318,6 +318,41 @@ export interface DamageCalculatorResultOut {
   side_effect_policy: string;
 }
 
+export interface StarfallComboCalculateInput {
+  attacker: DamageCalculatorParticipantInput;
+  defender: DamageCalculatorParticipantInput;
+  trigger_skill_id: string;
+  starfall_layers?: number;
+  modifiers?: DamageCalculatorModifierInput;
+  starfall_type_multiplier?: number | null;
+  observed_damage_value?: number | null;
+  notes?: string | null;
+}
+
+export interface StarfallComboResultOut {
+  status: string;
+  attacker: DamageCalculatorParticipantOut;
+  defender: DamageCalculatorParticipantOut;
+  trigger_skill_id: string;
+  trigger_skill_name?: string | null;
+  starfall_layers: number;
+  skill_damage_value?: number | null;
+  starfall_damage_value?: number | null;
+  total_damage_value?: number | null;
+  damage_percent?: number | null;
+  remaining_hp?: number | null;
+  is_kill?: boolean | null;
+  confidence: number;
+  missing_parts: string[];
+  unknown_factors: string[];
+  skill_result: DamageCalculatorResultOut;
+  starfall_result: DamageCalculatorResultOut;
+  observed_comparison?: DamageCalculatorObservedComparisonOut | null;
+  side_effect_policy: string;
+}
+
+
+
 export interface DamageCalculatorInferDefenderInput {
   attacker: DamageCalculatorParticipantInput;
   defender_elf_id: string;
