@@ -139,6 +139,30 @@ def test_recognition_api_returns_confirmable_candidates(api_client: TestClient) 
     assert "不会自动写入阵容" in body["warnings"][0]
 
 
+def test_recognition_api_accepts_frontend_top5_request(api_client: TestClient) -> None:
+    """前端准备页默认请求 Top5，应通过参数校验并返回可确认候选。"""
+    response = api_client.post(
+        "/api/v1/recognition/enemy-lineup?top_k=5&include_debug=true",
+        files={"file": ("screenshot.png", _build_default_size_screenshot(), "image/png")},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["slots"]) == 6
+    assert 1 <= len(body["slots"][0]["candidates"]) <= 5
+    assert body["debug_artifacts"] is not None
+
+
+def test_recognition_api_rejects_top_k_over_debug_limit(api_client: TestClient) -> None:
+    """TopK 上限保持为 Top5，避免前端误请求过大的调试候选集。"""
+    response = api_client.post(
+        "/api/v1/recognition/enemy-lineup?top_k=6",
+        files={"file": ("screenshot.png", _build_default_size_screenshot(), "image/png")},
+    )
+
+    assert response.status_code == 422
+
+
 def test_recognition_api_rejects_invalid_image(api_client: TestClient) -> None:
     """非图片上传应返回 400，避免进入模板识别流程。"""
     response = api_client.post(
