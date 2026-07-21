@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useConfirm } from "@/components/ui/confirm";
 
 /**
  * 设置 / 数据管理页面。
@@ -30,6 +31,7 @@ import { Input } from "@/components/ui/input";
  */
 export function SettingsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const health = useQuery({ queryKey: ["health"], queryFn: api.health });
   const archivedBattles = useQuery({
     queryKey: ["battles", "archived"],
@@ -310,7 +312,7 @@ export function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="rounded-2xl border bg-white p-4">
+          <div className="rounded-2xl border bg-raised/60 p-4">
             <div className="text-sm text-muted-foreground">API Base URL</div>
             <div className="mt-1 font-mono text-sm">{API_BASE_URL}</div>
           </div>
@@ -352,11 +354,11 @@ export function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="rounded-2xl border bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="rounded-2xl border bg-warning/10 p-4 text-sm text-warning">
             爬虫更新不是常驻服务，也不会随后端启动自动运行。日常使用只启动前后端；只有本地规则库为空或需要更新精灵/技能数据时，才在这里主动触发。
           </div>
 
-          <section className="space-y-3 rounded-2xl border bg-white p-4">
+          <section className="space-y-3 rounded-2xl border bg-raised/60 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-semibold">0. 新用户 / 空库一键初始化</h3>
@@ -401,8 +403,13 @@ export function SettingsPage() {
                 预检查一键初始化（dry-run）
               </Button>
               <Button
-                onClick={() => {
-                  if (window.confirm("确认执行空库一键初始化并写入数据库？建议先 dry-run 检查结果。")) {
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: "一键初始化本地数据库",
+                    description: "确认执行空库一键初始化并写入数据库？建议先 dry-run 检查结果。",
+                    confirmText: "执行初始化",
+                  });
+                  if (confirmed) {
                     bootstrapLocalMutation.mutate(true);
                   }
                 }}
@@ -419,7 +426,7 @@ export function SettingsPage() {
             {bootstrapLocalMutation.isPending ? <InlineProgressBar label="正在创建初始化任务..." /> : null}
           </section>
 
-          <section className="space-y-3 rounded-2xl border bg-white p-4">
+          <section className="space-y-3 rounded-2xl border bg-raised/60 p-4">
             <div>
               <h3 className="font-semibold">1. 单独录入精灵进化链规则</h3>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -437,8 +444,13 @@ export function SettingsPage() {
                 预检查进化链（dry-run）
               </Button>
               <Button
-                onClick={() => {
-                  if (window.confirm("确认写入精灵进化链规则？建议先 dry-run 检查结果。")) {
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: "录入进化链规则",
+                    description: "确认写入精灵进化链规则？建议先 dry-run 检查结果。",
+                    confirmText: "写入",
+                  });
+                  if (confirmed) {
                     evolutionChainSyncMutation.mutate(true);
                   }
                 }}
@@ -456,7 +468,7 @@ export function SettingsPage() {
             {evolutionChainSyncError ? <ErrorBox text={evolutionChainSyncError} /> : null}
           </section>
 
-          <section className="space-y-3 rounded-2xl border bg-white p-4">
+          <section className="space-y-3 rounded-2xl border bg-raised/60 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-semibold">2. 检查远程是否可能有新增精灵</h3>
@@ -488,9 +500,9 @@ export function SettingsPage() {
             {lastCheckResult ? <RocomCheckResultPanel result={lastCheckResult} /> : null}
           </section>
 
-          <section className="space-y-3 rounded-2xl border bg-white p-4">
+          <section className="space-y-3 rounded-2xl border bg-raised/60 p-4">
             <div>
-              <h3 className="font-semibold">2. 从本地 cleaned JSON 导入数据库</h3>
+              <h3 className="font-semibold">3. 从本地 cleaned JSON 导入数据库</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 如果你已经通过爬虫或其他方式生成了 cleaned JSON，优先用这个入口。它不访问远程，速度更稳定；
                 提交时会在同一事务内补齐项目内置状态定义和人工技能规则。
@@ -514,7 +526,7 @@ export function SettingsPage() {
                 />
               </label>
             </div>
-            <div className="space-y-2 rounded-xl border bg-slate-50 p-3 text-sm">
+            <div className="space-y-2 rounded-xl border bg-raised/60 p-3 text-sm">
               <div className="font-medium">导入模式</div>
               <label className="flex items-start gap-2">
                 <input
@@ -536,7 +548,7 @@ export function SettingsPage() {
               </label>
             </div>
             {localUpdateMode === "full" ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">
                 全量提交前请先确认 cleaned JSON 是完整数据集；你当前已生成的默认 cleaned 目录会被直接导入，不会重新访问 BWIKI。
               </div>
             ) : null}
@@ -549,8 +561,13 @@ export function SettingsPage() {
                 预检查本地数据（dry-run）
               </Button>
               <Button
-                onClick={() => {
-                  if (window.confirm("确认把本地 cleaned JSON 写入数据库？建议先 dry-run 检查结果。")) {
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: "导入本地数据",
+                    description: "确认把本地 cleaned JSON 写入数据库？建议先 dry-run 检查结果。",
+                    confirmText: "提交导入",
+                  });
+                  if (confirmed) {
                     importLocalMutation.mutate(true);
                   }
                 }}
@@ -563,9 +580,9 @@ export function SettingsPage() {
             {importLocalError ? <ErrorBox text={importLocalError} /> : null}
           </section>
 
-          <section className="space-y-3 rounded-2xl border bg-white p-4">
+          <section className="space-y-3 rounded-2xl border bg-raised/60 p-4">
             <div>
-              <h3 className="font-semibold">3. 同步已完备技能分支规则</h3>
+              <h3 className="font-semibold">4. 同步已完备技能分支规则</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 只检查 seed 中 review_status = structured 且没有结构缺口的技能。默认先列出还没写入数据库或与 seed 不一致的规则，
                 你可以勾选后 dry-run 或提交写库；项目状态定义 seed 会随任意同步操作一起 dry-run/写库，不需要单独勾选。
@@ -612,12 +629,13 @@ export function SettingsPage() {
                 预检查选中规则 / 状态定义（dry-run）
               </Button>
               <Button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `确认写入 ${selectedStaticRuleSkillIds.length} 条已选 structured 技能规则，并同步待更新状态定义？建议先 dry-run。`,
-                    )
-                  ) {
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: "写入选中规则",
+                    description: `确认写入 ${selectedStaticRuleSkillIds.length} 条已选 structured 技能规则，并同步待更新状态定义？建议先 dry-run。`,
+                    confirmText: "写入",
+                  });
+                  if (confirmed) {
                     staticRuleSyncMutation.mutate({
                       commit: true,
                       skillIds: selectedStaticRulePayload,
@@ -632,9 +650,14 @@ export function SettingsPage() {
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => {
+                onClick={async () => {
                   const scopeText = staticRuleSearch.trim() ? `当前筛选“${staticRuleSearch.trim()}”下的` : "所有";
-                  if (window.confirm(`确认写入${scopeText}待同步 structured 技能规则，并同步待更新状态定义？建议先查看列表。`)) {
+                  const confirmed = await confirm({
+                    title: "写入待同步规则",
+                    description: `确认写入${scopeText}待同步 structured 技能规则，并同步待更新状态定义？建议先查看列表。`,
+                    confirmText: "写入",
+                  });
+                  if (confirmed) {
                     staticRuleSyncMutation.mutate({ commit: true, skillIds: null });
                   }
                 }}
@@ -657,9 +680,9 @@ export function SettingsPage() {
             ) : null}
           </section>
 
-          <section className="space-y-3 rounded-2xl border bg-white p-4">
+          <section className="space-y-3 rounded-2xl border bg-raised/60 p-4">
             <div>
-              <h3 className="font-semibold">4. 远程爬取、清洗并导入</h3>
+              <h3 className="font-semibold">5. 远程爬取、清洗并导入</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 该操作会访问 BWIKI。默认按钮是 dry-run，不提交数据库；确认无误后再提交写库。提交时同样会补齐项目内置状态定义和人工技能规则。
               </p>
@@ -708,7 +731,7 @@ export function SettingsPage() {
                 写 raw / cleaned 文件
               </label>
             </div>
-            <div className="space-y-2 rounded-xl border bg-slate-50 p-3 text-sm">
+            <div className="space-y-2 rounded-xl border bg-raised/60 p-3 text-sm">
               <div className="font-medium">远程更新模式</div>
               <label className="flex items-start gap-2">
                 <input
@@ -743,8 +766,13 @@ export function SettingsPage() {
                 预检查远程并 dry-run
               </Button>
               <Button
-                onClick={() => {
-                  if (window.confirm("确认从远程爬取并写入数据库？建议先 dry-run 检查结果。")) {
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: "导入远程数据",
+                    description: "确认从远程爬取并写入数据库？建议先 dry-run 检查结果。",
+                    confirmText: "提交导入",
+                  });
+                  if (confirmed) {
                     syncMutation.mutate(true);
                   }
                 }}
@@ -757,7 +785,7 @@ export function SettingsPage() {
             {syncError ? <ErrorBox text={syncError} /> : null}
           </section>
 
-          <section className="space-y-3 rounded-2xl border bg-white p-4">
+          <section className="space-y-3 rounded-2xl border bg-raised/60 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold">数据更新任务</h3>
@@ -814,8 +842,14 @@ export function SettingsPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                if (window.confirm("确认物理删除符合条件的归档战斗？此操作不可恢复。")) {
+              onClick={async () => {
+                const confirmed = await confirm({
+                  title: "批量物理删除",
+                  description: "确认物理删除符合条件的归档战斗？此操作不可恢复。",
+                  confirmText: "永久删除",
+                  danger: true,
+                });
+                if (confirmed) {
                   bulkPurgeMutation.mutate(false);
                 }
               }}
@@ -829,7 +863,7 @@ export function SettingsPage() {
           {bulkError ? <ErrorBox text={bulkError} /> : null}
           {lastPurgeResult ? <PurgeResultPanel title="批量清理结果" result={lastPurgeResult} /> : null}
 
-          <div className="rounded-2xl border bg-white p-4">
+          <div className="rounded-2xl border bg-raised/60 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <div className="font-semibold">已归档战斗</div>
@@ -847,8 +881,14 @@ export function SettingsPage() {
                   result={singleResults[battle.battle_id]}
                   pending={singlePurgeMutation.isPending}
                   onPreview={() => singlePurgeMutation.mutate({ battleId: battle.battle_id, dryRun: true })}
-                  onDelete={() => {
-                    if (window.confirm(`确认物理删除「${battle.battle_name ?? battle.battle_id}」？此操作不可恢复。`)) {
+                  onDelete={async () => {
+                    const confirmed = await confirm({
+                      title: "物理删除战斗",
+                      description: `确认物理删除「${battle.battle_name ?? battle.battle_id}」？此操作不可恢复。`,
+                      confirmText: "永久删除",
+                      danger: true,
+                    });
+                    if (confirmed) {
                       singlePurgeMutation.mutate({ battleId: battle.battle_id, dryRun: false });
                     }
                   }}
@@ -866,7 +906,7 @@ export function SettingsPage() {
 function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }) {
   const seedFilesReady = status.seed_files.every((file) => file.exists);
   return (
-    <div className="rounded-2xl border bg-slate-50 p-4">
+    <div className="rounded-2xl border bg-raised/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-semibold">空库初始化数据状态</div>
         <Badge
@@ -891,18 +931,18 @@ function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }
         <InfoMini label="链内形态" value={String(status.counts.evolution_stages ?? 0)} />
       </div>
       {status.missing_required.length ? (
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="mt-3 rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">
           缺少：{status.missing_required.join("、")}
         </div>
       ) : null}
       <details className="mt-3">
         <summary className="cursor-pointer text-sm font-medium">查看必要数据清单与本地文件</summary>
         <div className="mt-3 space-y-3 text-sm">
-          <div className="rounded-xl border bg-white p-3">
+          <div className="rounded-xl border bg-raised/60 p-3">
             <div className="font-medium">使用前必要数据</div>
             <div className="mt-2 space-y-2">
               {status.required_data.map((item) => (
-                <div key={item.key} className="rounded-lg bg-slate-50 p-2">
+                <div key={item.key} className="rounded-lg bg-raised/60 p-2">
                   <div className="font-medium">{item.name}</div>
                   <div className="text-xs text-muted-foreground">
                     来源：{item.source}；导入：{item.import_path}
@@ -912,7 +952,7 @@ function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }
               ))}
             </div>
           </div>
-          <div className="rounded-xl border bg-white p-3">
+          <div className="rounded-xl border bg-raised/60 p-3">
             <div className="font-medium">本地 cleaned 目录</div>
             <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
               {status.local_cleaned_dir}
@@ -921,7 +961,7 @@ function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }
               {status.cleaned_files.map((file) => (
                 <div
                   key={file.name}
-                  className={file.exists ? "rounded-lg bg-emerald-50 p-2" : "rounded-lg bg-red-50 p-2"}
+                  className={file.exists ? "rounded-lg bg-success/10 p-2" : "rounded-lg bg-destructive/10 p-2"}
                 >
                   <span className="font-mono text-xs">{file.name}</span>
                   <span className="ml-2 text-xs">{file.exists ? formatBytes(file.size_bytes) : "缺失"}</span>
@@ -929,13 +969,13 @@ function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }
               ))}
             </div>
           </div>
-          <div className="rounded-xl border bg-white p-3">
+          <div className="rounded-xl border bg-raised/60 p-3">
             <div className="font-medium">项目 seed 文件</div>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               {status.seed_files.map((file) => (
                 <div
                   key={file.path}
-                  className={file.exists ? "rounded-lg bg-emerald-50 p-2" : "rounded-lg bg-red-50 p-2"}
+                  className={file.exists ? "rounded-lg bg-success/10 p-2" : "rounded-lg bg-destructive/10 p-2"}
                 >
                   <div className="font-mono text-xs">{file.name}</div>
                   <div className="mt-1 break-all text-xs text-muted-foreground">
@@ -953,7 +993,7 @@ function BootstrapStatusPanel({ status }: { status: ProjectDataBootstrapStatus }
 
 function EvolutionChainSyncResultPanel({ result }: { result: EvolutionChainSyncResponse }) {
   return (
-    <div className="rounded-2xl border bg-slate-50 p-4">
+    <div className="rounded-2xl border bg-raised/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-semibold">进化链同步结果</div>
         <Badge variant={result.transaction === "committed" ? "success" : "secondary"}>
@@ -975,7 +1015,7 @@ function EvolutionChainSyncResultPanel({ result }: { result: EvolutionChainSyncR
 
 function RocomCheckResultPanel({ result }: { result: RocomCheckResponse }) {
   return (
-    <div className="rounded-2xl border bg-slate-50 p-4">
+    <div className="rounded-2xl border bg-raised/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-semibold">检查结果</div>
         <Badge variant={result.status === "changed" ? "warning" : "success"}>
@@ -995,7 +1035,7 @@ function RocomCheckResultPanel({ result }: { result: RocomCheckResponse }) {
       {result.new_elves.length ? (
         <details className="mt-3">
           <summary className="cursor-pointer text-sm font-medium">查看新增精灵预览</summary>
-          <div className="mt-2 max-h-56 overflow-auto rounded-xl border bg-white">
+          <div className="mt-2 max-h-56 overflow-auto rounded-xl border bg-raised/60">
             {result.new_elves.map((elf, index) => (
               <div key={`${String(elf.elf_id)}-${index}`} className="border-b p-2 text-sm last:border-b-0">
                 <span className="font-medium">{String(elf.name ?? "未知名称")}</span>
@@ -1041,7 +1081,7 @@ function StaticSkillRuleSyncPanel({
   };
 
   return (
-    <div className="rounded-2xl border bg-slate-50 p-4">
+    <div className="rounded-2xl border bg-raised/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-semibold">技能规则同步检查结果</div>
         <Badge variant={result.pending_count > 0 ? "warning" : "success"}>
@@ -1060,18 +1100,18 @@ function StaticSkillRuleSyncPanel({
       </div>
       {result.errors.length ? <ErrorBox text={result.errors.join("\n")} /> : null}
       {result.applied_skill_ids.length || result.applied_effect_ids?.length ? (
-        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+        <div className="mt-3 rounded-xl border border-success/25 bg-success/10 p-3 text-sm text-success">
           {result.applied_skill_ids.length ? <div>已处理技能：{result.applied_skill_ids.join("、")}</div> : null}
           {result.applied_effect_ids?.length ? <div>已处理状态定义：{result.applied_effect_ids.join("、")}</div> : null}
         </div>
       ) : null}
 
       {result.effect_pending_items?.length ? (
-        <div className="mt-4 rounded-xl border bg-white p-3 text-sm">
+        <div className="mt-4 rounded-xl border bg-raised/60 p-3 text-sm">
           <div className="font-medium">待同步状态定义</div>
           <div className="mt-2 max-h-48 space-y-2 overflow-auto">
             {result.effect_pending_items.map((item) => (
-              <div key={item.effect_id} className="rounded-lg border bg-slate-50 p-2">
+              <div key={item.effect_id} className="rounded-lg border bg-raised/60 p-2">
                 <span className="font-medium">{item.effect_name ?? item.effect_id}</span>
                 <span className="ml-2 font-mono text-xs text-muted-foreground">{item.effect_id}</span>
                 <span className="mt-1 block text-xs text-muted-foreground">
@@ -1092,11 +1132,11 @@ function StaticSkillRuleSyncPanel({
             <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} />
             选择/取消选择当前可见待同步规则
           </label>
-          <div className="max-h-80 overflow-auto rounded-xl border bg-white">
+          <div className="max-h-80 overflow-auto rounded-xl border bg-raised/60">
             {result.pending_items.map((item) => (
               <label
                 key={item.skill_id}
-                className="flex cursor-pointer items-start gap-3 border-b p-3 text-sm last:border-b-0 hover:bg-slate-50"
+                className="flex cursor-pointer items-start gap-3 border-b p-3 text-sm last:border-b-0 hover:bg-raised/60"
               >
                 <input
                   className="mt-1"
@@ -1130,7 +1170,7 @@ function StaticSkillRuleSyncPanel({
 
 function AcceptedJobBanner({ job }: { job: RocomDataUpdateAccepted }) {
   return (
-    <div className="rounded-2xl border bg-emerald-50 p-3 text-sm text-emerald-900">
+    <div className="rounded-2xl border bg-success/10 p-3 text-sm text-success">
       <div className="font-medium">任务已创建：{job.job_id}</div>
       <div className="mt-1">{job.message}</div>
     </div>
@@ -1139,9 +1179,9 @@ function AcceptedJobBanner({ job }: { job: RocomDataUpdateAccepted }) {
 
 function InlineProgressBar({ label }: { label: string }) {
   return (
-    <div className="rounded-xl border bg-slate-50 p-3">
+    <div className="rounded-xl border bg-raised/60 p-3">
       <div className="mb-1 text-xs text-muted-foreground">{label}</div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+      <div className="h-2 overflow-hidden rounded-full bg-raised">
         <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
       </div>
     </div>
@@ -1150,7 +1190,7 @@ function InlineProgressBar({ label }: { label: string }) {
 
 function RocomJobCard({ job }: { job: RocomDataUpdateJobStatus }) {
   return (
-    <div className="rounded-xl border bg-slate-50 p-3">
+    <div className="rounded-xl border bg-raised/60 p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="font-medium">{job.job_type} - {job.job_id}</div>
@@ -1165,7 +1205,7 @@ function RocomJobCard({ job }: { job: RocomDataUpdateJobStatus }) {
       <RocomJobProgressBar progress={job.progress} status={job.status} />
       <details className="mt-3">
         <summary className="cursor-pointer text-sm text-muted-foreground">View params / progress / result</summary>
-        <pre className="mt-2 max-h-72 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-white">
+        <pre className="mt-2 max-h-72 overflow-auto rounded-xl bg-card p-3 text-xs text-foreground">
           {JSON.stringify({ params: job.params, progress: job.progress, result: job.result }, null, 2)}
         </pre>
       </details>
@@ -1193,7 +1233,7 @@ function RocomJobProgressBar({
         </span>
         <span className="font-mono">{countText ? `${countText} - ` : ""}{percent.toFixed(0)}%</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+      <div className="h-2 overflow-hidden rounded-full bg-raised">
         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${percent}%` }} />
       </div>
     </div>
@@ -1215,7 +1255,7 @@ function ArchivedBattleRow({
   onDelete: () => void;
 }) {
   return (
-    <div className="rounded-xl border bg-slate-50 p-3">
+    <div className="rounded-xl border bg-raised/60 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-medium">{battle.battle_name || battle.battle_id}</div>
@@ -1235,7 +1275,7 @@ function ArchivedBattleRow({
 
 function PurgeResultPanel({ title, result, compact = false }: { title: string; result: BattlePurgeResultOut; compact?: boolean }) {
   return (
-    <div className={compact ? "mt-3 rounded-xl border bg-white p-3" : "rounded-2xl border bg-white p-4"}>
+    <div className={compact ? "mt-3 rounded-xl border bg-raised/60 p-3" : "rounded-2xl border bg-raised/60 p-4"}>
       <div className="flex items-center justify-between gap-3">
         <div className="font-semibold">{title}</div>
         <Badge variant={result.dry_run ? "secondary" : "destructive"}>{result.dry_run ? "dry-run" : "已删除"}</Badge>
@@ -1249,14 +1289,14 @@ function PurgeResultPanel({ title, result, compact = false }: { title: string; r
       </div>
       <details className="mt-3">
         <summary className="cursor-pointer text-sm text-muted-foreground">查看各表行数</summary>
-        <pre className="mt-2 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-white">{JSON.stringify(result.rows, null, 2)}</pre>
+        <pre className="mt-2 overflow-auto rounded-xl bg-card p-3 text-xs text-foreground">{JSON.stringify(result.rows, null, 2)}</pre>
       </details>
     </div>
   );
 }
 
 function InfoMini({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-slate-100 p-2"><div className="text-xs text-muted-foreground">{label}</div><div className="font-mono font-semibold">{value}</div></div>;
+  return <div className="rounded-xl bg-raised p-2"><div className="text-xs text-muted-foreground">{label}</div><div className="font-mono font-semibold">{value}</div></div>;
 }
 
 function ErrorBox({ text }: { text: string }) {

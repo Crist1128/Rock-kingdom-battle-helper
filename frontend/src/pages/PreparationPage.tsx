@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { AvatarImage } from "@/components/ui/avatar";
 import { ElfSearchSelect } from "@/components/EntitySearchSelect";
 import { compactId, elementTypeNames, parseElementTypes, phaseName } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 import type {
   EnemyAvatarMatchedElfOut,
   EnemyLineupRecognitionOut,
@@ -66,8 +67,8 @@ function duplicateValues(values: string[]): string[] {
   return [...duplicates];
 }
 
-function showPreparationRequiredAlert(issues: string[]) {
-  window.alert(`提交前请先完成：\n${issues.map((item) => `- ${item}`).join("\n")}`);
+function preparationRequiredMessage(issues: string[]) {
+  return `提交前请先完成：\n${issues.map((item) => `- ${item}`).join("\n")}`;
 }
 
 async function canvasToPngFile(canvas: HTMLCanvasElement, fileName: string): Promise<File> {
@@ -86,6 +87,7 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
 export function PreparationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { currentBattleId, setCurrentBattleId } = useAppStore();
   const [battleIdInput, setBattleIdInput] = useState(currentBattleId ?? "");
   const [selfSlots, setSelfSlots] = useState<SelfSlot[]>(Array.from({ length: 6 }, () => ({ build_id: "", elf_id: "", active: false })));
@@ -240,7 +242,7 @@ export function PreparationPage() {
     if (preparation.issues.length > 0) {
       submitAndStartBattle.reset();
       setPreparationIssues(preparation.issues);
-      showPreparationRequiredAlert(preparation.issues);
+      toast(preparationRequiredMessage(preparation.issues), "error");
       return;
     }
     submitAndStartBattle.reset();
@@ -506,7 +508,7 @@ export function PreparationPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {selfSlots.map((slot, index) => (
-              <div key={index} className="rounded-2xl border bg-white p-3">
+              <div key={index} className="rounded-2xl border bg-raised/60 p-3">
                 <div className="mb-2 flex items-center justify-between"><span className="font-medium">槽位 {index + 1}</span>{slot.active ? <Badge>首发</Badge> : null}</div>
                 <Select value={slot.build_id} onChange={(e) => {
                   const build = builds.data?.find((item) => item.build_id === e.target.value);
@@ -536,7 +538,7 @@ export function PreparationPage() {
             <CardDescription>敌方只确认精灵种类，不输入性格、个体资质和技能组。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-2xl border border-dashed bg-slate-50 p-3">
+            <div className="rounded-2xl border border-dashed bg-raised/60 p-3">
               <div className="mb-2">
                 <div className="text-sm font-semibold">截图识别敌方阵容（候选确认）</div>
                 <div className="text-xs text-muted-foreground">
@@ -590,12 +592,12 @@ export function PreparationPage() {
                 </span>
               </div>
               {captureError ? (
-                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+                <div className="mt-2 rounded-xl border border-warning/25 bg-warning/10 p-2 text-xs text-warning">
                   截屏提示：{captureError}
                 </div>
               ) : null}
               {screenCapture ? (
-                <div className="mt-3 rounded-xl border bg-white p-2">
+                <div className="mt-3 rounded-xl border bg-raised/60 p-2">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="text-xs text-muted-foreground">
                       已捕获 {screenCapture.width}×{screenCapture.height}。按住鼠标在预览图上拖拽框选游戏界面。
@@ -640,7 +642,7 @@ export function PreparationPage() {
                       />
                       {cropSelection && cropSelection.width > 0 && cropSelection.height > 0 ? (
                         <div
-                          className="pointer-events-none absolute border-2 border-sky-400 bg-sky-400/20"
+                          className="pointer-events-none absolute border-2 border-info bg-info/20"
                           style={{
                             left: `${(cropSelection.x / screenCapture.width) * 100}%`,
                             top: `${(cropSelection.y / screenCapture.height) * 100}%`,
@@ -654,7 +656,7 @@ export function PreparationPage() {
                 </div>
               ) : null}
               {recognizeEnemyLineup.error ? (
-                <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                <div className="mt-2 rounded-xl border border-destructive/25 bg-destructive/10 p-2 text-xs text-destructive">
                   识别失败：{recognizeEnemyLineup.error.message}
                 </div>
               ) : null}
@@ -665,12 +667,12 @@ export function PreparationPage() {
                     模板 {recognitionResult.icon_template_count} 个。请逐槽确认，Top1 不一定总是正确。
                   </div>
                   {recognitionResult.warnings.map((warning) => (
-                    <div key={warning} className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                    <div key={warning} className="rounded-lg bg-warning/10 px-2 py-1 text-xs text-warning">
                       {warning}
                     </div>
                   ))}
                   {recognitionResult.debug_artifacts ? (
-                    <div className="rounded-xl border bg-white p-2">
+                    <div className="rounded-xl border bg-raised/60 p-2">
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <div className="text-xs font-semibold">识别调试图</div>
@@ -679,29 +681,29 @@ export function PreparationPage() {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 text-[11px]">
-                          <a className="text-sky-700 underline" href={recognitionResult.debug_artifacts.annotated_image_url} target="_blank" rel="noreferrer">打开框选图</a>
-                          <a className="text-sky-700 underline" href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer">打开总览图</a>
+                          <a className="text-info underline" href={recognitionResult.debug_artifacts.annotated_image_url} target="_blank" rel="noreferrer">打开框选图</a>
+                          <a className="text-info underline" href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer">打开总览图</a>
                         </div>
                       </div>
                       <div className="grid gap-2 md:grid-cols-2">
-                        <a href={recognitionResult.debug_artifacts.annotated_image_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-slate-50 p-2">
+                        <a href={recognitionResult.debug_artifacts.annotated_image_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-raised/60 p-2">
                           <div className="mb-1 text-[11px] font-medium">整图框选</div>
                           <img src={recognitionResult.debug_artifacts.annotated_image_url} alt="识别框选图" className="max-h-56 w-full rounded object-contain" />
                         </a>
-                        <a href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-slate-50 p-2">
+                        <a href={recognitionResult.debug_artifacts.contact_sheet_url} target="_blank" rel="noreferrer" className="block rounded-lg border bg-raised/60 p-2">
                           <div className="mb-1 text-[11px] font-medium">Top2 总览</div>
                           <img src={recognitionResult.debug_artifacts.contact_sheet_url} alt="识别候选总览图" className="max-h-56 w-full rounded object-contain" />
                         </a>
                       </div>
                       <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {recognitionResult.debug_artifacts.slots.map((debugSlot) => (
-                          <div key={debugSlot.slot_index} className="rounded-lg border bg-slate-50 p-2">
+                          <div key={debugSlot.slot_index} className="rounded-lg border bg-raised/60 p-2">
                             <div className="mb-1 flex items-center justify-between text-[11px] font-medium">
                               <span>槽位 {debugSlot.slot_index} 抄像检查</span>
                               <span className="flex gap-2 font-normal">
-                                <a className="text-sky-700 underline" href={debugSlot.crop_url} target="_blank" rel="noreferrer">裁剪</a>
-                                <a className="text-sky-700 underline" href={debugSlot.detail_url} target="_blank" rel="noreferrer">详情</a>
-                                <a className="text-sky-700 underline" href={debugSlot.top5_url} target="_blank" rel="noreferrer">Top2</a>
+                                <a className="text-info underline" href={debugSlot.crop_url} target="_blank" rel="noreferrer">裁剪</a>
+                                <a className="text-info underline" href={debugSlot.detail_url} target="_blank" rel="noreferrer">详情</a>
+                                <a className="text-info underline" href={debugSlot.top5_url} target="_blank" rel="noreferrer">Top2</a>
                               </span>
                             </div>
                             <a href={debugSlot.detail_url} target="_blank" rel="noreferrer">
@@ -714,7 +716,7 @@ export function PreparationPage() {
                   ) : null}
                   <div className="grid gap-2">
                     {recognitionResult.slots.map((slot) => (
-                      <div key={slot.slot_index} className="rounded-xl border bg-white p-2">
+                      <div key={slot.slot_index} className="rounded-xl border bg-raised/60 p-2">
                         <div className="mb-2 flex items-center justify-between">
                           <span className="text-xs font-semibold">槽位 {slot.slot_index}</span>
                           <span className="text-[11px] text-muted-foreground">
@@ -723,7 +725,7 @@ export function PreparationPage() {
                         </div>
                         <div className="space-y-2">
                           {slot.candidates.map((candidate, candidateIndex) => (
-                            <div key={`${slot.slot_index}-${candidate.file_name}`} className="rounded-lg border bg-slate-50 p-2">
+                            <div key={`${slot.slot_index}-${candidate.file_name}`} className="rounded-lg border bg-raised/60 p-2">
                               <div className="flex items-center gap-2">
                                 <AvatarImage
                                   src={candidate.icon_url}
@@ -753,7 +755,7 @@ export function PreparationPage() {
                                     </Button>
                                   ))
                                 ) : (
-                                  <span className="text-[11px] text-amber-700">该候选暂未映射到数据库</span>
+                                  <span className="text-[11px] text-warning">该候选暂未映射到数据库</span>
                                 )}
                               </div>
                             </div>
@@ -766,7 +768,7 @@ export function PreparationPage() {
               ) : null}
             </div>
             {enemySlots.map((slot, index) => (
-              <div key={index} className="rounded-2xl border bg-white p-3">
+              <div key={index} className="rounded-2xl border bg-raised/60 p-3">
                 <div className="mb-2 flex items-center justify-between"><span className="font-medium">槽位 {index + 1}</span>{slot.active ? <Badge>首发</Badge> : null}</div>
                 <PreparationEnemySelection slot={slot} />
                 <ElfSearchSelect label="敌方精灵" value={slot.elf_id} resultsMode="focus" onChange={(id, elf) => {
@@ -800,12 +802,12 @@ export function PreparationPage() {
               {submitAndStartBattle.isPending ? "提交并进入中..." : "提交阵容并进入战斗"}
             </Button>
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-xs text-warning">
             准备阶段必做项：选择当前战斗；己方至少 1 个完整配置；敌方至少 1 只精灵；双方各设置 1 个有效首发。
             缺项时点击提交会弹窗列出具体问题。
           </div>
           {preparationIssues.length > 0 ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
               <div className="font-semibold">提交前请先完成：</div>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 {preparationIssues.map((issue) => (
@@ -817,7 +819,7 @@ export function PreparationPage() {
         </CardContent>
       </Card>
       {submitAndStartBattle.error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
           提交失败：{String(submitAndStartBattle.error.message ?? "unknown error")}
         </div>
       ) : null}
@@ -827,12 +829,12 @@ export function PreparationPage() {
 
 function PreparationSelfSelection({ build }: { build?: PlayerElfBuildOut }) {
   if (!build) {
-    return <div className="mt-2 rounded-xl border border-dashed bg-slate-50 p-2 text-xs text-muted-foreground">未选择配置</div>;
+    return <div className="mt-2 rounded-xl border border-dashed bg-raised/60 p-2 text-xs text-muted-foreground">未选择配置</div>;
   }
   const name = build.elf_name ?? compactId(build.elf_id);
   const elements = parseElementTypes(build.element_types_json);
   return (
-    <div className="mt-2 flex items-center gap-3 rounded-xl border bg-slate-50 p-2">
+    <div className="mt-2 flex items-center gap-3 rounded-xl border bg-raised/60 p-2">
       <AvatarImage src={build.avatar} alt={name} fallback={name} className="h-12 w-12" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold">{name}</div>
@@ -847,12 +849,12 @@ function PreparationSelfSelection({ build }: { build?: PlayerElfBuildOut }) {
 
 function PreparationEnemySelection({ slot }: { slot: EnemySlot }) {
   if (!slot.elf_id) {
-    return <div className="mb-2 rounded-xl border border-dashed bg-slate-50 p-2 text-xs text-muted-foreground">未选择敌方精灵</div>;
+    return <div className="mb-2 rounded-xl border border-dashed bg-raised/60 p-2 text-xs text-muted-foreground">未选择敌方精灵</div>;
   }
   const name = slot.elf_name ?? compactId(slot.elf_id);
   const elements = parseElementTypes(slot.element_types_json);
   return (
-    <div className="mb-2 flex items-center gap-3 rounded-xl border bg-slate-50 p-2">
+    <div className="mb-2 flex items-center gap-3 rounded-xl border bg-raised/60 p-2">
       <AvatarImage src={slot.avatar} alt={name} fallback={name} className="h-12 w-12" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold">{name}</div>

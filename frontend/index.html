@@ -3,7 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>洛克王国世界 PVP 推算工具 MVP</title>
+    <title>洛克王国世界 PVP 推算工具</title>
+    <script>
+      // 主题初始化：默认深色，读取 localStorage 记忆；在首帧渲染前完成，避免主题闪烁。
+      (function () {
+        var theme = "dark";
+        try {
+          theme = localStorage.getItem("rock-pvp-helper.theme") === "light" ? "light" : "dark";
+        } catch (e) {}
+        if (theme === "dark") document.documentElement.classList.add("dark");
+        document.documentElement.style.background = theme === "dark" ? "#070a12" : "#f8fafc";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

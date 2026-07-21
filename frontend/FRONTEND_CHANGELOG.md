@@ -1,5 +1,56 @@
 # 本次前端修改说明
 
+## 2026-07-21 P4 页面打磨 + P5 体验收尾（Toast/确认框/代码分割）
+
+1. **EnergyPips 调整**：能量点按能量值一一对应显示，上限 99 点，移除溢出 +N 标记，点数多自动换行。
+2. **P4 页面改造**
+   - 伤害计算器：攻击/防御双卡间加居中 VS 徽章；预计伤害改 4xl 等宽渐变（青→蓝）大数字。
+   - 首页：最近战斗从卡片堆改为紧凑列表行（状态色点 + 名称 + 等宽 ID/时间 + 阶段徽章 + 行内按钮）。
+   - 设置页：数据更新 section 编号修正为 0-5 连续（原有两个"2."）。
+3. **P5 Toast 与确认对话框**（新增 `ui/toast.tsx`、`ui/confirm.tsx`）
+   - ToastProvider：右上角浮层，default/success/error 三态，4.2s 自动关闭，最多同时 4 条。
+   - ConfirmProvider：Promise 式 `confirm({title, description, confirmText, danger})`，居中模态 + 背景模糊，危险操作红色描边 + 红色确认键。
+   - 全局 19 处 `window.alert/confirm` 全部替换（Dashboard 4、Workbench 4、Builds 2、Preparation 1、Settings 8），Provider 挂载于 main.tsx。
+4. **P5 路由级代码分割**（`App.tsx` 重写）
+   - 8 个页面全部 React.lazy + Suspense（骨架屏 fallback）；主包 513KB → 259KB（gzip 150→83KB），500KB chunk 警告消除。
+   - 新增 `ui/skeleton.tsx`（Skeleton + PageLoadingSkeleton）；工作台"正在读取战斗状态"改三栏骨架屏。
+   - 卸载未使用的 recharts 死依赖（36 个包）。
+5. 验证：`npm.cmd run typecheck`、`npm.cmd run build` 通过，构建产物按页面分 chunk；dev server 各新模块转换正常。
+
+---
+
+## 2026-07-21 深浅双主题 + P3 战斗工作台 HUD 改造
+
+1. **深浅双主题**（`styles.css` / `index.html` / `Layout.tsx` / `tailwind.config.ts`）
+   - tokens 拆分为 `:root`（浅色）与 `.dark`（深色）双套；`index.html` 内联脚本在首帧前按 localStorage 恢复主题（默认深色），避免闪烁。
+   - 侧边栏底部新增 Sun/Moon 主题切换按钮，选择持久化到 `rock-pvp-helper.theme`。
+   - 18 系别色从 JS 常量改为 CSS 变量（`--el-*`，浅色系加深版 / 深色系亮色版），`ElementTypeChip` 全主题可读。
+   - 字面色二次语义化迁移：`amber→warning`、`red→destructive`、`emerald→success`、`sky/blue→info`、`violet→accentv`、`indigo→accenti`，所有提示块随主题变量自适应。
+2. **对位对峙卡**（`BattleWorkbenchPage.tsx` / `ElfCard.tsx` / `EnergyPips.tsx`）
+   - 新增 `EnergyPips` 能量格组件（发光菱形 + 等宽数字，超出上限折叠 +N），替换"能量 X"文字。
+   - ActiveSide 对位卡按侧着色（我方青边 / 敌方红边 + 侧色圆点），两卡之间加居中 VS 徽章。
+   - ElfCard 上场卡对抗色描边 + 微发光，"上场"标记改侧色胶囊；TeamPanel 标题加侧色圆点。
+3. **回合操作台**：行动类型从下拉框改为 5 段分段控件（未知/攻击/防御/状态/切换），选中段青色高亮微发光；速度先后手关系色改为对抗色（我方快=text-self、敌方快=text-enemy、同速=text-warning）。
+4. **事件时间线战斗日志风**（`EventTimeline.tsx` 重构）：工作台 compact 模式改终端日志样式——等宽字体、T{n} 回合分隔线、我方 ▸ 青 / 敌方 ◂ 红行前缀、行 hover 高亮；完整模式（事件日志页）保留快照面板与选择事件能力。
+5. 验证：`npm.cmd run typecheck`、`npm.cmd run build` 通过；构建 CSS 确认双主题变量与全部语义类生成；dev server 各模块转换正常。
+
+---
+
+## 2026-07-20 深空科技风视觉重构（P1 设计基座 + P2 框架）
+
+1. **设计 tokens 深色化**（`styles.css` / `tailwind.config.ts` / `index.html`）
+   - 全局切换为深色单主题：深空三色背景层级（base/card/raised）、电光青主色、`--self` 青 / `--enemy` 玫瑰红对抗色、success/warning/info 功能色。
+   - 圆角收紧（xl 16→10px、2xl 20→12px）、新增 `glow` 发光阴影、`font-num` 等宽数字工具类、深色滚动条与选中色。
+   - `index.html` 声明 `color-scheme: dark` 并内联底色避免启动白屏。
+2. **基础组件重绘**：Button/Card/Badge/Input/Select/Sheet/Avatar 全部改为玻璃拟态深色风格（细描边、弱底色、青色聚焦环、主按钮微发光）。
+3. **全站 token 迁移**：`bg-white`、`bg-slate-50`、`text-slate-*`、`border-slate-*` 及各彩色 info 块（emerald/amber/sky/red/violet/indigo/blue 50~950）批量替换为深色语义类（`bg-raised/60`、`text-foreground`、`amber-400/10` 等），共 28 个文件。
+4. **系别色板**：新增 `lib/elementTypeColors.ts`（18 系专属色）与 `components/ElementTypeChip.tsx`（色点+文字 chip）。
+5. **Layout 重构**：侧边栏 256→208px，支持折叠为 56px 图标栏（localStorage 持久化）；导航选中态改为左侧 2px 青色指示条 + 弱底色；新增顶栏战斗 HUD（战斗名、阶段、回合数等宽大数字、进入工作台快捷键，战斗中每 15s 轮询）。
+6. **其他**：FormulaUnavailableBanner 改细长可关闭警示条（localStorage 记忆）；HealthBar 改渐变血条（>50% 绿 / 20-50% 黄 / ≤20% 红）+ 等宽数字；移除 `body min-width: 1280px`。
+7. 验证：`npm.cmd run typecheck`、`npm.cmd run build` 通过；dev server 模块转换正常。构建单 chunk 513KB 警告仍在，路由级代码分割留待后续。
+
+---
+
 ## 2026-05-16 己方配置体验修正
 
 1. 己方配置列表不再直接展示 `elf_id`、`skill_id` 作为主要名称。

@@ -71,7 +71,7 @@ export function EventLogPage() {
               <Input value={eventIdInput} onChange={(e) => setEventIdInput(e.target.value)} placeholder="从时间线复制 event_id" />
             </div>
             <Button className="w-full" variant="destructive" disabled={!currentBattleId || !eventIdInput.trim() || voidMutation.isPending} onClick={() => voidMutation.mutate()}>作废事件</Button>
-            <div className="rounded-2xl border bg-white p-3">
+            <div className="rounded-2xl border bg-raised/60 p-3">
               <div className="mb-2 flex items-center gap-2">
                 <Badge variant="outline">通用修正</Badge>
                 <span className="text-xs text-muted-foreground">创建替代事件并作废原事件</span>
@@ -94,8 +94,8 @@ export function EventLogPage() {
                 {correctMutation.isPending ? "修正中..." : "创建修正事件"}
               </Button>
             </div>
-            <div className="rounded-2xl border bg-white p-3"><Badge variant="secondary">暂缓</Badge><div className="mt-2">事件重放与复杂修正暂时不作为当前主流程功能展示。</div></div>
-            {lastMessage ? <div className="rounded-2xl border bg-emerald-50 p-3 text-emerald-900">{lastMessage}</div> : null}
+            <div className="rounded-2xl border bg-raised/60 p-3"><Badge variant="secondary">暂缓</Badge><div className="mt-2">事件重放与复杂修正暂时不作为当前主流程功能展示。</div></div>
+            {lastMessage ? <div className="rounded-2xl border bg-success/10 p-3 text-success">{lastMessage}</div> : null}
           </CardContent>
         </Card>
       </div>

@@ -10,6 +10,7 @@ import { AvatarImage } from "@/components/ui/avatar";
 import { ElfSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { StatGrid } from "@/components/StatGrid";
 import { compactId, elementTypeNames, elfElementTypes, parseElementTypes, safeJsonParse, statName } from "@/lib/utils";
+import { useConfirm } from "@/components/ui/confirm";
 import type {
   IndividualTalentInput,
   PlayerElfBuildCreate,
@@ -23,6 +24,7 @@ const emptyTalents: IndividualTalentInput = { hp: 0, physical_attack: 0, physica
 
 export function PlayerBuildsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [editingBuildId, setEditingBuildId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -139,8 +141,14 @@ export function PlayerBuildsPage() {
     setForm({ ...form, skill_ids: next });
   };
 
-  const requestDelete = (buildId: string, name: string) => {
-    if (!window.confirm(`确认删除配置「${name}」？`)) return;
+  const requestDelete = async (buildId: string, name: string) => {
+    const confirmed = await confirm({
+      title: "删除配置",
+      description: `确认删除配置「${name}」？`,
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!confirmed) return;
     deleteMutation.mutate(buildId);
   };
 
@@ -150,8 +158,8 @@ export function PlayerBuildsPage() {
         <h1 className="text-2xl font-bold">己方配置管理</h1>
         <p className="mt-1 text-muted-foreground">己方配置是确定输入。保存后端会计算并缓存面板属性。</p>
       </div>
-      {deleteError ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{deleteError}</div> : null}
-      {validationError ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{validationError}</div> : null}
+      {deleteError ? <div className="rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-sm text-warning">{deleteError}</div> : null}
+      {validationError ? <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">{validationError}</div> : null}
       <div className="grid grid-cols-[1fr_540px] gap-6">
         <Card>
           <CardHeader>
@@ -165,7 +173,7 @@ export function PlayerBuildsPage() {
               const displayName = build.build_name || `${elfName}配置`;
               const nature = natureMap.get(build.nature_id);
               return (
-                <div key={build.build_id} className="rounded-2xl border bg-white p-4">
+                <div key={build.build_id} className="rounded-2xl border bg-raised/60 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 gap-3">
                       <AvatarImage src={build.avatar} alt={elfName} fallback={elfName} className="h-12 w-12" />
@@ -314,6 +322,7 @@ const emptyTeamSlots = (): TeamPresetFormSlot[] =>
   Array.from({ length: 6 }, () => ({ build_id: "", elf_id: "" }));
 
 function TeamPresetManager({ builds }: { builds: PlayerElfBuildOut[] }) {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -395,8 +404,14 @@ function TeamPresetManager({ builds }: { builds: PlayerElfBuildOut[] }) {
     });
   };
 
-  const requestDeletePreset = (preset: TeamPresetOut) => {
-    if (!window.confirm(`确认删除配队「${preset.preset_name}」？`)) return;
+  const requestDeletePreset = async (preset: TeamPresetOut) => {
+    const confirmed = await confirm({
+      title: "删除配队",
+      description: `确认删除配队「${preset.preset_name}」？`,
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!confirmed) return;
     deleteMutation.mutate(preset.preset_id);
   };
 
@@ -410,7 +425,7 @@ function TeamPresetManager({ builds }: { builds: PlayerElfBuildOut[] }) {
         <CardDescription>己方配队由已保存配置组成；敌方热门阵容可以只录入精灵种类，用于准备阶段快速填充。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div> : null}
+        {error ? <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div> : null}
         <div className="grid gap-6 lg:grid-cols-[1fr_520px]">
           <div className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2">
@@ -430,7 +445,7 @@ function TeamPresetManager({ builds }: { builds: PlayerElfBuildOut[] }) {
           </div>
 
           <form
-            className="space-y-4 rounded-2xl border bg-white p-4"
+            className="space-y-4 rounded-2xl border bg-raised/60 p-4"
             onSubmit={(event) => {
               event.preventDefault();
               saveMutation.mutate();
@@ -540,7 +555,7 @@ function PresetList({
   onDelete: (preset: TeamPresetOut) => void;
 }) {
   return (
-    <div className="rounded-2xl border bg-white p-3">
+    <div className="rounded-2xl border bg-raised/60 p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="text-sm font-semibold">{title}</div>
         <Badge variant="outline">{presets.length}</Badge>
@@ -548,7 +563,7 @@ function PresetList({
       {presets.length === 0 ? <div className="text-sm text-muted-foreground">暂无配队。</div> : null}
       <div className="space-y-2">
         {presets.map((preset) => (
-          <div key={preset.preset_id} className="rounded-xl border bg-slate-50 p-3 text-xs">
+          <div key={preset.preset_id} className="rounded-xl border bg-raised/60 p-3 text-xs">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate font-medium">{preset.preset_name}</div>

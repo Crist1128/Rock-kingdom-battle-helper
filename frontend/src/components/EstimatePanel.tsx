@@ -269,19 +269,19 @@ const disallowedPositiveStats = useMemo(
         </div>
       </CardHeader>
       <CardContent className="space-y-3 p-3 pt-0">
-        <div className="rounded-xl border bg-white p-3">
+        <div className="rounded-xl border bg-raised/60 p-3">
           <div className="grid gap-3">
             <div>
               <label className="text-sm font-medium">默认性格</label>
               <div className="mt-2 space-y-2">
                 {defaultNature ? (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                  <div className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-xs text-success">
                     当前：{defaultNature.nature_name}（+{statName(defaultNature.positive_stat)}
                     {" / -"}
                     {statName(defaultNature.negative_stat)}）
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
+                  <div className="rounded-lg border border-dashed bg-raised/60 px-3 py-2 text-xs text-muted-foreground">
                     请选择默认性格。
                   </div>
                 )}
@@ -294,10 +294,10 @@ const disallowedPositiveStats = useMemo(
                       return (
                         <details
                           key={group.key}
-                          className="overflow-hidden rounded-xl border bg-slate-50"
+                          className="overflow-hidden rounded-xl border bg-raised/60"
                         >
-                          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-white px-3 py-2 text-sm transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
-                            <span className="font-semibold text-emerald-700">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm transition hover:bg-raised [&::-webkit-details-marker]:hidden">
+                            <span className="font-semibold text-success">
                               {group.title}
                             </span>
                             <span className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -317,8 +317,8 @@ const disallowedPositiveStats = useMemo(
                                   className={[
                                     "rounded-lg border px-3 py-2 text-left text-sm transition",
                                     selected
-                                      ? "border-emerald-400 bg-emerald-50 text-emerald-950"
-                                      : "bg-white hover:border-emerald-200 hover:bg-emerald-50/50",
+                                      ? "border-success bg-success/10 text-success"
+                                      : "bg-raised/60 hover:border-success/25 hover:bg-success/10",
                                   ].join(" ")}
                                   onClick={() => handleDefaultNatureSelect(nature.nature_id)}
                                 >
@@ -336,7 +336,7 @@ const disallowedPositiveStats = useMemo(
                     })}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-xs text-warning">
                     当前约束下没有可选性格。
                   </div>
                 )}
@@ -347,7 +347,7 @@ const disallowedPositiveStats = useMemo(
                 </div>
               ) : null}
               {preferredDefaultStat ? (
-                <div className="mt-1 text-xs text-emerald-700">
+                <div className="mt-1 text-xs text-success">
                   建议正修{statName(preferredDefaultStat)}，该资质至少 7。
                 </div>
               ) : null}
@@ -357,7 +357,7 @@ const disallowedPositiveStats = useMemo(
                 </span>
                 {defaultNature && talentMode === "manual" ? (
                   <button
-                    className="text-emerald-700 underline-offset-2 hover:underline"
+                    className="text-success underline-offset-2 hover:underline"
                     type="button"
                     onClick={() => {
                       setDefaultTalents((current) =>
@@ -407,11 +407,11 @@ const disallowedPositiveStats = useMemo(
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+              <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
                 保存后显示默认六维面板，仅用于展示。
               </div>
             )}
-            <div className="rounded-xl border bg-slate-50 p-3">
+            <div className="rounded-xl border bg-raised/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">热门血脉</span>
                 <Badge variant={recommendedBloodlines.length ? "success" : "outline"}>
@@ -440,12 +440,12 @@ const disallowedPositiveStats = useMemo(
               {updateDefaultConfigMutation.isPending ? "保存并刷新理论伤害中..." : "保存默认配置"}
             </Button>
             {updateDefaultConfigMutation.isPending ? (
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-sky-700">
+              <div className="rounded-xl border border-info/25 bg-info/10 p-2 text-xs text-info">
                 正在用新的默认配置重算工作台理论伤害，刷新完成前会隐藏旧伤害数值。
               </div>
             ) : null}
             {updateDefaultConfigMutation.error ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+              <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-2 text-xs text-destructive">
                 保存失败：{String(updateDefaultConfigMutation.error.message ?? "unknown error")}
               </div>
             ) : null}
@@ -453,11 +453,11 @@ const disallowedPositiveStats = useMemo(
         </div>
 
         <details
-          className="rounded-xl border bg-slate-50 p-3 text-sm"
+          className="rounded-xl border bg-raised/60 p-3 text-sm"
           open={advancedOpen}
           onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
         >
-          <summary className="cursor-pointer text-xs font-medium text-slate-700">
+          <summary className="cursor-pointer text-xs font-medium text-foreground/80">
             高级信息：推导范围 / evidence
           </summary>
           <div className="mt-3 space-y-3">
@@ -467,7 +467,7 @@ const disallowedPositiveStats = useMemo(
               <Metric label="技能" value={estimate?.confirmed_skill_ids?.length ?? 0} />
             </div>
 
-            <div className="rounded-xl border bg-white p-3">
+            <div className="rounded-xl border bg-raised/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold">实时推导范围</div>
                 <Badge variant={constraintItems.length > 0 ? "success" : "outline"}>
@@ -486,13 +486,13 @@ const disallowedPositiveStats = useMemo(
                 </div>
               )}
               {estimate?.unknown_factors?.length ? (
-                <div className="mt-2 rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
+                <div className="mt-2 rounded-xl border bg-raised/60 p-2 text-xs text-muted-foreground">
                   未确定因素：{estimate.unknown_factors.slice(-4).join("；")}
                 </div>
               ) : null}
             </div>
 
-            <div className="rounded-xl border bg-white p-3">
+            <div className="rounded-xl border bg-raised/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold">最近 evidence</div>
                 <Badge variant="outline">estimate</Badge>
@@ -548,7 +548,7 @@ function EvidenceItem({ item }: { item: Record<string, unknown> }) {
   const unknownFactors = Array.isArray(item.unknown_factors) ? item.unknown_factors : [];
   const summary = typeof explanation?.summary === "string" ? explanation.summary : null;
   return (
-    <div className="rounded-xl border bg-slate-50 p-2 text-xs">
+    <div className="rounded-xl border bg-raised/60 p-2 text-xs">
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-medium">{String(item.observation_type ?? "observation")}</span>
         <Badge variant={badgeVariant}>{formatConstraintStatus(confidence)}</Badge>
@@ -559,7 +559,7 @@ function EvidenceItem({ item }: { item: Record<string, unknown> }) {
         <span>推导 {formatEvidenceValue(item.inferred_stats)}</span>
         <span>未知 {unknownFactors.length}</span>
       </div>
-      {summary ? <div className="mt-1 text-slate-700">{summary}</div> : null}
+      {summary ? <div className="mt-1 text-foreground/80">{summary}</div> : null}
       {formula ? (
         <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
           <span>公式 {String(formula.type ?? "--")}</span>
@@ -581,12 +581,12 @@ function EvidenceItem({ item }: { item: Record<string, unknown> }) {
       {constraintChanges.length ? <ConstraintChangeExplanation changes={constraintChanges} /> : null}
       {conflict ? <ConflictExplanation conflict={conflict} /> : null}
       {whyNoConstraint.length ? (
-        <div className="mt-1 truncate text-amber-700">
+        <div className="mt-1 truncate text-warning">
           未收窄：{whyNoConstraint.slice(0, 3).join("；")}
         </div>
       ) : null}
       {unknownFactors.length ? (
-        <div className="mt-1 truncate text-amber-700">
+        <div className="mt-1 truncate text-warning">
           未知：{unknownFactors.slice(0, 3).map(String).join("；")}
         </div>
       ) : null}
@@ -620,7 +620,7 @@ function ModifierExplanation({ modifiers }: { modifiers: Record<string, unknown>
   const lines = buildModifierExplanationLines(modifiers);
   if (lines.length === 0) return null;
   return (
-    <div className="mt-2 space-y-1 rounded-lg border bg-white p-2 text-slate-700">
+    <div className="mt-2 space-y-1 rounded-lg border bg-raised/60 p-2 text-foreground/80">
       {lines.map((line) => (
         <div key={line}>{line}</div>
       ))}
@@ -640,7 +640,7 @@ function ConstraintChangeExplanation({ changes }: { changes: Record<string, unkn
     .filter((line): line is string => Boolean(line));
   if (lines.length === 0) return null;
   return (
-    <div className="mt-2 space-y-1 rounded-lg border bg-white p-2 text-slate-700">
+    <div className="mt-2 space-y-1 rounded-lg border bg-raised/60 p-2 text-foreground/80">
       {lines.slice(0, 4).map((line) => (
         <div key={line}>{line}</div>
       ))}
@@ -655,7 +655,7 @@ function ConflictExplanation({ conflict }: { conflict: Record<string, unknown> }
   const statKey = asString(first.stat_key);
   const reason = asString(first.reason);
   return (
-    <div className="mt-1 text-red-700">
+    <div className="mt-1 text-destructive">
       冲突：{statKey ? statName(statKey) : "属性约束"} {reason ?? "需要人工复核"}
     </div>
   );
@@ -743,7 +743,7 @@ interface ConstraintDisplayItem {
 
 function ConstraintItem({ item }: { item: ConstraintDisplayItem }) {
   return (
-    <div className="rounded-xl border bg-slate-50 p-2 text-xs">
+    <div className="rounded-xl border bg-raised/60 p-2 text-xs">
       <div className="flex items-center justify-between gap-3">
         <span className="font-medium">{statName(item.statKey)}</span>
         <Badge variant={item.status === "formula_constraint_derived" ? "success" : "warning"}>
@@ -1129,7 +1129,7 @@ function panelRecordToStats(raw: Record<string, unknown> | null | undefined): St
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border bg-white p-3">
+    <div className="rounded-2xl border bg-raised/60 p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 text-lg font-semibold">{value}</div>
     </div>

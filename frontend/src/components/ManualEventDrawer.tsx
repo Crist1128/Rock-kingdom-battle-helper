@@ -344,7 +344,7 @@ function SkillUseForm({
         resultsMode="focus"
       />
       {comboPrefill.isCombo ? (
-        <div className="rounded-2xl border bg-slate-50 p-3 text-sm">
+        <div className="rounded-2xl border bg-raised/60 p-3 text-sm">
           <NumberField
             label="连击次数"
             value={skillHitCount}
@@ -373,28 +373,28 @@ function SkillUseForm({
           ["目标本回合切换", targetSwitchedThisTurn, setTargetSwitchedThisTurn],
         ]}
       />
-      <div className="rounded-2xl border bg-emerald-50 p-3 text-sm text-emerald-900">
+      <div className="rounded-2xl border bg-success/10 p-3 text-sm text-success">
         技能使用会记录 `skill_use` 事件；若该技能已入库结构化操作，后端会自动执行可确定的状态、天气或资源操作。
       </div>
-      <div className="rounded-2xl border bg-blue-50 p-3 text-sm text-blue-900">
+      <div className="rounded-2xl border bg-info/10 p-3 text-sm text-info">
         若这里记录的是防御/应对类技能，同回合下一次该精灵受击时，伤害事件可自动继承这条防御上下文。
       </div>
       <details
-        className="rounded-2xl border bg-amber-50 p-3 text-sm"
+        className="rounded-2xl border bg-warning/10 p-3 text-sm"
         open={statusDamageSectionOpen}
         onToggle={(event) => setStatusDamageSectionOpen(event.currentTarget.open)}
       >
-        <summary className="cursor-pointer font-medium text-amber-950">
+        <summary className="cursor-pointer font-medium text-warning">
           状态/印记结算伤害（可选）
         </summary>
         <div className="mt-3 space-y-3">
           {inferredStatusPrefill ? (
-            <div className="rounded-xl border border-amber-200 bg-white p-2 text-xs text-amber-900">
+            <div className="rounded-xl border border-warning/25 bg-raised/60 p-2 text-xs text-warning">
               已从当前技能解析到：{inferredStatusPrefill.effectId} × {inferredStatusPrefill.layers} 层，
               目标为{sideName(inferredStatusPrefill.defenderSide)}。若本次还需要录入可见扣血，勾选后会默认使用这些值。
             </div>
           ) : skillId ? (
-            <div className="rounded-xl border bg-white p-2 text-xs text-muted-foreground">
+            <div className="rounded-xl border bg-raised/60 p-2 text-xs text-muted-foreground">
               当前技能没有可自动预填的状态层数；如需记录状态伤害，请手动选择状态和层数。
             </div>
           ) : null}
@@ -429,7 +429,7 @@ function SkillUseForm({
                   <NumberMaybeField label="结算后 HP%" value={statusHpAfter} onChange={setStatusHpAfter} />
                 </div>
               ) : (
-                <div className="rounded-xl border bg-white p-2 text-xs text-muted-foreground">
+                <div className="rounded-xl border bg-raised/60 p-2 text-xs text-muted-foreground">
                   我方受状态伤害时会按当前精确 HP 直接扣减；敌方受伤时可额外填前后 HP% 用于反推生命资质。
                 </div>
               )}
@@ -442,11 +442,11 @@ function SkillUseForm({
                 <span>写入实时面板估计观察</span>
               </label>
               <NumberField label="伤害容差" value={statusDamageTolerance} onChange={setStatusDamageTolerance} />
-              <div className="text-xs text-amber-900">
+              <div className="text-xs text-warning">
                 这里会先记录状态技能已发动，再追加一条 `formula_type=status` 的状态伤害事件；灼烧/中毒会由后端按状态规则计算克制或抵抗倍率，棘刺等真实伤害按各自状态定义处理。
               </div>
               {selectedStatusEffect ? (
-                <div className="rounded-xl border bg-white p-2 text-xs text-slate-700">
+                <div className="rounded-xl border bg-raised/60 p-2 text-xs text-foreground/80">
                   {statusLayerSummary.hasStructuredRule ? (
                     <div>
                       规则：{statusLayerSummary.ruleTexts.join("；")}；当前：{statusLayerSummary.layerText}，最终 {statusLayerSummary.finalTexts.join("；")}
@@ -458,13 +458,13 @@ function SkillUseForm({
               ) : null}
             </div>
           ) : (
-            <div className="text-xs text-amber-900">
+            <div className="text-xs text-warning">
               如果只是施加状态、改天气或加印记，不产生本次可见扣血，保持不勾选即可。
             </div>
           )}
         </div>
       </details>
-      {mutation.error ? <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">提交失败：{String((mutation.error as Error).message)}</div> : null}
+      {mutation.error ? <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-2 text-xs text-destructive">提交失败：{String((mutation.error as Error).message)}</div> : null}
       <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="备注" />
       <SubmitButton loading={mutation.isPending} disabled={!skillId || (recordStatusDamage && (!statusEffectId || statusDamageValue <= 0))} />
     </form>
@@ -953,12 +953,12 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
         }}
         resultsMode="focus"
       />
-      <details className="rounded-2xl border bg-slate-50 p-3 text-sm">
-        <summary className="cursor-pointer font-medium text-slate-800">
+      <details className="rounded-2xl border bg-raised/60 p-3 text-sm">
+        <summary className="cursor-pointer font-medium text-foreground">
           高级覆盖：手动指定防御 / 应对上下文
         </summary>
         <div className="mt-3 space-y-3">
-          <div className="rounded-xl border bg-white p-3 text-xs text-muted-foreground">
+          <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
             正常回合流程下先在“结算本回合”记录防御动作，这里保持空白即可。只有补录旧事件、自动继承失败或调试后端应对字段时，才需要手动覆盖。
           </div>
           <SkillSearchSelect
@@ -1024,7 +1024,7 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
         <div className="grid grid-cols-2 gap-3"><NumberField label="单段伤害" value={perHitDamage} onChange={setPerHitDamage} /><NumberField label="连击次数" value={hitCount} onChange={(value) => { setHitCount(value); setHitCountManuallyEdited(true); }} /></div>
       ) : null}
       {defenderSide === "self" ? (
-        <div className="rounded-xl border bg-slate-50 p-3 text-xs text-slate-600">
+        <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
           我方受击会按当前 HP 扣减本次伤害值，不需要额外填写剩余血量。
         </div>
       ) : (
@@ -1033,7 +1033,7 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
           <NumberMaybeField label="受击后 HP%" value={hpAfter} onChange={setHpAfter} />
         </div>
       )}
-      <div className="space-y-3 rounded-2xl border bg-slate-50 p-3 text-sm">
+      <div className="space-y-3 rounded-2xl border bg-raised/60 p-3 text-sm">
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={syncObservation} onChange={(e) => setSyncObservation(e.target.checked)} />
           <span>同步写入实时面板估计观察</span>
@@ -1044,12 +1044,12 @@ function DamageForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
         </label>
         <NumberField label="伤害容差" value={damageTolerance} onChange={setDamageTolerance} />
         {syncObservation && observationPayloads.length === 0 ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+          <div className="rounded-xl border border-warning/25 bg-warning/10 p-2 text-xs text-warning">
             当前缺少可用于反推的技能、敌方目标、伤害值或面板信息，本次只会记录事件。
           </div>
         ) : null}
       </div>
-      {mutation.error ? <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">提交失败：{String((mutation.error as Error).message)}</div> : null}
+      {mutation.error ? <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-2 text-xs text-destructive">提交失败：{String((mutation.error as Error).message)}</div> : null}
       <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="备注" />
       <SubmitButton loading={mutation.isPending} />
     </form>
@@ -1249,7 +1249,7 @@ function EffectForm({ battleId, state, defaultSide, onDone }: { battleId: string
       if (!effectId) return;
       mutation.mutate();
     }}>
-      <div className="rounded-2xl border bg-slate-50 p-3 text-sm text-slate-700">
+      <div className="rounded-2xl border bg-raised/60 p-3 text-sm text-foreground/80">
         这里只用于施加、更新或修正最终状态/天气结果。灼烧、中毒、棘刺等可见扣血请在“记录状态技能已发动”的抽屉里勾选“状态/印记结算伤害”录入，避免和普通状态修正混在一起。
       </div>
       <EffectSearchSelect
@@ -1270,8 +1270,8 @@ function EffectForm({ battleId, state, defaultSide, onDone }: { battleId: string
         <NumberMaybeField label="剩余回合" value={remainingTurns} onChange={setRemainingTurns} />
       </div>
       {selectedEffect ? (
-        <div className="rounded-2xl border bg-slate-50 p-3 text-xs text-slate-700">
-          <div className="font-medium text-slate-900">层数预览</div>
+        <div className="rounded-2xl border bg-raised/60 p-3 text-xs text-foreground/80">
+          <div className="font-medium text-foreground">层数预览</div>
           {layerSummary.hasStructuredRule ? (
             <div className="mt-1 space-y-1">
               <div>规则：{layerSummary.ruleTexts.join("；")}</div>
@@ -1307,7 +1307,7 @@ function SwitchForm({ battleId, state, defaultSide, plannedAction, onDone }: { b
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
       <SideSelect label="切换方" value={side} onChange={(v) => { setSide(v); setElfId(""); }} />
       <div><label className="text-sm font-medium">新上场精灵</label><Select value={elfId} onChange={(e) => setElfId(e.target.value)}>{candidates.map((elf) => <option key={elf.elf_id} value={elf.elf_id}>{elf.elf_name ?? elf.elf_id}</option>)}</Select></div>
-      <div className="rounded-2xl border bg-amber-50 p-3 text-sm text-amber-900">切换会由后端处理 clear_on_switch 状态：可切换清除的状态失效，不可清除的状态保留。</div>
+      <div className="rounded-2xl border bg-warning/10 p-3 text-sm text-warning">切换会由后端处理 clear_on_switch 状态：可切换清除的状态失效，不可清除的状态保留。</div>
       <SubmitButton loading={mutation.isPending} disabled={!elfId} />
     </form>
   );
@@ -1342,7 +1342,7 @@ function ConditionFlagGroup({
   flags: Array<[string, boolean, (value: boolean) => void]>;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-2 rounded-2xl border bg-slate-50 p-3 text-sm sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-2 rounded-2xl border bg-raised/60 p-3 text-sm sm:grid-cols-2">
       {flags.map(([label, checked, onChange]) => (
         <label key={label} className="flex items-center gap-2">
           <input

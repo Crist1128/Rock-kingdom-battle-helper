@@ -633,7 +633,7 @@ export function DamageCalculatorPage() {
 
       <Card>
         <CardContent className="p-2">
-          <div className="grid gap-2 rounded-2xl bg-slate-100 p-1 md:grid-cols-3">
+          <div className="grid gap-2 rounded-2xl bg-raised p-1 md:grid-cols-3">
             <ModeTabButton
               active={mode === "calculate"}
               title="单纯计算伤害"
@@ -667,17 +667,17 @@ export function DamageCalculatorPage() {
 
       {formError ? <ValidationAlert message={formError} /> : null}
       {calculateMutation.error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {calculateMutation.error instanceof Error ? calculateMutation.error.message : "计算失败"}
         </div>
       ) : null}
       {inferMutation.error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {inferMutation.error instanceof Error ? inferMutation.error.message : "反推失败"}
         </div>
       ) : null}
       {inferAttackerMutation.error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {inferAttackerMutation.error instanceof Error ? inferAttackerMutation.error.message : "反推攻击方失败"}
         </div>
       ) : null}
@@ -720,7 +720,10 @@ export function DamageCalculatorPage() {
 
       <form className="grid gap-6 xl:grid-cols-[1fr_420px]" onSubmit={submit}>
         <div className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="relative grid gap-6 lg:grid-cols-2">
+            <span className="font-num pointer-events-none absolute left-1/2 top-1/2 z-10 hidden h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-[11px] font-bold tracking-widest text-muted-foreground shadow-lg lg:flex">
+              VS
+            </span>
             <ParticipantCard
               title={attackerTitle}
               form={attacker}
@@ -754,21 +757,21 @@ export function DamageCalculatorPage() {
                 }}
               />
               {latestSkillIds.length > 0 ? (
-                <div className="rounded-xl border bg-slate-50 p-3 text-xs text-slate-600">
+                <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
                   最近战斗中该攻击方已记录技能：{latestSkillIds.map(compactId).join("、")}
                 </div>
               ) : null}
               {effectiveSkill ? (
-                <div className="rounded-xl border bg-white p-3 text-sm">
+                <div className="rounded-xl border bg-raised/60 p-3 text-sm">
                   <div className="font-medium">{effectiveSkill.skill_name}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {effectiveSkill.element_type} / {skillCategoryName(effectiveSkill.skill_category)} / 威力 {effectiveSkill.base_power ?? "—"} / 能耗 {effectiveSkill.base_energy_cost}
                   </div>
-                  {effectiveSkill.raw_description ? <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-700">{effectiveSkill.raw_description}</div> : null}
+                  {effectiveSkill.raw_description ? <div className="mt-2 rounded-lg bg-raised/60 p-2 text-xs text-foreground/80">{effectiveSkill.raw_description}</div> : null}
                 </div>
               ) : null}
 
-              <div className="rounded-2xl border bg-slate-50 p-4">
+              <div className="rounded-2xl border bg-raised/60 p-4">
                 <div className="text-sm font-semibold">状态类修正</div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   会按当前技能类别只展示相关攻防修正；物理技能读取物攻/物防，魔法技能读取魔攻/魔防。技能威力层数、自填技能威力和连击数也放在这里统一处理。
@@ -800,7 +803,7 @@ export function DamageCalculatorPage() {
                 <NumberField label="本系倍率覆盖" value={modifiers.stab_multiplier} onChange={(value) => updateModifier("stab_multiplier", value)} placeholder="按技能/精灵预填" />
                 <NumberField label="克制倍率覆盖" value={modifiers.type_multiplier} onChange={(value) => updateModifier("type_multiplier", value)} placeholder="按技能/目标预填" />
               </div>
-              <details className="rounded-xl border bg-white p-3 text-sm">
+              <details className="rounded-xl border bg-raised/60 p-3 text-sm">
                 <summary className="cursor-pointer font-medium">高级公式覆盖</summary>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                   <NumberField label="固定威力修正" value={modifiers.flat_power_bonus} onChange={(value) => updateModifier("flat_power_bonus", value)} placeholder="一般用威力层数" />
@@ -812,7 +815,7 @@ export function DamageCalculatorPage() {
               <div className="grid gap-3 md:grid-cols-1">
                 <label className="space-y-1 text-sm">
                   <span className="font-medium">减伤比例</span>
-                  <div className="flex overflow-hidden rounded-xl border bg-white focus-within:ring-2 focus-within:ring-ring">
+                  <div className="flex overflow-hidden rounded-xl border bg-raised/60 focus-within:ring-2 focus-within:ring-ring">
                     <Input className="border-0 focus:ring-0" value={modifiers.damage_reductions} onChange={(event) => updateModifier("damage_reductions", event.target.value)} placeholder="例如 90, 75" />
                     <span className="flex items-center px-3 text-sm text-muted-foreground">%</span>
                   </div>
@@ -845,7 +848,7 @@ export function DamageCalculatorPage() {
                 ) : null}
                 {mode === "infer_defender" ? (
                   <div className="space-y-4">
-                    <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+                    <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
                       反推防御方配置必须同时填写真实伤害和受击前后血量百分比；否则无法同时约束 HP 资质和防御资质。
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -873,7 +876,7 @@ export function DamageCalculatorPage() {
                 ) : null}
                 {mode === "infer_attacker" ? (
                   <div className="space-y-4">
-                    <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+                    <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
                       反推攻击方时，左侧“敌方攻击方”只需要选择精灵；右侧“己方防御方”建议从最近战斗导入己方面板或填写性格资质。
                     </div>
                     <label className="block space-y-1 text-sm">
@@ -910,7 +913,7 @@ function ValidationAlert({ message, compact = false }: { message: string; compac
   const items = lines.slice(1).map((line) => line.replace(/^- /, ""));
   return (
     <div
-      className={`rounded-2xl border border-red-200 bg-red-50 text-sm text-red-900 ${
+      className={`rounded-2xl border border-destructive/25 bg-destructive/10 text-sm text-destructive ${
         compact ? "px-3 py-2" : "px-4 py-3"
       }`}
     >
@@ -942,8 +945,8 @@ function ModeTabButton({
       type="button"
       className={`rounded-xl px-4 py-3 text-left transition-all duration-300 ${
         active
-          ? "bg-white text-primary shadow-sm ring-1 ring-primary/10"
-          : "text-muted-foreground hover:bg-white/70"
+          ? "bg-raised/60 text-primary shadow-sm ring-1 ring-primary/10"
+          : "text-muted-foreground hover:bg-raised/60/70"
       }`}
       onClick={onClick}
     >
@@ -988,7 +991,7 @@ function BattleImportSelect({
         </div>
       )}
       {selected ? (
-        <div className="flex items-center gap-3 rounded-xl border bg-slate-50 p-3 text-sm">
+        <div className="flex items-center gap-3 rounded-xl border bg-raised/60 p-3 text-sm">
           <AvatarImage src={selected.avatar ?? undefined} alt={selected.elf_name} fallback={selected.elf_name} className="h-10 w-10" />
           <div className="min-w-0">
             <div className="truncate font-medium">{selected.elf_name}</div>
@@ -1074,7 +1077,7 @@ function ParticipantCard({
           }
         />
         {form.panel_stats ? (
-          <label className="flex items-start gap-2 rounded-xl border bg-slate-50 p-3 text-sm">
+          <label className="flex items-start gap-2 rounded-xl border bg-raised/60 p-3 text-sm">
             <input
               className="mt-1"
               type="checkbox"
@@ -1171,10 +1174,12 @@ function TalentSelect({
 function ResultPanel({ result }: { result: Awaited<ReturnType<typeof api.damageCalculator.calculate>> }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border bg-primary/5 p-4">
-        <div className="text-sm text-muted-foreground">预计伤害</div>
-        <div className="mt-1 text-3xl font-bold">{result.damage_value ?? "无法计算"}</div>
-        <div className="mt-1 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <div className="text-xs font-medium tracking-wide text-muted-foreground">预计伤害</div>
+        <div className="font-num mt-1 bg-gradient-to-r from-primary to-info bg-clip-text text-4xl font-bold text-transparent">
+          {result.damage_value ?? "--"}
+        </div>
+        <div className="font-num mt-1 text-xs text-muted-foreground">
           {result.damage_percent !== null && result.damage_percent !== undefined ? `约 ${result.damage_percent}% 最大生命` : "缺少目标生命或公式上下文"}
         </div>
       </div>
@@ -1186,7 +1191,7 @@ function ResultPanel({ result }: { result: Awaited<ReturnType<typeof api.damageC
         <InfoRow label="防御方面板" value={panelText(result.defender.panel_stats)} />
       </div>
       {result.observed_comparison ? (
-        <div className="rounded-xl border bg-white p-3 text-sm">
+        <div className="rounded-xl border bg-raised/60 p-3 text-sm">
           <div className="font-medium">真实伤害对比</div>
           <div className="mt-1 text-muted-foreground">
             真实 {result.observed_comparison.observed_damage_value}，偏差 {result.observed_comparison.delta_value ?? "—"}
@@ -1196,18 +1201,18 @@ function ResultPanel({ result }: { result: Awaited<ReturnType<typeof api.damageC
         </div>
       ) : null}
       {result.unknown_factors.length > 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">
           未知因素：{result.unknown_factors.join("、")}
         </div>
       ) : null}
       {result.missing_parts.length > 0 ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+        <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
           缺失上下文：{result.missing_parts.join("、")}
         </div>
       ) : null}
-      <details className="rounded-xl border bg-white p-3 text-sm">
+      <details className="rounded-xl border bg-raised/60 p-3 text-sm">
         <summary className="cursor-pointer font-medium">倍率与解释链</summary>
-        <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-50">
+        <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-card p-3 text-xs text-foreground">
           {JSON.stringify({ multipliers: result.multipliers, explanation: result.explanation }, null, 2)}
         </pre>
       </details>
@@ -1257,21 +1262,21 @@ function InferencePanel({
   }, [natureById, result.candidates]);
 
   return (
-    <div className="space-y-3 rounded-2xl border bg-white p-4">
+    <div className="space-y-3 rounded-2xl border bg-raised/60 p-4">
       <div>
         <div className="font-semibold">防御方配置候选</div>
         <div className="mt-1 text-xs text-muted-foreground">
           已枚举 {result.searched_candidate_count} 个候选，返回 {result.returned_candidate_count} 个命中候选；观察扣血 {result.observed_hp_percent_delta ?? "—"}%。
         </div>
         {result.candidates.length > 0 ? (
-          <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+          <div className="mt-2 rounded-xl border border-info/20 bg-info/10 px-3 py-2 text-xs text-info">
             已按正面性格分成 {groups.length} 类，默认全部收起。请点开某一类查看具体性格和三维资质。
           </div>
         ) : null}
       </div>
       <CandidateTalentSummary candidates={result.candidates} />
       {result.candidates.length === 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">
           没有找到同时满足伤害值和受击前后血量百分比的候选。请检查攻击方面板、技能威力/层数、克制、本系、天气、减伤和连击等修正项。
         </div>
       ) : null}
@@ -1279,11 +1284,11 @@ function InferencePanel({
         {groups.map((group) => {
           const best = group.candidates[0];
           return (
-            <details key={group.key} className="overflow-hidden rounded-2xl border bg-slate-50">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b bg-white px-4 py-3 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+            <details key={group.key} className="overflow-hidden rounded-2xl border bg-raised/60">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b bg-raised/60 px-4 py-3 transition hover:bg-raised/60 [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-emerald-700">{group.title}</span>
+                    <span className="font-semibold text-success">{group.title}</span>
                     <Badge variant="outline">{group.candidates.length} 个候选</Badge>
                     {best ? <Badge variant="success">最优 #{best.rank}</Badge> : null}
                   </div>
@@ -1307,7 +1312,7 @@ function InferencePanel({
           );
         })}
       </div>
-      <details className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+      <details className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
         <summary className="cursor-pointer font-medium text-foreground">反推假设</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           {result.assumptions.map((item) => (
@@ -1361,21 +1366,21 @@ function AttackerInferencePanel({
   }, [natureById, result.candidates]);
 
   return (
-    <div className="space-y-3 rounded-2xl border bg-white p-4">
+    <div className="space-y-3 rounded-2xl border bg-raised/60 p-4">
       <div>
         <div className="font-semibold">攻击方配置候选</div>
         <div className="mt-1 text-xs text-muted-foreground">
           已枚举 {result.searched_candidate_count} 个候选，返回 {result.returned_candidate_count} 个命中候选；本技能读取 {statName(result.relevant_attack_stat)}。
         </div>
         {result.candidates.length > 0 ? (
-          <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+          <div className="mt-2 rounded-xl border border-info/20 bg-info/10 px-3 py-2 text-xs text-info">
             候选会标记“是否为 {statName(result.relevant_attack_stat)}+ 性格”和“是否点了 {statName(result.relevant_attack_stat)} 资质”。
           </div>
         ) : null}
       </div>
       <CandidateTalentSummary candidates={result.candidates} />
       {result.candidates.length === 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-sm text-warning">
           没有找到与真实伤害完全一致的攻击方候选。请检查己方防御面板、敌方技能、技能威力、克制、本系、天气、减伤和连击等修正项。
         </div>
       ) : null}
@@ -1383,11 +1388,11 @@ function AttackerInferencePanel({
         {groups.map((group) => {
           const best = group.candidates[0];
           return (
-            <details key={group.key} className="overflow-hidden rounded-2xl border bg-slate-50">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b bg-white px-4 py-3 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+            <details key={group.key} className="overflow-hidden rounded-2xl border bg-raised/60">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-b bg-raised/60 px-4 py-3 transition hover:bg-raised/60 [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-emerald-700">{group.title}</span>
+                    <span className="font-semibold text-success">{group.title}</span>
                     <Badge variant="outline">{group.candidates.length} 个候选</Badge>
                     {best ? <Badge variant="success">最优 #{best.rank}</Badge> : null}
                   </div>
@@ -1411,7 +1416,7 @@ function AttackerInferencePanel({
           );
         })}
       </div>
-      <details className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+      <details className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
         <summary className="cursor-pointer font-medium text-foreground">反推假设</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           {result.assumptions.map((item) => (
@@ -1462,7 +1467,7 @@ function CandidateTalentSummary({ candidates }: { candidates: TalentCandidateLik
       : "暂无所有候选共同点的资质";
 
   return (
-    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-950">
+    <div className="rounded-2xl border border-success/15 bg-success/10 p-3 text-xs text-success">
       <div className="font-semibold">候选资质统计</div>
       <div className="mt-1">所有候选都点了：{allPositiveText}</div>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -1482,7 +1487,7 @@ function CandidateCard({
   candidate: DamageCalculatorInferDefenderOut["candidates"][number];
 }) {
   return (
-    <div className="rounded-xl border bg-white p-3 text-sm shadow-sm">
+    <div className="rounded-xl border bg-raised/60 p-3 text-sm shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -1494,7 +1499,7 @@ function CandidateCard({
               .map((key) => ({ key, value: Number(candidate.individual_talent_distribution[key] ?? 0) }))
               .filter((item) => item.value > 0)
               .map((item) => (
-                <Badge key={item.key} variant="secondary" className="bg-slate-100 text-slate-700">
+                <Badge key={item.key} variant="secondary" className="bg-raised text-foreground/80">
                   {statName(item.key)} {item.value}
                 </Badge>
               ))}
@@ -1509,7 +1514,7 @@ function CandidateCard({
           : ""}
       </div>
       {candidate.unknown_factors.length > 0 ? (
-        <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+        <div className="mt-2 rounded-lg bg-warning/10 px-2 py-1 text-xs text-warning">
           未知因素：{candidate.unknown_factors.join("、")}
         </div>
       ) : null}
@@ -1523,7 +1528,7 @@ function AttackerCandidateCard({
   candidate: DamageCalculatorInferAttackerOut["candidates"][number];
 }) {
   return (
-    <div className="rounded-xl border bg-white p-3 text-sm shadow-sm">
+    <div className="rounded-xl border bg-raised/60 p-3 text-sm shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -1541,7 +1546,7 @@ function AttackerCandidateCard({
               .map((key) => ({ key, value: Number(candidate.individual_talent_distribution[key] ?? 0) }))
               .filter((item) => item.value > 0)
               .map((item) => (
-                <Badge key={item.key} variant="secondary" className="bg-slate-100 text-slate-700">
+                <Badge key={item.key} variant="secondary" className="bg-raised text-foreground/80">
                   {statName(item.key)} {item.value}
                 </Badge>
               ))}
@@ -1553,7 +1558,7 @@ function AttackerCandidateCard({
         预测伤害 {candidate.predicted_damage_value ?? "无法计算"}
       </div>
       {candidate.unknown_factors.length > 0 ? (
-        <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+        <div className="mt-2 rounded-lg bg-warning/10 px-2 py-1 text-xs text-warning">
           未知因素：{candidate.unknown_factors.join("、")}
         </div>
       ) : null}
@@ -1563,7 +1568,7 @@ function AttackerCandidateCard({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3 rounded-xl border bg-white px-3 py-2">
+    <div className="flex justify-between gap-3 rounded-xl border bg-raised/60 px-3 py-2">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right font-medium">{value}</span>
     </div>

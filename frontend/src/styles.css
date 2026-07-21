@@ -2,27 +2,107 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * 双主题设计 tokens。
+ * 浅色为 :root 默认，深色挂在 .dark 下（由 index.html 内联脚本或主题开关切换）。
+ * 背景三层：base（页面底）< card（面板）< raised（悬浮层）。
+ * 对抗色：--self 青 / --enemy 红，全局表达我方与敌方。
+ */
 :root {
-  --background: 220 20% 98%;
+  color-scheme: light;
+  --background: 210 40% 98%;
   --foreground: 222 47% 11%;
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
-  --primary: 222 84% 48%;
-  --primary-foreground: 210 40% 98%;
+  --raised: 214 32% 93%;
+  --primary: 191 91% 36%;
+  --primary-foreground: 0 0% 100%;
   --muted: 214 32% 91%;
   --muted-foreground: 215 16% 47%;
-  --border: 214 32% 88%;
-  --input: 214 32% 88%;
-  --ring: 222 84% 48%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --border: 214 32% 86%;
+  --input: 214 28% 80%;
+  --ring: 191 91% 36%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --self: 191 91% 36%;
+  --enemy: 349 76% 54%;
+  --success: 160 84% 30%;
+  --warning: 28 92% 38%;
+  --info: 217 91% 55%;
+  --accentv: 262 83% 58%;
+  --accenti: 239 84% 60%;
+
+  /* 系别专属色（浅色底加深版） */
+  --el-normal: #64748b;
+  --el-fire: #ea580c;
+  --el-water: #0284c7;
+  --el-grass: #16a34a;
+  --el-electric: #ca8a04;
+  --el-ice: #0891b2;
+  --el-wing: #3b82f6;
+  --el-mechanical: #6b7280;
+  --el-earth: #a16207;
+  --el-ghost: #7c3aed;
+  --el-dragon: #4f46e5;
+  --el-dark: #c026d3;
+  --el-fighting: #dc2626;
+  --el-poison: #65a30d;
+  --el-light: #b45309;
+  --el-cute: #db2777;
+  --el-illusion: #0d9488;
+  --el-bug: #4d7c0f;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: 222 48% 5%;
+  --foreground: 213 33% 94%;
+  --card: 219 42% 9%;
+  --card-foreground: 213 33% 94%;
+  --raised: 220 40% 13%;
+  --primary: 188 86% 53%;
+  --primary-foreground: 222 47% 8%;
+  --muted: 219 34% 15%;
+  --muted-foreground: 215 18% 62%;
+  --border: 217 28% 17%;
+  --input: 217 28% 20%;
+  --ring: 188 86% 53%;
+  --destructive: 0 84% 66%;
+  --destructive-foreground: 0 0% 100%;
+  --self: 188 86% 53%;
+  --enemy: 351 89% 71%;
+  --success: 158 64% 52%;
+  --warning: 43 96% 56%;
+  --info: 217 91% 68%;
+  --accentv: 262 83% 74%;
+  --accenti: 239 84% 76%;
+
+  /* 系别专属色（深色底亮色版） */
+  --el-normal: #9aa7bd;
+  --el-fire: #fb923c;
+  --el-water: #38bdf8;
+  --el-grass: #4ade80;
+  --el-electric: #fbbf24;
+  --el-ice: #a5f3fc;
+  --el-wing: #93c5fd;
+  --el-mechanical: #9ca3af;
+  --el-earth: #d4a373;
+  --el-ghost: #a78bfa;
+  --el-dragon: #818cf8;
+  --el-dark: #e879f9;
+  --el-fighting: #ef4444;
+  --el-poison: #a3e635;
+  --el-light: #fef08a;
+  --el-cute: #f9a8d4;
+  --el-illusion: #5eead4;
+  --el-bug: #d9f99d;
 }
 
 * { border-color: hsl(var(--border)); }
+
 body {
   margin: 0;
-  min-width: 1280px;
-  background: hsl(var(--background));
+  background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   /*
    * 中文 UI 文案较多，显式加入常见中文字体。
@@ -42,6 +122,15 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 深空底色光晕只在深色主题出现 */
+.dark body {
+  background-image:
+    radial-gradient(1200px 600px at 85% -10%, hsl(217 60% 12% / 0.55), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, hsl(188 70% 10% / 0.4), transparent 55%);
+  background-attachment: fixed;
 }
 
 button,
@@ -51,6 +140,44 @@ select {
   font: inherit;
 }
 
+::selection {
+  background: hsl(var(--primary) / 0.28);
+}
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); background-clip: content-box; }
+
+@layer utilities {
+  /* 数字、ID、伤害值统一等宽字体 + 表格数字，营造 HUD 仪表感 */
+  .font-num {
+    font-family: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  /* 玻璃面板 */
+  .glass {
+    background: hsl(var(--card) / 0.72);
+    backdrop-filter: blur(12px);
+  }
+  /* 主色微发光 */
+  .glow-primary {
+    box-shadow: 0 0 24px hsl(var(--primary) / 0.16);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

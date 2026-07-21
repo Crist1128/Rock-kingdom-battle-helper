@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { compactId, phaseName } from "@/lib/utils";
+import { compactId, cn, phaseName } from "@/lib/utils";
+import { useConfirm } from "@/components/ui/confirm";
+import { useToast } from "@/components/ui/toast";
 import { useAppStore } from "@/store/useAppStore";
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { toast } = useToast();
   const [battleName, setBattleName] = useState(`PVP ${new Date().toLocaleDateString()}`);
   const [notes, setNotes] = useState("");
   const [manualBattleId, setManualBattleId] = useState("");
@@ -58,7 +62,7 @@ export function DashboardPage() {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "归档失败";
-      window.alert(`移除战斗失败：${message}`);
+      toast(`移除战斗失败：${message}`, "error");
     },
   });
 
@@ -77,14 +81,17 @@ export function DashboardPage() {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "批量归档失败";
-      window.alert(`批量移除战斗失败：${message}`);
+      toast(`批量移除战斗失败：${message}`, "error");
     },
   });
 
-  const removeBattle = (battleId: string) => {
-    if (!window.confirm("确认从最近战斗中移除？该操作会归档战斗，但不会删除历史事件和实时估计数据。")) {
-      return;
-    }
+  const removeBattle = async (battleId: string) => {
+    const confirmed = await confirm({
+      title: "移除战斗",
+      description: "该操作会归档战斗，但不会删除历史事件和实时估计数据。",
+      confirmText: "移除",
+    });
+    if (!confirmed) return;
     if (battlesQuery.data) {
       archiveBattle.mutate(battleId);
       return;
@@ -95,11 +102,15 @@ export function DashboardPage() {
     }
   };
 
-  const removeAllBattles = () => {
+  const removeAllBattles = async () => {
     if (displayedBattles.length === 0) return;
-    if (!window.confirm("确认移除全部最近战斗？后端战斗会被归档，历史事件和实时估计数据仍会保留。")) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "移除全部最近战斗",
+      description: "后端战斗会被归档，历史事件和实时估计数据仍会保留。",
+      confirmText: "全部移除",
+      danger: true,
+    });
+    if (!confirmed) return;
     const battleIds = displayedBattles.map((battle) => battle.battle_id);
     if (battlesQuery.data) {
       archiveAllBattles.mutate(battleIds);
@@ -177,18 +188,35 @@ export function DashboardPage() {
               <Input value={manualBattleId} onChange={(e) => setManualBattleId(e.target.value)} placeholder="手动输入 battle_id" />
               <Button variant="outline" type="submit">添加</Button>
             </form>
-            {displayedBattles.length === 0 ? <div className="rounded-2xl border bg-slate-50 p-4 text-sm text-muted-foreground">暂无战斗记录。</div> : null}
-            {battlesQuery.isError ? <div className="rounded-2xl border bg-amber-50 p-3 text-sm text-amber-900">后端战斗列表读取失败，已显示本地记录。</div> : null}
+            {displayedBattles.length === 0 ? <div className="rounded-2xl border bg-raised/60 p-4 text-sm text-muted-foreground">暂无战斗记录。</div> : null}
+            {battlesQuery.isError ? <div className="rounded-2xl border bg-warning/10 p-3 text-sm text-warning">后端战斗列表读取失败，已显示本地记录。</div> : null}
             {displayedBattles.map((battle) => (
-              <div key={battle.battle_id} className="flex items-center justify-between rounded-2xl border bg-white p-4">
-                <div>
-                  <div className="font-medium">{battle.battle_name ?? compactId(battle.battle_id)}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">{battle.battle_id}</div>
-                  <div className="mt-2 flex gap-2"><Badge variant="outline">{phaseName(battle.phase)}</Badge><Badge variant="secondary">{battle.updated_at ? new Date(battle.updated_at).toLocaleString() : "暂无更新时间"}</Badge></div>
+              <div
+                key={battle.battle_id}
+                className="group flex items-center gap-3 rounded-lg border border-transparent bg-raised/40 px-3 py-2.5 transition-colors hover:border-border hover:bg-raised"
+              >
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 shrink-0 rounded-full",
+                    battle.phase === "battle"
+                      ? "bg-success shadow-glow-sm"
+                      : battle.phase === "preparation"
+                        ? "bg-warning"
+                        : "bg-muted-foreground/50",
+                  )}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{battle.battle_name ?? compactId(battle.battle_id)}</div>
+                  <div className="font-num mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {compactId(battle.battle_id)}
+                    {battle.updated_at ? ` · ${new Date(battle.updated_at).toLocaleString()}` : ""}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => openBattle(battle.battle_id)}>进入</Button>
+                <Badge variant="outline" className="shrink-0">{phaseName(battle.phase)}</Badge>
+                <div className="flex shrink-0 gap-1.5">
+                  <Button size="sm" onClick={() => openBattle(battle.battle_id)}>进入</Button>
                   <Button
+                    size="sm"
                     variant="ghost"
                     disabled={archiveBattle.isPending}
                     onClick={() => removeBattle(battle.battle_id)}
@@ -214,7 +242,7 @@ export function DashboardPage() {
 
 function QuickLink({ to, title, desc }: { to: string; title: string; desc: string }) {
   return (
-    <Link to={to} className="rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <Link to={to} className="rounded-2xl border bg-raised/60 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="font-semibold">{title}</div>
       <div className="mt-1 text-sm text-muted-foreground">{desc}</div>
     </Link>

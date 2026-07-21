@@ -253,7 +253,7 @@ function SearchSelectShell({
         placeholder={placeholder}
       />
       {showResults ? (
-        <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border bg-white p-1">
+        <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border bg-raised/60 p-1">
           {loading ? <div className="px-3 py-2 text-sm text-muted-foreground">加载中...</div> : children}
           {!loading ? (
             <div className="mt-1 grid grid-cols-2 gap-1">

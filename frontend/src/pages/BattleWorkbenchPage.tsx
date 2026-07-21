@@ -10,12 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ElfSearchSelect, SkillSearchSelect } from "@/components/EntitySearchSelect";
 import { ElfCard } from "@/components/ElfCard";
+import { EnergyPips } from "@/components/EnergyPips";
 import { StatGrid } from "@/components/StatGrid";
 import { EstimatePanel, type EstimatePanelSelection } from "@/components/EstimatePanel";
 import { EventTimeline } from "@/components/EventTimeline";
 import { ActiveEffectsPanel } from "@/components/ActiveEffectsPanel";
 import { ManualEventDrawer } from "@/components/ManualEventDrawer";
 import { HealthBar } from "@/components/HealthBar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useConfirm } from "@/components/ui/confirm";
+import { useToast } from "@/components/ui/toast";
 import { cn, elementTypeName, phaseName, sideName, skillCategoryName } from "@/lib/utils";
 import type { BattleEffectInstanceDict, BattleElfStateDict, BattleEventOut, BattleSkillSlotDict, BattleSpeedPreview, DamageEventCreateResult, ElfEvolutionStageOut, EndTurnResult, Side, SkillDefinitionOut, SpeedPreviewRow, SpeedPreviewTarget, StatBlock } from "@/types/api";
 
@@ -55,6 +59,8 @@ function createEmptyActions(): PlannedActions {
 
 export function BattleWorkbenchPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { toast } = useToast();
   const { currentBattleId, openDrawer, setEstimatePanelElfId, estimatePanelElfId } = useAppStore();
   const [lastEndTurnResult, setLastEndTurnResult] = useState<EndTurnResult | null>(null);
   const [lastSkillEvent, setLastSkillEvent] = useState<BattleEventOut | null>(null);
@@ -151,26 +157,42 @@ export function BattleWorkbenchPage() {
       queryClient.invalidateQueries({ queryKey: ["enemy-estimate-evidence"] });
     },
     onError: (error) => {
-      window.alert(`切换有效形态失败：${apiErrorText(error)}`);
+      toast(`切换有效形态失败：${apiErrorText(error)}`, "error");
     },
   });
 
-  const requestEndTurn = () => {
+  const requestEndTurn = async () => {
     if (!currentBattleId || !state) return;
-    if (!window.confirm(`确认结束第 ${state.battle.turn_number} 回合并执行回合末结算？`)) return;
+    const confirmed = await confirm({
+      title: "结束回合",
+      description: `确认结束第 ${state.battle.turn_number} 回合并执行回合末结算？`,
+      confirmText: "结束回合",
+    });
+    if (!confirmed) return;
     endTurn.mutate();
   };
 
-  const requestFinishBattle = () => {
+  const requestFinishBattle = async () => {
     if (!currentBattleId) return;
-    if (!window.confirm("确认结束当前战斗？结束后仍可查看事件和实时估计记录。")) return;
+    const confirmed = await confirm({
+      title: "结束战斗",
+      description: "结束后仍可查看事件和实时估计记录。",
+      confirmText: "结束战斗",
+      danger: true,
+    });
+    if (!confirmed) return;
     finishBattle.mutate();
   };
 
-  const requestReturnToField = (side: Side, elfId: string) => {
+  const requestReturnToField = async (side: Side, elfId: string) => {
     if (!currentBattleId || !state) return;
     const sideLabel = sideName(side);
-    if (!window.confirm(`确认让${sideLabel}当前精灵执行返场？这会触发切换清除、入场结算和首回合机制。`)) return;
+    const confirmed = await confirm({
+      title: "执行返场",
+      description: `确认让${sideLabel}当前精灵执行返场？这会触发切换清除、入场结算和首回合机制。`,
+      confirmText: "返场",
+    });
+    if (!confirmed) return;
     returnToField.mutate({ side, elfId });
   };
 
@@ -224,13 +246,23 @@ export function BattleWorkbenchPage() {
       </div>
 
       {!currentBattleId ? <Card><CardContent className="pt-5 text-sm text-muted-foreground">请先在首页创建或选择战斗。</CardContent></Card> : null}
-      {stateQuery.isLoading ? <Card><CardContent className="pt-5 text-sm text-muted-foreground">正在读取战斗状态...</CardContent></Card> : null}
+      {currentBattleId && stateQuery.isLoading ? (
+        <div className="grid grid-cols-[220px_minmax(0,1fr)_280px] gap-4">
+          <Skeleton className="h-96" />
+          <div className="space-y-4">
+            <Skeleton className="h-64" />
+            <Skeleton className="h-40" />
+            <Skeleton className="h-40" />
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      ) : null}
 
       {state ? (
         <div className="grid grid-cols-[220px_minmax(0,1fr)_280px] gap-4">
           <div className="space-y-4">
-            <TeamPanel title="我方队伍" elves={selfElves} activeElfId={state.battle.self_active_elf_id} onSwitch={(elfId) => { setEstimatePanelElfId(null); requestSwitchActiveElf("self", elfId); }} onReturn={(elfId) => requestReturnToField("self", elfId)} />
-            <TeamPanel title="敌方队伍" elves={enemyElves} activeElfId={state.battle.enemy_active_elf_id} onSwitch={(elfId) => requestSwitchActiveElf("enemy", elfId)} onReturn={(elfId) => requestReturnToField("enemy", elfId)} onSelectEstimate={setEstimatePanelElfId} />
+            <TeamPanel title="我方队伍" side="self" elves={selfElves} activeElfId={state.battle.self_active_elf_id} onSwitch={(elfId) => { setEstimatePanelElfId(null); requestSwitchActiveElf("self", elfId); }} onReturn={(elfId) => requestReturnToField("self", elfId)} />
+            <TeamPanel title="敌方队伍" side="enemy" elves={enemyElves} activeElfId={state.battle.enemy_active_elf_id} onSwitch={(elfId) => requestSwitchActiveElf("enemy", elfId)} onReturn={(elfId) => requestReturnToField("enemy", elfId)} onSelectEstimate={setEstimatePanelElfId} />
           </div>
 
           <div className="space-y-4">
@@ -240,7 +272,10 @@ export function BattleWorkbenchPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <SpeedPreviewPanel preview={state.speed_preview} />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="relative grid grid-cols-2 gap-4">
+                  <span className="font-num pointer-events-none absolute left-1/2 top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-[11px] font-bold tracking-widest text-muted-foreground shadow-lg">
+                    VS
+                  </span>
                   <ActiveSide
                     battleId={state.battle.battle_id}
                     title="我方上场"
@@ -399,7 +434,7 @@ function TurnActionPlanner({
             onChange={(action) => updateAction("enemy", action)}
           />
         </div>
-        <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+        <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
           这里先记录双方本回合选择了什么，不会立刻写入后端事件。真正的伤害、状态、天气、切换和未出手结果，在下面“结算本回合”里按实际发生顺序录入。
         </div>
       </CardContent>
@@ -460,7 +495,7 @@ function ActionDraftEditor({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border bg-white p-4">
+    <div className="space-y-3 rounded-xl border bg-raised/60 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="font-semibold">{title}</div>
@@ -471,13 +506,23 @@ function ActionDraftEditor({
 
       <div>
         <label className="text-sm font-medium">行动类型</label>
-        <Select value={action.kind} onChange={(event) => updateKind(event.target.value as PlannedActionKind)}>
-          <option value="unknown">未知 / 暂不记录</option>
-          <option value="attack_skill">攻击技能</option>
-          <option value="defense_skill">防御 / 应对技能</option>
-          <option value="status_skill">状态 / 天气技能</option>
-          <option value="switch">切换精灵</option>
-        </Select>
+        <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-lg border border-border/70 bg-raised/40 p-1">
+          {ACTION_KIND_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => updateKind(option.value)}
+              className={cn(
+                "rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors",
+                action.kind === option.value
+                  ? "bg-primary/15 text-primary shadow-glow-sm"
+                  : "text-muted-foreground hover:bg-raised hover:text-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {needsSkill ? (
@@ -505,7 +550,7 @@ function ActionDraftEditor({
       ) : null}
 
       {action.cancelled ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+        <div className="rounded-xl border border-warning/25 bg-warning/10 p-2 text-xs text-warning">
           已标记未执行：{action.cancelReason ?? "未填写原因"}
         </div>
       ) : null}
@@ -560,7 +605,7 @@ function TurnResolutionPanel({
           />
         </div>
 
-        <div className="rounded-xl border bg-blue-50 p-3 text-xs text-blue-900">
+        <div className="rounded-xl border bg-info/10 p-3 text-xs text-info">
           如果一方先手击杀、切换导致攻击没发生，先把对应行动标记为“未执行”，不要录入伤害。防御技能先按技能事件录入；之后另一方攻击伤害会继续使用后端自动继承的防御上下文。
         </div>
 
@@ -608,7 +653,7 @@ function ResolutionActionItem({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border bg-white p-4">
+    <div className="space-y-3 rounded-xl border bg-raised/60 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="font-semibold">{title}</div>
@@ -621,7 +666,7 @@ function ResolutionActionItem({
 
       {cancelled ? (
         <div className="space-y-2">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+          <div className="rounded-xl border border-warning/25 bg-warning/10 p-2 text-xs text-warning">
             原计划未写入真实技能/伤害事件。原因：{action.cancelReason ?? "--"}
           </div>
           <Button variant="outline" size="sm" onClick={clearCancelled}>恢复为待结算</Button>
@@ -663,7 +708,7 @@ function ResolutionActionItem({
           ) : null}
 
           {action.kind === "unknown" ? (
-            <div className="rounded-xl border bg-slate-50 p-3 text-xs text-muted-foreground">
+            <div className="rounded-xl border bg-raised/60 p-3 text-xs text-muted-foreground">
               这方行动未知时可以先不录；等观察到真实结果后，再补充技能、伤害、状态或切换事件。
             </div>
           ) : null}
@@ -687,6 +732,14 @@ function plannedActionKindName(kind: PlannedActionKind) {
   if (kind === "switch") return "切换";
   return "未知";
 }
+
+const ACTION_KIND_OPTIONS: { value: PlannedActionKind; label: string }[] = [
+  { value: "unknown", label: "未知" },
+  { value: "attack_skill", label: "攻击" },
+  { value: "defense_skill", label: "防御" },
+  { value: "status_skill", label: "状态" },
+  { value: "switch", label: "切换" },
+];
 
 function plannedKindFromSkillCategory(category?: string | null): PlannedActionKind {
   if (category === "physical" || category === "magic") return "attack_skill";
@@ -738,7 +791,7 @@ function SkillOperationSummary({ event }: { event: BattleEventOut }) {
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border bg-slate-50 p-3 text-muted-foreground">
+          <div className="rounded-xl border bg-raised/60 p-3 text-muted-foreground">
             这个技能没有可执行的结构化状态、天气或资源操作。
           </div>
         )}
@@ -798,7 +851,7 @@ function DamageEventSummary({ result }: { result: DamageEventCreateResult }) {
         {reductionItems.length > 0 ? (
           <div className="space-y-2">
             {reductionItems.map((item, index) => (
-              <div key={`${result.damage_event.event_id}-reduction-${index}`} className="rounded-xl border bg-white p-3">
+              <div key={`${result.damage_event.event_id}-reduction-${index}`} className="rounded-xl border bg-raised/60 p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="success">减伤 {String(item.reduction ?? "--")}</Badge>
                   <Badge variant="outline">{String(item.source_name ?? item.source_id ?? "--")}</Badge>
@@ -811,7 +864,7 @@ function DamageEventSummary({ result }: { result: DamageEventCreateResult }) {
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border bg-slate-50 p-3 text-muted-foreground">
+          <div className="rounded-xl border bg-raised/60 p-3 text-muted-foreground">
             本次伤害没有解析出可用减伤项；若你刚刚记录了防御技能，请确认伤害发生在同一回合、受击方一致，且防御技能规则已入库。
           </div>
         )}
@@ -831,7 +884,7 @@ function FlagList({ title, flags }: { title: string; flags: Record<string, unkno
     return null;
   }
   return (
-    <div className="rounded-xl border bg-slate-50 p-3">
+    <div className="rounded-xl border bg-raised/60 p-3">
       <div className="text-xs font-medium text-muted-foreground">{title}</div>
       <div className="mt-2 flex flex-wrap gap-2">
         {enabledFlags.map(([key]) => (
@@ -848,7 +901,7 @@ function SkillOperationItem({ item }: { item: Record<string, unknown> }) {
   const status = String(item.status ?? "unknown");
   const variant = status === "executed" ? "success" : status === "skipped" ? "secondary" : "warning";
   return (
-    <div className="rounded-xl border bg-white p-3">
+    <div className="rounded-xl border bg-raised/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={variant}>{formatOperationStatus(status)}</Badge>
         <Badge variant="outline">{String(item.operation ?? "--")}</Badge>
@@ -985,7 +1038,7 @@ function SettlementEventItem({ item }: { item: Record<string, unknown> }) {
       : null;
 
   return (
-    <div className="rounded-xl border bg-white p-3">
+    <div className="rounded-xl border bg-raised/60 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{String(item.status ?? "event")}</Badge>
         {item.settlement_phase ? <Badge variant="secondary">{String(item.settlement_phase)}</Badge> : null}
@@ -1015,7 +1068,7 @@ function SettlementEventItem({ item }: { item: Record<string, unknown> }) {
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-xl border bg-white p-3">
+    <div className="rounded-xl border bg-raised/60 p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 font-semibold">{value}</div>
     </div>
@@ -1024,15 +1077,16 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 
 function Capability({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border bg-white p-3">
+    <div className="flex items-center justify-between gap-3 rounded-2xl border bg-raised/60 p-3">
       <span className="text-muted-foreground">{label}</span>
-      <span className={muted ? "font-semibold text-amber-700" : "font-semibold text-emerald-700"}>{value}</span>
+      <span className={muted ? "font-semibold text-warning" : "font-semibold text-success"}>{value}</span>
     </div>
   );
 }
 
 function TeamPanel({
   title,
+  side,
   elves,
   activeElfId,
   onSwitch,
@@ -1040,6 +1094,7 @@ function TeamPanel({
   onSelectEstimate,
 }: {
   title: string;
+  side: Side;
   elves: BattleElfStateDict[];
   activeElfId?: string | null;
   onSwitch: (elfId: string) => void;
@@ -1048,7 +1103,12 @@ function TeamPanel({
 }) {
   return (
     <Card>
-      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <span className={cn("h-2 w-2 rounded-full", side === "self" ? "bg-self shadow-glow-sm" : "bg-enemy")} />
+          {title}
+        </CardTitle>
+      </CardHeader>
       <CardContent className="space-y-3">
         {elves.map((elf) => (
           <ElfCard
@@ -1108,7 +1168,7 @@ function SkillSlotRuntimeList({
           />
         ))}
       </div>
-      <div className="rounded-xl border bg-white p-3">
+      <div className="rounded-xl border bg-raised/60 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-xs font-semibold">{isEnemy ? "敌方额外技能" : "临时技能"}</span>
           <Badge variant="outline">第 5 槽</Badge>
@@ -1217,8 +1277,8 @@ function SkillSlotCard({
 
   if (!slot) {
     return (
-      <div className="min-h-28 rounded-xl border border-dashed bg-slate-50 p-3 text-xs text-muted-foreground">
-        <div className="font-medium text-slate-700">{label}</div>
+      <div className="min-h-28 rounded-xl border border-dashed bg-raised/60 p-3 text-xs text-muted-foreground">
+        <div className="font-medium text-foreground/80">{label}</div>
         <div className="mt-4">{emptyText}</div>
       </div>
     );
@@ -1226,9 +1286,9 @@ function SkillSlotCard({
   return (
     <div
       className={cn(
-        "min-h-28 rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/90 p-3 text-xs shadow-sm",
+        "min-h-28 rounded-xl border border-border bg-gradient-to-br from-raised/80 to-card p-3 text-xs shadow-sm",
         onSkillQuickSelect
-          && "cursor-pointer transition hover:scale-[1.015] hover:border-primary/60 hover:from-primary/5 hover:to-sky-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40",
+          && "cursor-pointer transition hover:scale-[1.015] hover:border-primary/60 hover:from-primary/5 hover:to-info/10 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40",
       )}
       role={onSkillQuickSelect ? "button" : undefined}
       tabIndex={onSkillQuickSelect ? 0 : undefined}
@@ -1243,10 +1303,10 @@ function SkillSlotCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+          <div className="inline-flex items-center rounded-full bg-raised px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
             {label}
           </div>
-          <div className="mt-1.5 truncate text-[13px] font-semibold text-slate-950">
+          <div className="mt-1.5 truncate text-[13px] font-semibold text-foreground">
             {slot.skill_name ?? compactEventValue(slot.skill_id)}
           </div>
         </div>
@@ -1258,23 +1318,23 @@ function SkillSlotCard({
         </Badge>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1 text-muted-foreground">
-        <Badge variant="outline" className="border-slate-200 px-1.5 py-0 text-[10px]">
+        <Badge variant="outline" className="border-border px-1.5 py-0 text-[10px]">
           {elementTypeName(slot.element_type)}
         </Badge>
-        <Badge variant="outline" className="border-slate-200 px-1.5 py-0 text-[10px]">
+        <Badge variant="outline" className="border-border px-1.5 py-0 text-[10px]">
           {skillCategoryName(slot.skill_category)}
         </Badge>
         {slot.cooldown_remaining ? (
-          <Badge variant="outline" className="border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-700">
+          <Badge variant="outline" className="border-warning/25 bg-warning/10 px-1.5 py-0 text-[10px] text-warning">
             冷却 {slot.cooldown_remaining}
           </Badge>
         ) : null}
       </div>
       <SkillSlotEffectBadges effects={slot.skill_slot_effects ?? []} />
-      <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 text-[10px]">
+      <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-border bg-raised/80 p-2 text-[10px]">
         <div>
           <div className="text-muted-foreground">费用</div>
-          <div className="mt-0.5 font-semibold text-slate-900">
+          <div className="mt-0.5 font-semibold text-foreground">
             {slot.effective_energy_cost ?? slot.current_energy_cost ?? slot.base_energy_cost ?? "--"}
           </div>
         </div>
@@ -1284,7 +1344,7 @@ function SkillSlotCard({
             "mt-0.5 font-semibold",
             slot.current_power !== null && slot.current_power !== undefined
               ? "text-primary"
-              : "text-slate-900",
+              : "text-foreground",
           )}>
             {slot.current_power ?? slot.static_base_power ?? "--"}
             {slot.current_power !== null && slot.current_power !== undefined ? "（覆盖）" : ""}
@@ -1347,7 +1407,7 @@ function SkillSlotCard({
               </Button>
             </div>
             {updateRuntime.error ? (
-              <div className="mt-2 text-[11px] text-red-600">
+              <div className="mt-2 text-[11px] text-destructive">
                 保存失败：{String((updateRuntime.error as Error).message)}
               </div>
             ) : null}
@@ -1382,9 +1442,9 @@ function SkillSlotCard({
 
 function DamagePreviewRefreshingNotice() {
   return (
-    <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-[10px] text-sky-700">
+    <div className="mt-2 rounded-lg border border-info/25 bg-info/10 px-2 py-1.5 text-[10px] text-info">
       <span className="inline-flex items-center gap-2">
-        <span className="h-2 w-2 animate-pulse rounded-full bg-sky-500" />
+        <span className="h-2 w-2 animate-pulse rounded-full bg-info" />
         理论伤害刷新中，暂时隐藏旧数值...
       </span>
     </div>
@@ -1400,7 +1460,7 @@ function SkillEffectPreviewPanel({
 }) {
   const displayDescription = description ?? originalDescriptionFromRawOperations(rawOperationsJson);
   return (
-    <div className="mt-2 rounded-lg border border-slate-200 bg-white/80 px-2 py-1.5 text-[10px] leading-5 text-slate-700 shadow-sm">
+    <div className="mt-2 rounded-lg border border-border bg-raised/80 px-2 py-1.5 text-[10px] leading-5 text-foreground/80 shadow-sm">
       {displayDescription ?? "暂无原始技能描述"}
     </div>
   );
@@ -1451,14 +1511,14 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
   }
   if (!currentTarget) {
     return (
-      <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] text-muted-foreground">
+      <div className="mt-2 rounded-lg border border-border bg-raised/60 px-2 py-1.5 text-[10px] text-muted-foreground">
         理论伤害 --{preview.reason ? `（${preview.reason}）` : ""}
       </div>
     );
   }
 
   return (
-    <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/40 px-2 py-1.5 text-[10px]">
+    <div className="mt-2 rounded-lg border border-success/15 bg-success/10 px-2 py-1.5 text-[10px]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
@@ -1467,14 +1527,14 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
           setExpanded((value) => !value);
         }}
       >
-        <span className="flex min-w-0 items-center gap-1 text-emerald-800">
+        <span className="flex min-w-0 items-center gap-1 text-success">
           {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
           <span className="font-medium">理论伤害</span>
         </span>
-        <span className="font-semibold text-emerald-700">{damageTargetText(currentTarget)}</span>
+        <span className="font-semibold text-success">{damageTargetText(currentTarget)}</span>
       </button>
       {expanded ? (
-        <div className="mt-2 space-y-2 border-t border-emerald-100 pt-2">
+        <div className="mt-2 space-y-2 border-t border-success/15 pt-2">
           <div className="flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
             <span>{currentTarget.elf_name ?? compactEventValue(currentTarget.elf_id)}</span>
             <span>HP {currentTarget.defender_max_hp ?? "--"}</span>
@@ -1491,7 +1551,7 @@ function SkillDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
             ) : null}
           </div>
           {currentTarget.unknown_factors?.length ? (
-            <div className="text-amber-700">未纳入：{currentTarget.unknown_factors.join("、")}</div>
+            <div className="text-warning">未纳入：{currentTarget.unknown_factors.join("、")}</div>
           ) : null}
         </div>
       ) : null}
@@ -1509,7 +1569,7 @@ function SkillTeamDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
   if (targets.length <= 1) return null;
 
   return (
-    <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px]">
+    <div className="mt-2 rounded-lg border border-border bg-raised/60 px-2 py-1.5 text-[10px]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
@@ -1531,7 +1591,7 @@ function SkillTeamDamagePreviewPanel({ slot }: { slot: BattleSkillSlotDict }) {
                 {target.elf_name ?? compactEventValue(target.elf_id)}
                 {target.is_active_target ? "（上场）" : ""}
               </span>
-              <span className="shrink-0 font-medium text-slate-900">{damageTargetText(target)}</span>
+              <span className="shrink-0 font-medium text-foreground">{damageTargetText(target)}</span>
             </div>
           ))}
         </div>
@@ -1576,7 +1636,7 @@ function SkillPowerPreviewLine({
   const multipliers = preview.multipliers ?? {};
   const effectivePower = preview.effective_display_power_text ?? preview.effective_display_power ?? fallbackPower ?? "--";
   return (
-    <div className="mt-2 rounded-lg border border-violet-100 bg-violet-50/40 px-2 py-1.5 text-[10px]">
+    <div className="mt-2 rounded-lg border border-accentv/20 bg-accentv/10 px-2 py-1.5 text-[10px]">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
@@ -1585,14 +1645,14 @@ function SkillPowerPreviewLine({
           setExpanded((value) => !value);
         }}
       >
-        <span className="flex min-w-0 items-center gap-1 text-violet-800">
+        <span className="flex min-w-0 items-center gap-1 text-accentv">
           {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
           <span className="font-medium">估算威力</span>
         </span>
-        <span className="font-semibold text-violet-700">{effectivePower}</span>
+        <span className="font-semibold text-accentv">{effectivePower}</span>
       </button>
       {expanded ? (
-        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 border-t border-violet-100 pt-2 text-muted-foreground">
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 border-t border-accentv/20 pt-2 text-muted-foreground">
           <span>本系 x{multipliers.stab ?? "1"}</span>
           <span>攻防状态 x{multipliers.stat_stage ?? "1"}</span>
           <span>天气 x{multipliers.weather ?? "1"}</span>
@@ -1638,7 +1698,7 @@ function SkillSlotEffectBadges({ effects }: { effects: BattleEffectInstanceDict[
   if (activeEffects.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
-      <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+      <span className="rounded-full bg-accenti/10 px-1.5 py-0.5 text-[10px] font-medium text-accenti">
         特性
       </span>
       <div className="flex flex-wrap gap-1">
@@ -1666,17 +1726,17 @@ function SkillSlotEffectBadges({ effects }: { effects: BattleEffectInstanceDict[
             >
               <Badge
                 variant="outline"
-                className="border-indigo-200 bg-white px-1.5 py-0 text-[10px] text-indigo-700 shadow-sm"
+                className="border-accenti/25 bg-raised/60 px-1.5 py-0 text-[10px] text-accenti shadow-sm"
               >
                 {name}{layerText}{remaining ? ` · ${remaining}` : ""}
               </Badge>
-              <span className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-64 rounded-lg border border-indigo-100 bg-white p-2 text-[10px] leading-5 text-slate-700 shadow-lg group-hover:block group-focus:block">
-                <span className="block font-semibold text-indigo-800">{name}{layerText}</span>
-                <span className="mt-1 block text-slate-600">状态ID：{effect.effect_id}</span>
-                <span className="block text-slate-600">层数：{Number.isFinite(layers) ? layers : "--"}</span>
-                <span className="block text-slate-600">分组：{groupText} · 极性：{polarityText}</span>
-                {remaining ? <span className="block text-slate-600">剩余使用：{effect.remaining_uses} 次</span> : null}
-                <span className="mt-1 block border-t border-indigo-50 pt-1 text-indigo-700">
+              <span className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-64 rounded-lg border border-accenti/20 bg-raised/60 p-2 text-[10px] leading-5 text-foreground/80 shadow-lg group-hover:block group-focus:block">
+                <span className="block font-semibold text-accenti">{name}{layerText}</span>
+                <span className="mt-1 block text-muted-foreground">状态ID：{effect.effect_id}</span>
+                <span className="block text-muted-foreground">层数：{Number.isFinite(layers) ? layers : "--"}</span>
+                <span className="block text-muted-foreground">分组：{groupText} · 极性：{polarityText}</span>
+                {remaining ? <span className="block text-muted-foreground">剩余使用：{effect.remaining_uses} 次</span> : null}
+                <span className="mt-1 block border-t border-accenti/15 pt-1 text-accenti">
                   技能槽侧修正：绑定当前精灵的这个技能，通常在技能卡展示，不进入普通状态栏。
                 </span>
               </span>
@@ -1766,7 +1826,7 @@ function RuntimeFormControl({
         有效形态：{currentEffective}
       </Button>
       {expanded ? (
-        <div className="mt-2 rounded-xl border bg-slate-50 p-2">
+        <div className="mt-2 rounded-xl border bg-raised/60 p-2">
           {hasChainStages ? (
             <RuntimeFormChainSelect
               stages={chainStages}
@@ -1778,7 +1838,7 @@ function RuntimeFormControl({
             />
           ) : (
             <>
-              <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
+              <div className="mb-2 rounded-lg border border-warning/25 bg-warning/10 px-2 py-1 text-[11px] text-warning">
                 {evolutionChainQuery.isLoading
                   ? "正在加载进化链可选形态..."
                   : "暂未录入该精灵的进化链数据，保留全局搜索作为兜底。"}
@@ -1793,7 +1853,7 @@ function RuntimeFormControl({
             </>
           )}
           {selectedStage ? (
-            <div className="mt-2 rounded-lg border border-primary/20 bg-white px-2 py-1 text-[11px] text-primary">
+            <div className="mt-2 rounded-lg border border-primary/20 bg-raised/60 px-2 py-1 text-[11px] text-primary">
               已选进化阶段 {selectedStage.stage_index}：{selectedStage.elf_name}
             </div>
           ) : null}
@@ -1863,7 +1923,7 @@ function RuntimeFormChainSelect({
           </option>
         ))}
       </Select>
-      <div className="grid gap-1 rounded-xl border bg-white p-1">
+      <div className="grid gap-1 rounded-xl border bg-raised/60 p-1">
         {stages.map((stage) => {
           const selected = stage.elf_id === value;
           return (
@@ -1931,9 +1991,23 @@ function ActiveSide({
       : estimateNatureName;
   const displayName = battleElfDisplayName(elf);
   const originalName = elf?.elf_name ?? elf?.elf_id;
+  const isSelf = elf?.side === "self";
   return (
-    <div className="rounded-2xl border bg-white p-4">
-      <div className="mb-2 flex items-center justify-between"><div className="font-semibold">{title}</div><Badge variant="outline">{sideName(elf?.side)}</Badge></div>
+    <div
+      className={cn(
+        "rounded-xl border bg-raised/40 p-4",
+        isSelf ? "border-self/35" : "border-enemy/35",
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 font-semibold">
+          <span className={cn("h-2 w-2 rounded-full", isSelf ? "bg-self shadow-glow-sm" : "bg-enemy")} />
+          {title}
+        </div>
+        <span className={cn("text-[11px] font-medium", isSelf ? "text-self" : "text-enemy")}>
+          {sideName(elf?.side)}
+        </span>
+      </div>
       {elf ? (
         <div className="space-y-3">
           <div>
@@ -1942,17 +2016,19 @@ function ActiveSide({
               <div className="text-xs text-muted-foreground">原始精灵：{originalName}</div>
             ) : null}
           </div>
-          <div className="rounded-xl border bg-slate-50 p-2">
+          <div className="rounded-xl border bg-raised/60 p-2">
             <HealthBar
               currentHpValue={typeof elf.current_hp_value === "number" ? elf.current_hp_value : null}
               currentHpPercent={typeof elf.current_hp_percent === "number" ? elf.current_hp_percent : null}
               maxHp={typeof hpStats?.hp === "number" ? hpStats.hp : null}
               sourceLabel={hpSourceLabel}
             />
-            <div className="mt-2 text-xs text-muted-foreground">能量 {elf.energy ?? 0}</div>
+            <div className="mt-2">
+              <EnergyPips value={elf.energy ?? 0} />
+            </div>
           </div>
-          <div className="rounded-xl border bg-slate-50 p-2 text-xs text-muted-foreground">
-            性格：<span className="font-medium text-slate-900">{natureName ?? "未知"}</span>
+          <div className="rounded-xl border bg-raised/60 p-2 text-xs text-muted-foreground">
+            性格：<span className="font-medium text-foreground">{natureName ?? "未知"}</span>
             {elf.nature_source ? <span className="ml-2">来源：{natureSourceName(String(elf.nature_source))}</span> : null}
           </div>
           <RuntimeFormControl
@@ -1969,7 +2045,7 @@ function ActiveSide({
             onSkillQuickSelect={onSkillQuickSelect}
           />
           {!hasRuntimeStats && displayEstimatedStats ? (
-            <div className="text-xs text-amber-700">
+            <div className="text-xs text-warning">
               {estimateSource === "expanded_config"
                 ? `显示你选择的默认配置，命中 ${estimateMatchedCount} 项约束。`
                 : estimateSource === "default_config"
@@ -1992,7 +2068,7 @@ function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null })
   const [expanded, setExpanded] = useState(false);
   if (!preview || preview.status !== "resolved" || !preview.self) {
     return (
-      <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-muted-foreground">
+      <div className="rounded-xl border border-info/25 bg-info/10 p-2 text-xs text-muted-foreground">
         速度观察：当前信息不足。
       </div>
     );
@@ -2014,7 +2090,7 @@ function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null })
     : "暂无敌方速度档位";
 
   return (
-    <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs">
+    <div className="rounded-xl border border-info/25 bg-info/10 p-2 text-xs">
       <Button
         type="button"
         variant="ghost"
@@ -2023,7 +2099,7 @@ function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null })
         onClick={() => setExpanded((value) => !value)}
       >
         {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        <span className="font-medium text-slate-900">
+        <span className="font-medium text-foreground">
           速度观察：我方 {preview.self.current_speed ?? "--"}
         </span>
         <span className="truncate text-muted-foreground">{activeSummary}</span>
@@ -2036,7 +2112,7 @@ function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null })
             <span>状态修正 {formatSigned(preview.self.speed_modifier ?? 0)}</span>
             <span>当前 {preview.self.current_speed ?? "--"}</span>
             {preview.self.unknown_factors?.length ? (
-              <span className="text-amber-700">存在未计入速度因素</span>
+              <span className="text-warning">存在未计入速度因素</span>
             ) : null}
           </div>
 
@@ -2048,7 +2124,7 @@ function SpeedPreviewPanel({ preview }: { preview?: BattleSpeedPreview | null })
 
           {(preview.enemy_team ?? []).length > 0 ? (
             <div className="space-y-2">
-              <div className="font-medium text-slate-900">敌方全队</div>
+              <div className="font-medium text-foreground">敌方全队</div>
               <div className="grid gap-2 md:grid-cols-2">
                 {(preview.enemy_team ?? []).map((target) => (
                   <SpeedPreviewTargetBlock key={target.elf_id} target={target} compact />
@@ -2085,9 +2161,9 @@ function SpeedPreviewTargetBlock({
       )
     : target.rows;
   return (
-    <div className="rounded-lg border bg-white p-2">
+    <div className="rounded-lg border bg-raised/60 p-2">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="font-medium text-slate-900">
+        <div className="font-medium text-foreground">
           {title ? `${title}：` : ""}
           {target.effective_elf_name ?? target.elf_name ?? target.elf_id}
         </div>
@@ -2105,7 +2181,7 @@ function SpeedPreviewTargetBlock({
         ))}
       </div>
       {target.unknown_factors?.length ? (
-        <div className="mt-1 text-amber-700">有未计入速度因素</div>
+        <div className="mt-1 text-warning">有未计入速度因素</div>
       ) : null}
     </div>
   );
@@ -2120,10 +2196,10 @@ function speedRelationText(row: SpeedPreviewRow) {
 }
 
 function speedRelationClassName(row: SpeedPreviewRow) {
-  if (row.relation === "self_faster") return "font-medium text-emerald-700";
-  if (row.relation === "enemy_faster") return "font-medium text-rose-700";
-  if (row.relation === "speed_tie") return "font-medium text-amber-700";
-  return "font-medium text-slate-700";
+  if (row.relation === "self_faster") return "font-medium text-self";
+  if (row.relation === "enemy_faster") return "font-medium text-enemy";
+  if (row.relation === "speed_tie") return "font-medium text-warning";
+  return "font-medium text-muted-foreground";
 }
 
 function formatSigned(value: number) {

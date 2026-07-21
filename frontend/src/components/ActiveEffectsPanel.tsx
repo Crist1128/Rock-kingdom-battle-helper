@@ -107,7 +107,7 @@ export function ActiveEffectsPanel({
   return (
     <div className="space-y-3">
       {hiddenSkillSlotCount > 0 ? (
-        <div className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-sky-800">
+        <div className="rounded-xl border border-info/25 bg-info/10 p-2 text-xs text-info">
           有 {hiddenSkillSlotCount} 个技能槽侧修正已移到对应技能卡展示，不再混入普通状态栏。
         </div>
       ) : null}
@@ -115,7 +115,7 @@ export function ActiveEffectsPanel({
         const items = effects.filter(group.match);
         if (group.hideWhenEmpty && items.length === 0) return null;
         return (
-          <div key={group.key} className="rounded-2xl border bg-white p-3">
+          <div key={group.key} className="rounded-2xl border bg-raised/60 p-3">
             <div className="mb-2 flex items-center justify-between">
               <div className="text-sm font-semibold">{group.label}</div>
               <Badge variant="outline">{items.length}</Badge>
@@ -126,7 +126,7 @@ export function ActiveEffectsPanel({
                 const def = defById[effect.effect_id];
                 const summary = buildEffectLayerSummary(def, effect.layers);
                 return (
-                  <div key={effect.instance_id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-2 text-xs">
+                  <div key={effect.instance_id} className="flex items-center justify-between gap-2 rounded-xl bg-raised/60 p-2 text-xs">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">{summary.displayName ?? def?.effect_name ?? effect.effect_id}</div>
                       <div className="text-muted-foreground">
@@ -135,7 +135,7 @@ export function ActiveEffectsPanel({
                       {summary.finalTexts.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {summary.finalTexts.map((text) => (
-                            <Badge key={text} variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                            <Badge key={text} variant="outline" className="border-success/25 bg-success/10 text-success">
                               最终 {text}
                             </Badge>
                           ))}
@@ -187,7 +187,7 @@ export function ActiveEffectsPanel({
               })}
             </div>
             {clearLayersMutation.error ? (
-              <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+              <div className="mt-2 rounded-xl border border-destructive/25 bg-destructive/10 p-2 text-xs text-destructive">
                 消层失败：{String((clearLayersMutation.error as Error).message)}
               </div>
             ) : null}

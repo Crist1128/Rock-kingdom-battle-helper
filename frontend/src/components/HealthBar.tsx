@@ -24,20 +24,35 @@ export function HealthBar({
   const displayedPercent = percent == null ? null : Math.ceil(percent);
   const barWidth = percent == null ? 0 : percent;
 
+  const fillClass =
+    percent == null
+      ? "bg-raised"
+      : percent > 50
+        ? "bg-gradient-to-r from-emerald-400 to-teal-300"
+        : percent > 20
+          ? "bg-gradient-to-r from-amber-400 to-yellow-300"
+          : "bg-gradient-to-r from-rose-500 to-red-400";
+
   return (
     <div className={cn("space-y-1", compact ? "text-[10px]" : "text-xs", className)}>
       <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-slate-700">HP</span>
-        <span className="shrink-0 font-semibold text-slate-950">
-          {displayedCurrent ?? "--"} / {displayedMax ?? "--"}
+        <span className="font-medium tracking-wide text-muted-foreground">HP</span>
+        <span className="font-num shrink-0 font-semibold text-foreground">
+          {displayedCurrent ?? "--"}
+          <span className="text-muted-foreground"> / {displayedMax ?? "--"}</span>
           <span className="ml-1 text-muted-foreground">
             ({displayedPercent == null ? "--" : displayedPercent}%)
           </span>
         </span>
       </div>
-      <div className={cn("overflow-hidden rounded-full bg-slate-200", compact ? "h-2" : "h-3")}>
+      <div
+        className={cn(
+          "overflow-hidden rounded-full bg-raised/80 shadow-[0_1px_2px_0_hsl(0_0%_0%/0.4)_inset]",
+          compact ? "h-1.5" : "h-2.5",
+        )}
+      >
         <div
-          className="h-full rounded-full bg-emerald-300 transition-[width] duration-300"
+          className={cn("h-full rounded-full transition-[width] duration-300", fillClass)}
           style={{ width: `${barWidth}%` }}
         />
       </div>

@@ -7,17 +7,17 @@ export function Badge({
   ...props
 }: React.HTMLAttributes<HTMLSpanElement> & { variant?: "default" | "secondary" | "outline" | "destructive" | "warning" | "success" }) {
   const variants = {
-    default: "bg-primary text-primary-foreground",
-    secondary: "bg-muted text-muted-foreground",
-    outline: "border bg-white text-foreground",
-    destructive: "bg-destructive text-destructive-foreground",
-    warning: "bg-amber-100 text-amber-800 border border-amber-200",
-    success: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+    default: "border border-primary/30 bg-primary/12 text-primary",
+    secondary: "border border-transparent bg-raised text-muted-foreground",
+    outline: "border border-border bg-transparent text-muted-foreground",
+    destructive: "border border-destructive/30 bg-destructive/12 text-destructive",
+    warning: "border border-warning/30 bg-warning/12 text-warning",
+    success: "border border-success/30 bg-success/12 text-success",
   };
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium tracking-wide",
         variants[variant],
         className,
       )}

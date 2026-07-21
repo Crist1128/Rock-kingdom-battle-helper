@@ -108,12 +108,12 @@ export function RulesPage() {
           {tab === "skills" && skills.data?.map((skill) => (
             <SkillRuleCard key={skill.skill_id} skill={skill} adminToken={adminToken} />
           ))}
-          {tab === "effects" && effects.data?.map((effect) => <div key={effect.effect_id} className="rounded-2xl border bg-white p-4"><div className="font-semibold">{effect.effect_name}</div><div className="text-xs text-muted-foreground">{effect.effect_id}</div><div className="mt-2 flex gap-2"><Badge>{effectCategoryName(effect.category)}</Badge><Badge variant="outline">{ownerScopeName(effect.owner_scope)}</Badge><Badge variant={effect.clear_on_switch ? "warning" : "secondary"}>{effect.clear_on_switch ? "切换清除" : "切换保留"}</Badge></div></div>)}
-          {tab === "natures" && natures.data?.map((nature) => <div key={nature.nature_id} className="rounded-2xl border bg-white p-4"><div className="font-semibold">{nature.nature_name}</div><div className="text-xs text-muted-foreground">{nature.nature_id}</div><div className="mt-2 flex gap-2"><Badge variant="success">+ {statName(nature.positive_stat)} ×{nature.positive_multiplier}</Badge><Badge variant="destructive">- {statName(nature.negative_stat)} ×{nature.negative_multiplier}</Badge></div></div>)}
-          {tab === "audit" && capabilityAudit.isLoading ? <div className="rounded-2xl border bg-slate-50 p-4 text-sm text-muted-foreground">正在审计技能规则能力...</div> : null}
+          {tab === "effects" && effects.data?.map((effect) => <div key={effect.effect_id} className="rounded-2xl border bg-raised/60 p-4"><div className="font-semibold">{effect.effect_name}</div><div className="text-xs text-muted-foreground">{effect.effect_id}</div><div className="mt-2 flex gap-2"><Badge>{effectCategoryName(effect.category)}</Badge><Badge variant="outline">{ownerScopeName(effect.owner_scope)}</Badge><Badge variant={effect.clear_on_switch ? "warning" : "secondary"}>{effect.clear_on_switch ? "切换清除" : "切换保留"}</Badge></div></div>)}
+          {tab === "natures" && natures.data?.map((nature) => <div key={nature.nature_id} className="rounded-2xl border bg-raised/60 p-4"><div className="font-semibold">{nature.nature_name}</div><div className="text-xs text-muted-foreground">{nature.nature_id}</div><div className="mt-2 flex gap-2"><Badge variant="success">+ {statName(nature.positive_stat)} ×{nature.positive_multiplier}</Badge><Badge variant="destructive">- {statName(nature.negative_stat)} ×{nature.negative_multiplier}</Badge></div></div>)}
+          {tab === "audit" && capabilityAudit.isLoading ? <div className="rounded-2xl border bg-raised/60 p-4 text-sm text-muted-foreground">正在审计技能规则能力...</div> : null}
           {tab === "audit" && capabilityAudit.data ? <CapabilityAuditPanel audit={capabilityAudit.data} /> : null}
-          {tab === "audit" && capabilityAudit.error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">审计失败：{errorText(capabilityAudit.error)}</div> : null}
-          {activeLength === 0 && tab !== "audit" ? <div className="rounded-2xl border bg-slate-50 p-4 text-sm text-muted-foreground">暂无匹配结果。</div> : null}
+          {tab === "audit" && capabilityAudit.error ? <div className="rounded-2xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">审计失败：{errorText(capabilityAudit.error)}</div> : null}
+          {activeLength === 0 && tab !== "audit" ? <div className="rounded-2xl border bg-raised/60 p-4 text-sm text-muted-foreground">暂无匹配结果。</div> : null}
         </CardContent>
       </Card>
     </div>
@@ -138,9 +138,9 @@ function CapabilityAuditPanel({ audit }: { audit: SkillRuleCapabilityAuditOut })
       <CapabilitySection title="已实现并有执行链" items={audit.implemented_capabilities} />
       <CapabilitySection title="尚未实现 / 部分实现" items={audit.pending_capabilities} pending />
       {audit.risk_notes.length ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <div className="font-semibold text-amber-900">风险提示</div>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+        <div className="rounded-2xl border border-warning/25 bg-warning/10 p-4">
+          <div className="font-semibold text-warning">风险提示</div>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-warning">
             {audit.risk_notes.map((note) => <li key={note}>{note}</li>)}
           </ul>
         </div>
@@ -151,7 +151,7 @@ function CapabilityAuditPanel({ audit }: { audit: SkillRuleCapabilityAuditOut })
 
 function AuditStat({ title, value, warning = false }: { title: string; value: number; warning?: boolean }) {
   return (
-    <div className={`rounded-2xl border p-4 ${warning ? "border-amber-200 bg-amber-50" : "bg-white"}`}>
+    <div className={`rounded-2xl border p-4 ${warning ? "border-warning/25 bg-warning/10" : "bg-raised/60"}`}>
       <div className="text-sm text-muted-foreground">{title}</div>
       <div className="mt-1 text-2xl font-bold">{value}</div>
     </div>
@@ -161,7 +161,7 @@ function AuditStat({ title, value, warning = false }: { title: string; value: nu
 function AuditCountCard({ title, counts, warning = false }: { title: string; counts: Record<string, number>; warning?: boolean }) {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   return (
-    <div className="rounded-2xl border bg-white p-4">
+    <div className="rounded-2xl border bg-raised/60 p-4">
       <div className="font-semibold">{title}</div>
       <div className="mt-3 flex flex-wrap gap-2">
         {entries.length ? entries.map(([key, value]) => (
@@ -178,7 +178,7 @@ function CapabilitySection({ title, items, pending = false }: { title: string; i
       <div className="font-semibold">{title}</div>
       <div className="grid gap-3 xl:grid-cols-2">
         {items.map((item) => (
-          <div key={item.key} className={`rounded-2xl border p-4 ${pending ? "border-amber-200 bg-amber-50" : "bg-white"}`}>
+          <div key={item.key} className={`rounded-2xl border p-4 ${pending ? "border-warning/25 bg-warning/10" : "bg-raised/60"}`}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-medium">{item.label}</div>
@@ -204,7 +204,7 @@ function CapabilitySection({ title, items, pending = false }: { title: string; i
 function ElfRuleCard({ elf }: { elf: ElfDefinitionOut }) {
   const elements = elfElementTypes(elf);
   return (
-    <div className="rounded-2xl border bg-white p-4">
+    <div className="rounded-2xl border bg-raised/60 p-4">
       <div className="flex items-start gap-3">
         <AvatarImage src={elf.avatar} alt={elf.elf_name} fallback={elf.elf_name} className="h-14 w-14" />
         <div className="min-w-0 flex-1">
@@ -285,7 +285,7 @@ function SkillRuleCard({ skill, adminToken }: { skill: SkillRuleReviewOut; admin
       : "secondary";
 
   return (
-    <div className="rounded-2xl border bg-white p-4">
+    <div className="rounded-2xl border bg-raised/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-semibold">{skill.skill_name}</div>
@@ -304,7 +304,7 @@ function SkillRuleCard({ skill, adminToken }: { skill: SkillRuleReviewOut; admin
         <Badge variant={skill.has_hit_rule ? "success" : "outline"}>命中/连击</Badge>
         {damageStatus ? <Badge variant="warning">{damageStatus}</Badge> : null}
       </div>
-      <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+      <div className="mt-3 rounded-xl border border-info/15 bg-info/10 px-3 py-2 text-xs text-info">
         <span className="font-medium">技能原文：</span>
         {skill.raw_description?.trim() || "暂无原文描述"}
       </div>
@@ -366,7 +366,7 @@ function SkillRuleCard({ skill, adminToken }: { skill: SkillRuleReviewOut; admin
         </div>
       </div>
       {updateMutation.error ? (
-        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+        <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive/10 p-2 text-xs text-destructive">
           保存失败：{errorText(updateMutation.error)}
         </div>
       ) : null}

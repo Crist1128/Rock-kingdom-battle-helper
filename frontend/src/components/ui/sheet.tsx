@@ -16,12 +16,21 @@ export function Sheet({ open, title, description, onClose, children, widthClassN
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <button className="absolute inset-0 bg-slate-900/30" onClick={onClose} aria-label="关闭抽屉背景" />
-      <aside className={cn("relative h-full w-[520px] overflow-y-auto border-l bg-background shadow-2xl", widthClassName)}>
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b bg-background/95 p-5 backdrop-blur">
+      <button
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label="关闭抽屉背景"
+      />
+      <aside
+        className={cn(
+          "relative h-full w-[520px] overflow-y-auto border-l border-border/80 bg-card/95 shadow-2xl backdrop-blur-md",
+          widthClassName,
+        )}
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-border/70 bg-card/90 p-5 backdrop-blur">
           <div>
-            <h2 className="text-lg font-semibold">{title}</h2>
-            {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+            <h2 className="text-base font-semibold tracking-wide">{title}</h2>
+            {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
